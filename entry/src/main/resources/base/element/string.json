@@ -1,0 +1,17 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "沉浸式日语学习"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "言葉主窗口"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "言葉"
+    }
+  ]
+}
+

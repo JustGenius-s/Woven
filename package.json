@@ -1,0 +1,14 @@
+{
+  "name": "kotoba-harmony",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.21.0",
+  "scripts": {
+    "build:hap": "sh scripts/build-hap.sh",
+    "check:content": "node scripts/check-content.mjs",
+    "gateway:build": "pnpm --filter @kotoba/ai-gateway build",
+    "gateway:typecheck": "pnpm --filter @kotoba/ai-gateway typecheck",
+    "gateway:test": "pnpm --filter @kotoba/ai-gateway test"
+  }
+}

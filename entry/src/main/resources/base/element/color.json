@@ -1,0 +1,68 @@
+{
+  "color": [
+    {
+      "name": "start_window_background",
+      "value": "#F4F1EC"
+    },
+    {
+      "name": "surface",
+      "value": "#F4F1EC"
+    },
+    {
+      "name": "surface_raised",
+      "value": "#ECE7E0"
+    },
+    {
+      "name": "immersive_plane",
+      "value": "#C7F7F4EF"
+    },
+    {
+      "name": "immersive_plane_strong",
+      "value": "#E6F8F5F0"
+    },
+    {
+      "name": "immersive_edge",
+      "value": "#B3FFFFFF"
+    },
+    {
+      "name": "immersive_warm",
+      "value": "#42EA8B7D"
+    },
+    {
+      "name": "immersive_cool",
+      "value": "#3575A89A"
+    },
+    {
+      "name": "immersive_light",
+      "value": "#FFF8F1"
+    },
+    {
+      "name": "ink",
+      "value": "#1B1A18"
+    },
+    {
+      "name": "ink_muted",
+      "value": "#706B64"
+    },
+    {
+      "name": "line",
+      "value": "#1A1B1A18"
+    },
+    {
+      "name": "accent",
+      "value": "#D86255"
+    },
+    {
+      "name": "accent_soft",
+      "value": "#18D86255"
+    },
+    {
+      "name": "success",
+      "value": "#4F7A64"
+    },
+    {
+      "name": "danger",
+      "value": "#B3463F"
+    }
+  ]
+}

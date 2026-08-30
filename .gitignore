@@ -1,0 +1,10 @@
+/.hvigor/
+/.idea/
+/node_modules/
+/oh_modules/
+/entry/oh_modules/
+/entry/build/
+/gateway/dist/
+/gateway/node_modules/
+/gateway/.env
+local.properties

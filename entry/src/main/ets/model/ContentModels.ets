@@ -1,0 +1,167 @@
+export enum AppSection {
+  LEARN = 0,
+  KANA = 1,
+  VOCABULARY = 2,
+  MATERIALS = 3,
+  PRACTICE = 4
+}
+
+export interface KanaCell {
+  key: string;
+  hira: string;
+  kata: string;
+  romaji: string;
+}
+
+export interface KanaRow {
+  label: string;
+  cells: KanaCell[];
+}
+
+export interface KanaGroups {
+  basic: KanaRow[];
+  voiced: KanaRow[];
+  contracted: KanaRow[];
+}
+
+export interface DialogueLine {
+  speaker: string;
+  text: string;
+  reading: string;
+  meaning: string;
+  learner?: boolean;
+}
+
+export interface Dialogue {
+  id: string;
+  title: string;
+  setting: string;
+  level: string;
+  goal: string;
+  lines: DialogueLine[];
+}
+
+export interface PracticeScenario {
+  id: string;
+  title: string;
+  setting: string;
+  learnerRole: string;
+  aiRole: string;
+  level: string;
+  goal: string;
+  openingHint: string;
+}
+
+export interface LearningCatalog {
+  schemaVersion: number;
+  kanaGroups: KanaGroups;
+  dialogues: Dialogue[];
+  practiceScenarios: PracticeScenario[];
+}
+
+export interface ContentManifestVocabulary {
+  total: number;
+}
+
+export interface ContentManifestGrammar {
+  totalLessons: number;
+  totalSections: number;
+}
+
+export interface ContentManifest {
+  vocabulary: ContentManifestVocabulary;
+  grammar: ContentManifestGrammar;
+}
+
+export interface GrammarIndexEntry {
+  id: string;
+  level: string;
+  order: number;
+  title: string;
+  summary: string;
+  sectionCount: number;
+}
+
+export interface GrammarLesson {
+  id: string;
+  level: string;
+  order: number;
+  title: string;
+  summary: string;
+  sectionCount: number;
+  content: string;
+}
+
+export interface GrammarVocabularyEntry {
+  word: string;
+  reading: string;
+  meaning: string;
+}
+
+export interface GrammarBlock {
+  kind: string;
+  text: string;
+  cells: string[][];
+}
+
+export interface GrammarDocument {
+  blocks: GrammarBlock[];
+  vocabulary: GrammarVocabularyEntry[];
+}
+
+export interface InlineSegment {
+  text: string;
+  word: string;
+  reading: string;
+  meaning: string;
+  annotated: boolean;
+}
+
+export interface VocabularyExample {
+  japanese: string;
+  english: string;
+}
+
+export interface VocabularyEntry {
+  id: string;
+  level: string;
+  word: string;
+  reading: string;
+  meanings: string[];
+  common: boolean;
+  example?: VocabularyExample;
+}
+
+export interface NewsItem {
+  id: string;
+  title: string;
+  summary: string;
+  url: string;
+  publishedAt?: string;
+}
+
+export interface NewsSnapshot {
+  source: string;
+  sourceUrl: string;
+  fetchedAt: string;
+  stale: boolean;
+  items: NewsItem[];
+}
+
+export interface NewsArticle {
+  url: string;
+  title: string;
+  body: string;
+  imageUrl?: string;
+  publishedAt?: string;
+  complete: boolean;
+}
+
+export interface VideoStudyItem {
+  id: string;
+  title: string;
+  url: string;
+  transcript: string;
+  createdAt: number;
+}
+
