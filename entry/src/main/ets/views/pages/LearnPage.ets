@@ -8,33 +8,34 @@ import {
   LearningCatalog,
   LearningJourney
 } from '../../model/ContentModels';
+import { AiInquiryContext } from '../../model/DeepSeekModels';
+import { AiInquiryFactory } from '../../services/AiInquiryFactory';
 import { ContentRepository } from '../../services/ContentRepository';
+import { AiAskAction } from '../components/AiAskAction';
 import { ImmersiveAction } from '../components/ImmersiveAction';
 import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
 import { contentLightEffect, ImmersivePlane, planeLightEffect } from '../components/ImmersiveCanvas';
-import { GravityMark } from '../components/GravityMark';
 import { PageChrome } from '../components/PageChrome';
 import { GrammarPage } from './GrammarPage';
 
 @Component
 export struct LearnPage {
-  gatewayUrl: string = '';
-  appToken: string = '';
-  model: string = '';
   savedLessonIndex: number = 0;
   journeys: LearningJourney[] = [];
   currentJourney: LearningJourney | undefined = undefined;
   journeyStage: number = 0;
   journeyCompletedMask: number = 0;
+  showHomeGuide: boolean = false;
   onLessonChange: (index: number) => void = (index: number) => {};
   onJourney: (journey: LearningJourney) => void = (journey: LearningJourney) => {};
-  onSettings: () => void = () => {};
-  onPractice: () => void = () => {};
+  onAsk: (context: AiInquiryContext) => void = (context: AiInquiryContext) => {};
+  onDismissHomeGuide: () => void = () => {};
 
   @State private mode: number = 0;
   @State private grammarIndex: GrammarIndexEntry[] = [];
   @State private catalog: LearningCatalog | undefined = undefined;
   @State private dialogueIndex: number = 0;
+  @State private selectedDialogueLineKey: string = '';
   @State private loadError: string = '';
 
   aboutToAppear(): void {
@@ -51,7 +52,24 @@ export struct LearnPage {
   private changeMode(mode: number): void {
     this.getUIContext().animateTo({ curve: curves.springMotion(0.4, 0.86, 0.16) }, () => {
       this.mode = mode;
+      this.selectedDialogueLineKey = '';
     });
+  }
+
+  private dialogueLineKey(dialogue: Dialogue, index: number): string {
+    return `${dialogue.id}-${index}`;
+  }
+
+  private toggleDialogueLine(dialogue: Dialogue, index: number): void {
+    const key: string = this.dialogueLineKey(dialogue, index);
+    this.selectedDialogueLineKey = this.selectedDialogueLineKey === key ? '' : key;
+  }
+
+  private startFromGuide(): void {
+    this.onDismissHomeGuide();
+    if (this.currentJourney !== undefined) {
+      this.onJourney(this.currentJourney);
+    }
   }
 
   build() {
@@ -59,10 +77,8 @@ export struct LearnPage {
       GrammarPage({
         entries: this.grammarIndex,
         initialIndex: this.savedLessonIndex,
-        gatewayUrl: this.gatewayUrl,
-        appToken: this.appToken,
-        model: this.model,
         onIndexChange: this.onLessonChange,
+        onAsk: this.onAsk,
         onBack: () => this.changeMode(0)
       })
       .transition(TransitionEffect.OPACITY
@@ -78,7 +94,7 @@ export struct LearnPage {
   @Builder
   private home() {
     Column() {
-      PageChrome({ eyebrow: '今日の流れ', title: '学习旅程', onSettings: this.onSettings })
+      PageChrome({ title: '旅程' })
       if (this.loadError.length > 0) {
         Column({ space: 12 }) {
           Text('课程没有加载出来')
@@ -93,29 +109,18 @@ export struct LearnPage {
         .justifyContent(FlexAlign.Center)
       } else {
         Scroll() {
-          Column({ space: 22 }) {
-            Row({ space: 18 }) {
-              Column({ space: 8 }) {
-                Text('今天，从一句话出发')
-                  .width('100%')
-                  .fontSize(31)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor($r('app.color.ink'))
-                  .lineHeight(40)
-                Text('让声音、词和句型在场景里自然汇合。')
-                  .width('100%')
-                  .fontSize(14)
-                  .fontColor($r('app.color.ink_muted'))
-                  .lineHeight(22)
-              }
-              .layoutWeight(1)
-              .alignItems(HorizontalAlign.Start)
-              GravityMark({ diameter: 88, progress: this.journeyStage })
+          Column({ space: 20 }) {
+            if (this.showHomeGuide) {
+              ImmersivePlane({
+                planeStrong: true,
+                planeContent: () => {
+                  this.firstUseGuide()
+                }
+              })
+              .transition(TransitionEffect.OPACITY
+                .combine(TransitionEffect.translate({ y: -10 }))
+                .animation({ curve: curves.springMotion(0.38, 0.88, 0.16) }))
             }
-            .width('100%')
-            .padding({ left: 4, right: 4, top: 10, bottom: 2 })
-            .alignItems(VerticalAlign.Center)
-            .visualEffect(contentLightEffect())
 
             if (this.currentJourney !== undefined) {
               ImmersivePlane({
@@ -128,27 +133,23 @@ export struct LearnPage {
             }
 
             if (this.journeys.length > 1) {
-              Column({ space: 12 }) {
-                Row() {
-                  Text('换一个场景')
-                    .fontSize(19)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor($r('app.color.ink'))
-                  Blank()
-                  Text(`${this.journeys.length} 条旅程`)
-                    .fontSize(11)
-                    .fontColor($r('app.color.ink_muted'))
-                }
-                .width('100%')
+              Column({ space: 10 }) {
+                Text('其他场景')
+                  .width('100%')
+                  .fontSize(17)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor($r('app.color.ink'))
                 List({ space: 10 }) {
                   ForEach(this.journeys, (journey: LearningJourney) => {
-                    ListItem() {
-                      this.journeyChoice(journey)
+                    if (journey.id !== this.currentJourney?.id) {
+                      ListItem() {
+                        this.journeyChoice(journey)
+                      }
                     }
                   }, (journey: LearningJourney) => journey.id)
                 }
                 .width('100%')
-                .height(104)
+                .height(80)
                 .listDirection(Axis.Horizontal)
                 .scrollBar(BarState.Off)
                 .edgeEffect(EdgeEffect.Spring)
@@ -157,21 +158,7 @@ export struct LearnPage {
               .alignItems(HorizontalAlign.Start)
             }
 
-            if (this.grammarIndex.length > 0) {
-              Column({ space: 8 }) {
-                Text('补强当前语法')
-                  .width('100%')
-                  .fontSize(19)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor($r('app.color.ink'))
-                this.continueLesson(
-                  this.grammarIndex[Math.min(this.savedLessonIndex, this.grammarIndex.length - 1)])
-              }
-              .width('100%')
-              .alignItems(HorizontalAlign.Start)
-            }
-
-            this.sceneBridge()
+            this.learningShortcuts()
             Column()
               .height(FLOATING_TAB_CONTENT_INSET)
           }
@@ -206,62 +193,92 @@ export struct LearnPage {
   }
 
   @Builder
+  private firstUseGuide() {
+    Column({ space: 16 }) {
+      Text('欢迎来到言葉')
+        .width('100%')
+        .fontSize(22)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.ink'))
+      Text('从一个真实场景开始。每次完成一个小阶段，进度会自动保存。')
+        .width('100%')
+        .fontSize(14)
+        .fontColor($r('app.color.ink_muted'))
+        .lineHeight(22)
+        .maxLines(3)
+      Row() {
+        Blank()
+        ImmersiveAction({
+          label: '开始旅程',
+          actionAccessibilityText: '完成首次使用引导并开始旅程',
+          icon: $r('sys.symbol.arrow_right'),
+          emphasized: true,
+          onAction: () => this.startFromGuide()
+        })
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+    .padding({ left: 22, right: 20, top: 22, bottom: 18 })
+  }
+
+  @Builder
   private journeyHero(journey: LearningJourney | undefined) {
     if (journey !== undefined) {
-      Column({ space: 18 }) {
+      Column({ space: 16 }) {
         Row() {
-          Text(`${journey.setting}  ${journey.level}`)
-            .fontSize(11)
+          Text('当前旅程')
+            .fontSize(13)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.accent'))
-            .letterSpacing(0.8)
           Blank()
-          Text(`正在进行：${this.journeyStageLabel()}`)
-            .fontSize(11)
+          Text(journey.duration)
+            .fontSize(12)
             .fontColor($r('app.color.ink_muted'))
         }
-        Text(journey.japaneseTitle)
-          .width('100%')
-          .fontSize(36)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.ink'))
-          .lineHeight(46)
+        Column({ space: 4 }) {
+          Text(journey.title)
+            .width('100%')
+            .fontSize(28)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+            .lineHeight(37)
+          Text(journey.japaneseTitle)
+            .width('100%')
+            .fontSize(17)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.ink_muted'))
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
         Text(journey.goal)
           .width('100%')
-          .fontSize(15)
+          .fontSize(14)
           .fontColor($r('app.color.ink_muted'))
-          .lineHeight(24)
-        Row({ space: 5 }) {
-          ForEach(['景', '音', '词', '句', '话', '说'], (label: string, index: number) => {
-            Text(this.journeyStage === index ? label :
-              ((this.journeyCompletedMask & (1 << index)) !== 0 ? '✓' : (index + 1).toString()))
-              .width(this.journeyStage === index ? 62 : 36)
-              .height(36)
-              .fontSize(11)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(this.journeyStage === index ? Color.White :
-                ((this.journeyCompletedMask & (1 << index)) !== 0 ?
-                  $r('app.color.accent') : $r('app.color.ink_muted')))
-              .textAlign(TextAlign.Center)
-              .borderRadius(18)
-              .backgroundColor(this.journeyStage === index ?
-                $r('app.color.accent') : $r('app.color.immersive_plane'))
-              .border({ width: 0.5, color: this.journeyStage === index ?
-                $r('app.color.accent') : $r('app.color.immersive_edge') })
-              .shadow({ radius: this.journeyStage === index ? 12 : 0,
-                color: $r('app.color.gravity_glow'), offsetY: 4 })
+          .lineHeight(22)
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+        Row({ space: 6 }) {
+          ForEach([0, 1, 2, 3, 4, 5], (index: number) => {
+            Column()
+              .height(5)
+              .layoutWeight(1)
+              .borderRadius(3)
+              .backgroundColor(this.journeyStage === index ||
+                (this.journeyCompletedMask & (1 << index)) !== 0 ?
+                $r('app.color.accent') : $r('app.color.line'))
               .animation({ curve: curves.springMotion(0.38, 0.82, 0.18) })
           })
         }
         .width('100%')
-        .justifyContent(FlexAlign.Center)
         Row() {
-          Text(`${this.completedStageCount()}/6 已贯通`)
+          Text(`${this.journeyStageLabel()}  ${this.completedStageCount()}/6`)
             .fontSize(12)
             .fontColor($r('app.color.ink_muted'))
           Blank()
           ImmersiveAction({
-            label: this.completedStageCount() === 0 ? '开始旅程' : '继续旅程',
+            label: this.completedStageCount() === 0 ? '开始' : '继续',
             actionAccessibilityText: `打开${journey.title}学习旅程`,
             icon: $r('sys.symbol.arrow_right'),
             emphasized: true,
@@ -280,119 +297,103 @@ export struct LearnPage {
 
   @Builder
   private journeyChoice(journey: LearningJourney) {
-    Column({ space: 6 }) {
-      Text(journey.setting)
-        .width('100%')
-        .fontSize(10)
-        .fontColor(this.currentJourney?.id === journey.id ? $r('app.color.accent') : $r('app.color.ink_muted'))
+    Column({ space: 4 }) {
       Text(journey.title)
         .width('100%')
-        .fontSize(17)
+        .fontSize(15)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
       Text(journey.japaneseTitle)
         .width('100%')
-        .fontSize(12)
+        .fontSize(11)
         .fontColor($r('app.color.ink_muted'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
-    .width(150)
-    .height(96)
+    .width(140)
+    .height(76)
     .alignItems(HorizontalAlign.Start)
     .justifyContent(FlexAlign.Center)
     .padding({ left: 16, right: 14 })
-    .borderRadius(22)
+    .borderRadius(20)
     .backgroundEffect({
       radius: 24,
-      color: this.currentJourney?.id === journey.id ?
-        $r('app.color.immersive_plane_strong') : $r('app.color.immersive_plane'),
+      color: $r('app.color.immersive_plane'),
       saturation: 1.06
     })
-    .border({
-      width: this.currentJourney?.id === journey.id ? 1 : 0.5,
-      color: this.currentJourney?.id === journey.id ? $r('app.color.accent') : $r('app.color.immersive_edge')
-    })
+    .border({ width: 0.5, color: $r('app.color.immersive_edge') })
     .visualEffect(planeLightEffect())
     .onClick(() => this.onJourney(journey))
   }
 
   @Builder
-  private sceneBridge() {
-    Row({ space: 18 }) {
-      Column({ space: 6 }) {
-        Text('会話の棚')
-          .fontSize(10)
-          .fontColor($r('app.color.accent'))
-          .letterSpacing(1)
-        Text('浏览完整场景语料')
-          .fontSize(18)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.ink'))
-        Text('先看自然对话，也可以直接进入自由对练。')
-          .fontSize(13)
-          .fontColor($r('app.color.ink_muted'))
+  private learningShortcuts() {
+    Column() {
+      if (this.grammarIndex.length > 0) {
+        this.learningShortcut(
+          '语法',
+          this.grammarIndex[Math.min(this.savedLessonIndex, this.grammarIndex.length - 1)].title,
+          `${this.grammarIndex[Math.min(this.savedLessonIndex, this.grammarIndex.length - 1)].level}  第${this.grammarIndex[Math.min(this.savedLessonIndex, this.grammarIndex.length - 1)].order}课`,
+          $r('sys.symbol.bookmark'),
+          () => this.changeMode(1))
+        Divider()
+          .strokeWidth(0.5)
+          .color($r('app.color.line'))
+          .margin({ left: 54 })
       }
-      .layoutWeight(1)
-      .alignItems(HorizontalAlign.Start)
-      Column({ space: 8 }) {
-        ImmersiveAction({
-          actionAccessibilityText: '浏览场景语料',
-          icon: $r('sys.symbol.arrow_right'),
-          onAction: () => this.changeMode(2)
-        })
-        Text('自由对练')
-          .fontSize(11)
-          .fontColor($r('app.color.accent'))
-          .onClick(this.onPractice)
-      }
+      this.learningShortcut(
+        '对话',
+        '日常对话',
+        `${this.catalog?.dialogues.length ?? 0} 个场景`,
+        $r('sys.symbol.message'),
+        () => this.changeMode(2))
     }
     .width('100%')
-    .padding({ left: 8, right: 6, top: 20, bottom: 20 })
     .border({ width: { top: 0.5 }, color: $r('app.color.line') })
-    .visualEffect(contentLightEffect())
   }
 
   @Builder
-  private continueLesson(lesson: GrammarIndexEntry) {
-    Column({ space: 14 }) {
-      Row() {
-        Text('继续语法')
-          .fontSize(13)
-          .fontColor($r('app.color.accent'))
-          .fontWeight(FontWeight.Medium)
-        Blank()
-        Text(`${lesson.level} · ${lesson.order.toString().padStart(2, '0')}`)
-          .fontSize(12)
-          .fontColor($r('app.color.ink_muted'))
+  private learningShortcut(category: string, title: string, meta: string, icon: Resource, onSelect: () => void) {
+    Row({ space: 14 }) {
+      Stack({ alignContent: Alignment.Center }) {
+        SymbolGlyph(icon)
+          .fontSize(19)
+          .fontColor([$r('app.color.accent')])
       }
-      Text(lesson.title)
-        .width('100%')
-        .fontSize(22)
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.ink'))
-        .lineHeight(31)
-        .maxLines(3)
-      Text(lesson.summary)
-        .width('100%')
-        .fontSize(15)
+      .width(40)
+      .height(40)
+      .borderRadius(20)
+      .backgroundColor($r('app.color.accent_soft'))
+      Column({ space: 3 }) {
+        Text(category)
+          .width('100%')
+          .fontSize(11)
+          .fontColor($r('app.color.ink_muted'))
+        Text(title)
+          .width('100%')
+          .fontSize(17)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.ink'))
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+      Text(meta)
+        .fontSize(11)
         .fontColor($r('app.color.ink_muted'))
-        .lineHeight(24)
-        .maxLines(2)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
       ImmersiveAction({
-        label: '继续学习',
-        actionAccessibilityText: '继续当前语法课',
+        actionAccessibilityText: `打开${category}`,
         icon: $r('sys.symbol.arrow_right'),
-        emphasized: true,
-        onAction: () => this.changeMode(1)
+        actionSize: 40,
+        onAction: onSelect
       })
     }
     .width('100%')
-    .alignItems(HorizontalAlign.Start)
-    .padding({ left: 8, right: 6, top: 16, bottom: 18 })
-    .border({ width: { top: 0.5 }, color: $r('app.color.line') })
-    .onClick(() => this.changeMode(1))
+    .height(76)
+    .alignItems(VerticalAlign.Center)
+    .visualEffect(contentLightEffect())
+    .onClick(onSelect)
   }
 
   @Builder
@@ -412,7 +413,10 @@ export struct LearnPage {
         .duration(MOTION_DURATION)
         .curve(curves.springMotion(0.42, 0.86, 0.16))
         .layoutWeight(1)
-        .onChange((index: number) => this.dialogueIndex = index)
+        .onChange((index: number) => {
+          this.dialogueIndex = index;
+          this.selectedDialogueLineKey = '';
+        })
       }
     }
     .width('100%')
@@ -486,6 +490,12 @@ export struct LearnPage {
                 .fontSize(13)
                 .fontColor($r('app.color.ink_muted'))
                 .textAlign(line.learner === true ? TextAlign.End : TextAlign.Start)
+              if (this.selectedDialogueLineKey === this.dialogueLineKey(dialogue, index)) {
+                AiAskAction({
+                  label: '问这句',
+                  onAsk: () => this.onAsk(AiInquiryFactory.dialogue(dialogue, line))
+                })
+              }
             }
             .width(line.learner === true ? '78%' : '90%')
             .alignItems(line.learner === true ? HorizontalAlign.End : HorizontalAlign.Start)
@@ -494,8 +504,12 @@ export struct LearnPage {
             }
           }
           .width('100%')
-          .padding({ top: 24, bottom: 24 })
+          .padding({ left: 12, right: 12, top: 24, bottom: 24 })
+          .borderRadius(18)
+          .backgroundColor(this.selectedDialogueLineKey === this.dialogueLineKey(dialogue, index) ?
+            $r('app.color.accent_soft') : Color.Transparent)
           .visualEffect(contentLightEffect())
+          .onClick(() => this.toggleDialogueLine(dialogue, index))
         }
       }, (line: DialogueLine, index: number) => `${dialogue.id}-${index}`)
       ListItem() {

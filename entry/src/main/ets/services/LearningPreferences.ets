@@ -1,17 +1,14 @@
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
-import { VideoStudyItem } from '../model/ContentModels';
 
 const STORE_NAME: string = 'kotoba_settings';
-const KEY_GATEWAY_URL: string = 'gateway_url';
-const KEY_APP_TOKEN: string = 'app_token';
-const KEY_MODEL: string = 'model';
+const KEY_DEEPSEEK_API_KEY: string = 'deepseek_api_key';
 const KEY_GRAMMAR_INDEX: string = 'grammar_index';
 const KEY_SECTION: string = 'section';
-const KEY_VIDEOS: string = 'videos';
 const KEY_JOURNEY_ID: string = 'journey_id';
 const KEY_JOURNEY_STAGE: string = 'journey_stage';
 const KEY_JOURNEY_COMPLETED_MASK: string = 'journey_completed_mask';
+const KEY_HOME_GUIDE_SEEN: string = 'home_guide_seen';
 
 export class LearningPreferences {
   private static store(context: common.Context): preferences.Preferences {
@@ -38,20 +35,12 @@ export class LearningPreferences {
     }
   }
 
-  static gatewayUrl(context: common.Context): string {
-    return LearningPreferences.readString(context, KEY_GATEWAY_URL, 'http://127.0.0.1:8787');
-  }
-
-  static appToken(context: common.Context): string {
-    return LearningPreferences.readString(context, KEY_APP_TOKEN, '');
-  }
-
-  static model(context: common.Context): string {
-    return LearningPreferences.readString(context, KEY_MODEL, 'gpt-5.6-luna');
-  }
-
   static grammarIndex(context: common.Context): number {
     return LearningPreferences.readNumber(context, KEY_GRAMMAR_INDEX, 0);
+  }
+
+  static deepSeekApiKey(context: common.Context): string {
+    return LearningPreferences.readString(context, KEY_DEEPSEEK_API_KEY, '');
   }
 
   static section(context: common.Context): number {
@@ -70,24 +59,27 @@ export class LearningPreferences {
     return LearningPreferences.readNumber(context, KEY_JOURNEY_COMPLETED_MASK, 0);
   }
 
-  static videos(context: common.Context): VideoStudyItem[] {
-    const raw: string = LearningPreferences.readString(context, KEY_VIDEOS, '[]');
-    try {
-      return JSON.parse(raw) as VideoStudyItem[];
-    } catch (error) {
-      return [];
-    }
-  }
-
-  static saveAiSettings(context: common.Context, gatewayUrl: string, appToken: string, model: string): void {
+  static shouldShowHomeGuide(context: common.Context): boolean {
     try {
       const store: preferences.Preferences = LearningPreferences.store(context);
-      store.putSync(KEY_GATEWAY_URL, gatewayUrl.trim().replace(/\/+$/, ''));
-      store.putSync(KEY_APP_TOKEN, appToken.trim());
-      store.putSync(KEY_MODEL, model.trim());
-      store.flush();
+      if ((store.getSync(KEY_HOME_GUIDE_SEEN, 0) as number) === 1) {
+        return false;
+      }
+      const historyKeys: string[] = [
+        KEY_GRAMMAR_INDEX,
+        KEY_SECTION,
+        KEY_JOURNEY_ID,
+        KEY_JOURNEY_STAGE,
+        KEY_JOURNEY_COMPLETED_MASK
+      ];
+      for (let index: number = 0; index < historyKeys.length; index++) {
+        if (store.hasSync(historyKeys[index])) {
+          return false;
+        }
+      }
+      return true;
     } catch (error) {
-      return;
+      return false;
     }
   }
 
@@ -95,6 +87,16 @@ export class LearningPreferences {
     try {
       const store: preferences.Preferences = LearningPreferences.store(context);
       store.putSync(KEY_GRAMMAR_INDEX, index);
+      store.flush();
+    } catch (error) {
+      return;
+    }
+  }
+
+  static saveDeepSeekApiKey(context: common.Context, apiKey: string): void {
+    try {
+      const store: preferences.Preferences = LearningPreferences.store(context);
+      store.putSync(KEY_DEEPSEEK_API_KEY, apiKey.trim());
       store.flush();
     } catch (error) {
       return;
@@ -124,13 +126,14 @@ export class LearningPreferences {
     }
   }
 
-  static saveVideos(context: common.Context, videos: VideoStudyItem[]): void {
+  static saveHomeGuideSeen(context: common.Context): void {
     try {
       const store: preferences.Preferences = LearningPreferences.store(context);
-      store.putSync(KEY_VIDEOS, JSON.stringify(videos));
+      store.putSync(KEY_HOME_GUIDE_SEEN, 1);
       store.flush();
     } catch (error) {
       return;
     }
   }
+
 }

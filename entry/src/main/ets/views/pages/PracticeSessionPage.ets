@@ -1,15 +1,15 @@
-import { PracticeScenario } from '../../model/ContentModels';
 import { showImmersiveNotice } from '../../common/ImmersiveNotice';
-import {
-  PracticeMessage,
-  ResponseInputMessage,
-  ResponsesCreateRequest
-} from '../../model/AiModels';
-import { ResponsesClient } from '../../services/ResponsesClient';
-import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
+import { hilog } from '@kit.PerformanceAnalysisKit';
+import { DeepSeekMessage, PracticeMessage } from '../../model/DeepSeekModels';
+import { PracticeScenario } from '../../model/ContentModels';
+import { DeepSeekClient } from '../../services/DeepSeekClient';
 import { ImmersiveAction } from '../components/ImmersiveAction';
-import { aiFlowEffect, contentLightEffect, planeLightEffect } from '../components/ImmersiveCanvas';
+import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
+import { contentLightEffect, planeLightEffect } from '../components/ImmersiveCanvas';
 
+const MAX_CONTEXT_MESSAGES: number = 16;
+const LOG_DOMAIN: number = 0x4b4f;
+const LOG_TAG: string = 'WovenPractice';
 const EMPTY_SCENARIO: PracticeScenario = {
   id: '',
   title: '',
@@ -24,24 +24,28 @@ const EMPTY_SCENARIO: PracticeScenario = {
 @Component
 export struct PracticeSessionPage {
   scenario: PracticeScenario = EMPTY_SCENARIO;
-  gatewayUrl: string = '';
-  appToken: string = '';
-  model: string = '';
+  apiKey: string = '';
   onExit: () => void = () => {};
 
   @State private messages: PracticeMessage[] = [];
   @State private draft: string = '';
   @State private generating: boolean = false;
-  @State private previousResponseId: string = '';
   @State private status: string = '';
-  private client?: ResponsesClient;
+  private history: DeepSeekMessage[] = [];
+  private client?: DeepSeekClient;
+  private activeAssistantId: string = '';
   private scroller: Scroller = new Scroller();
 
   aboutToAppear(): void {
+    hilog.info(LOG_DOMAIN, LOG_TAG,
+      'Session appeared scenario=%{public}s keyConfigured=%{public}s',
+      this.scenario.id, this.apiKey.trim().length > 0 ? 'true' : 'false');
     setTimeout(() => this.begin(), 180);
   }
 
   aboutToDisappear(): void {
+    hilog.info(LOG_DOMAIN, LOG_TAG, 'Session disappeared scenario=%{public}s generating=%{public}s',
+      this.scenario.id, this.generating ? 'true' : 'false');
     this.client?.cancel();
   }
 
@@ -49,7 +53,12 @@ export struct PracticeSessionPage {
     if (this.messages.length > 0 || this.generating) {
       return;
     }
-    this.request('场景已经开始。请以你的角色先自然开口，不要解释规则。');
+    this.history = [{
+      role: 'user',
+      content: '场景现在开始。请以你的角色先自然开口，不要说明规则。'
+    }];
+    hilog.info(LOG_DOMAIN, LOG_TAG, 'Opening request scenario=%{public}s', this.scenario.id);
+    this.request();
   }
 
   private send(): void {
@@ -58,68 +67,103 @@ export struct PracticeSessionPage {
       return;
     }
     this.draft = '';
+    this.status = '';
     this.appendMessage('user', value);
-    this.request(value);
+    this.history.push({ role: 'user', content: value });
+    hilog.info(LOG_DOMAIN, LOG_TAG, 'User turn scenario=%{public}s chars=%{public}d',
+      this.scenario.id, value.length);
+    this.request();
   }
 
-  private request(userText: string): void {
-    this.client = new ResponsesClient(this.gatewayUrl, this.appToken);
+  private retry(): void {
+    if (!this.generating) {
+      this.status = '';
+      this.request();
+    }
+  }
+
+  private stop(): void {
+    if (!this.generating) {
+      return;
+    }
+    this.client?.cancel();
+    this.generating = false;
+    this.status = '已停止生成，可以继续输入。';
+    this.removeIfEmpty(this.activeAssistantId);
+    this.activeAssistantId = '';
+  }
+
+  private request(): void {
+    if (this.generating) {
+      return;
+    }
+    this.client = new DeepSeekClient(this.apiKey);
     this.generating = true;
     this.status = '';
     const assistantId: string = this.appendMessage('assistant', '');
-    const input: ResponseInputMessage[] = [{
-      role: 'user',
-      content: [{ type: 'input_text', text: userText }]
-    }];
-    const request: ResponsesCreateRequest = {
-      model: this.model,
-      instructions: this.instructions(),
-      input: input,
-      stream: true,
-      store: true
-    };
-    if (this.previousResponseId.length > 0) {
-      request.previous_response_id = this.previousResponseId;
-    }
-    this.client.stream(request, {
-      onDelta: (delta: string) => this.appendDelta(assistantId, delta),
-      onCompleted: (responseId: string) => {
-        this.previousResponseId = responseId;
-        this.generating = false;
-        this.scrollToLatest();
-      },
-      onError: (message: string) => {
-        this.generating = false;
-        this.status = message;
-        showImmersiveNotice(this.getUIContext(), '对练暂时中断', message);
-        this.removeIfEmpty(assistantId);
-      }
-    }).catch(() => {
+    this.activeAssistantId = assistantId;
+    this.client.complete(this.contextMessages()).then((generated: string) => {
       this.generating = false;
+      this.activeAssistantId = '';
+      this.appendDelta(assistantId, generated);
+      this.history.push({ role: 'assistant', content: generated });
+      hilog.info(LOG_DOMAIN, LOG_TAG, 'Assistant turn rendered scenario=%{public}s chars=%{public}d',
+        this.scenario.id, generated.length);
+      this.scrollToLatest();
+    }).catch((error: Error) => {
+      if (DeepSeekClient.isCancelled(error)) {
+        return;
+      }
+      this.generating = false;
+      this.activeAssistantId = '';
+      this.status = error.message;
       this.removeIfEmpty(assistantId);
+      hilog.error(LOG_DOMAIN, LOG_TAG, 'Request surfaced to UI scenario=%{public}s', this.scenario.id);
+      showImmersiveNotice(this.getUIContext(), '对练暂时中断', error.message);
     });
   }
 
+  private contextMessages(): DeepSeekMessage[] {
+    const messages: DeepSeekMessage[] = [{ role: 'system', content: this.instructions() }];
+    const start: number = Math.max(0, this.history.length - MAX_CONTEXT_MESSAGES);
+    for (let index: number = start; index < this.history.length; index++) {
+      messages.push(this.history[index]);
+    }
+    return messages;
+  }
+
   private instructions(): string {
-    return `你正在进行日语角色扮演。场景：${this.scenario.setting}。你扮演：${this.scenario.aiRole}。学习者扮演：${this.scenario.learnerRole}。难度：${this.scenario.level}。目标：${this.scenario.goal}。主要使用自然日语，每次一到两句，保持角色，不要输出标题、列表、Markdown 或教学说明。如果学习者表达影响理解，只在日语回应后追加一行简短中文纠正，格式为“自然表达：...”。`;
+    return `你正在和日语学习者进行角色扮演。场景：${this.scenario.setting}。你扮演：${this.scenario.aiRole}。学习者扮演：${this.scenario.learnerRole}。难度：${this.scenario.level}。练习目标：${this.scenario.goal}。参考开场：${this.scenario.openingHint}。主要使用自然、简短的日语，每次只说一到两句，保持角色并给学习者回应空间。不要输出标题、列表或 Markdown。只有当学习者的日语明显影响理解时，才在日语回应后另起一行给出一句简短中文提示，格式为“自然表达：……”。`;
   }
 
   private appendMessage(role: string, text: string): string {
     const id: string = `${role}-${Date.now()}-${this.messages.length}`;
-    this.messages = this.messages.concat([{ id: id, role: role, text: text }]);
+    this.messages = this.messages.concat([{ id: id, role: role, text: text, revision: 0 }]);
     this.scrollToLatest();
     return id;
   }
 
   private appendDelta(id: string, delta: string): void {
     const next: PracticeMessage[] = this.messages.slice();
+    let updated: boolean = false;
+    let revision: number = 0;
     for (let index: number = 0; index < next.length; index++) {
       if (next[index].id === id) {
-        next[index] = { id: next[index].id, role: next[index].role, text: next[index].text + delta };
+        revision = next[index].revision + 1;
+        next[index] = {
+          id: next[index].id,
+          role: next[index].role,
+          text: next[index].text + delta,
+          revision: revision
+        };
+        updated = true;
         break;
       }
     }
     this.messages = next;
+    hilog.info(LOG_DOMAIN, LOG_TAG,
+      'Message state updated found=%{public}s chars=%{public}d revision=%{public}d',
+      updated ? 'true' : 'false', delta.length, revision);
     this.scrollToLatest();
   }
 
@@ -151,41 +195,8 @@ export struct PracticeSessionPage {
           onBack: this.onExit
         })
 
-        Row() {
-          Column({ space: 5 }) {
-            Text(this.scenario.learnerRole)
-              .fontSize(11)
-              .fontColor($r('app.color.accent'))
-            Text('あなた')
-              .fontSize(9)
-              .fontColor($r('app.color.ink_muted'))
-          }
-          .alignItems(HorizontalAlign.Start)
-          Blank()
-          Text('×')
-            .fontSize(18)
-            .fontColor($r('app.color.ink_muted'))
-          Blank()
-          Column({ space: 5 }) {
-            Text(this.scenario.aiRole)
-              .fontSize(11)
-              .fontColor($r('app.color.ink'))
-            Text('AI')
-              .fontSize(9)
-              .fontColor($r('app.color.ink_muted'))
-          }
-          .alignItems(HorizontalAlign.End)
-        }
-        .width('100%')
-        .padding({ left: 20, right: 20, top: 13, bottom: 13 })
-        .margin({ left: 20, right: 20, bottom: 4 })
-        .borderRadius(22)
-        .backgroundEffect({ radius: 24, color: $r('app.color.immersive_plane'), saturation: 1.06 })
-        .border({ width: 0.5, color: $r('app.color.immersive_edge') })
-        .visualEffect(planeLightEffect())
-
         List({ space: 0, scroller: this.scroller }) {
-          ForEach(this.messages, (message: PracticeMessage, index: number) => {
+          ForEach(this.messages, (message: PracticeMessage) => {
             ListItem() {
               Row() {
                 if (message.role === 'user') {
@@ -200,16 +211,22 @@ export struct PracticeSessionPage {
                   if (message.text.length > 0) {
                     Text(message.text)
                       .width('100%')
-                      .fontSize(message.role === 'user' ? 22 : 28)
+                      .fontSize(message.role === 'user' ? 22 : 27)
                       .fontWeight(message.role === 'user' ? FontWeight.Medium : FontWeight.Bold)
                       .fontColor($r('app.color.ink'))
-                      .lineHeight(message.role === 'user' ? 33 : 40)
+                      .lineHeight(message.role === 'user' ? 33 : 39)
                       .textAlign(message.role === 'user' ? TextAlign.End : TextAlign.Start)
                   } else {
-                    LoadingProgress()
-                      .width(22)
-                      .height(22)
-                      .color($r('app.color.accent'))
+                    Column({ space: 8 }) {
+                      LoadingProgress()
+                        .width(22)
+                        .height(22)
+                        .color($r('app.color.accent'))
+                      Text('正在连接，最长等待 45 秒')
+                        .fontSize(11)
+                        .fontColor($r('app.color.ink_muted'))
+                    }
+                    .alignItems(HorizontalAlign.Start)
                   }
                 }
                 .width(message.role === 'user' ? '76%' : '86%')
@@ -219,10 +236,32 @@ export struct PracticeSessionPage {
                 }
               }
               .width('100%')
-              .padding({ left: 24, right: 24, top: 25, bottom: 25 })
-              .visualEffect(message.text.length === 0 ? aiFlowEffect(true) : contentLightEffect())
+              .padding({ left: 24, right: 24, top: 24, bottom: 24 })
+              .visualEffect(contentLightEffect())
             }
-          }, (message: PracticeMessage) => message.id)
+          }, (message: PracticeMessage) => `${message.id}-${message.revision}`)
+          if (this.status.length > 0) {
+            ListItem() {
+              Row({ space: 12 }) {
+                Text(this.status)
+                  .layoutWeight(1)
+                  .fontSize(13)
+                  .lineHeight(21)
+                  .fontColor($r('app.color.ink_muted'))
+                if (this.status !== '已停止生成，可以继续输入。') {
+                  ImmersiveAction({
+                    label: '重试',
+                    actionAccessibilityText: '重试 DeepSeek 对练请求',
+                    icon: $r('sys.symbol.arrow_right'),
+                    actionSize: 42,
+                    onAction: () => this.retry()
+                  })
+                }
+              }
+              .width('100%')
+              .padding({ left: 24, right: 24, top: 10, bottom: 18 })
+            }
+          }
           ListItem() {
             Column()
               .height(104)
@@ -236,40 +275,47 @@ export struct PracticeSessionPage {
       .width('100%')
       .height('100%')
 
-      Column({ space: 7 }) {
-        Row({ space: 10 }) {
-          TextInput({ text: this.draft, placeholder: this.generating ? 'AI 正在回应' : '用日语回应' })
-            .layoutWeight(1)
-            .height(48)
-            .fontSize(16)
-            .fontColor($r('app.color.ink'))
-            .placeholderColor($r('app.color.ink_muted'))
-            .backgroundColor(Color.Transparent)
-            .padding({ left: 4, right: 8 })
-            .border({ width: { bottom: 0.5 }, color: $r('app.color.line') })
-            .enabled(!this.generating)
-            .enterKeyType(EnterKeyType.Send)
-            .onChange((value: string) => this.draft = value)
-            .onSubmit(() => this.send())
+      Row({ space: 10 }) {
+        TextInput({ text: this.draft, placeholder: this.generating ? 'DeepSeek 正在回应' : '用日语回应' })
+          .layoutWeight(1)
+          .height(48)
+          .fontSize(16)
+          .fontColor($r('app.color.ink'))
+          .placeholderColor($r('app.color.ink_muted'))
+          .backgroundColor(Color.Transparent)
+          .padding({ left: 4, right: 8 })
+          .border({ width: { bottom: 0.5 }, color: $r('app.color.line') })
+          .enabled(!this.generating)
+          .maxLength(500)
+          .enterKeyType(EnterKeyType.Send)
+          .onChange((value: string) => this.draft = value)
+          .onSubmit(() => this.send())
+        if (this.generating) {
+          ImmersiveAction({
+            actionAccessibilityText: '停止生成',
+            icon: $r('sys.symbol.xmark'),
+            actionSize: 48,
+            emphasized: true,
+            onAction: () => this.stop()
+          })
+        } else {
           ImmersiveAction({
             actionAccessibilityText: '发送日语回应',
             icon: $r('sys.symbol.paperplane_fill'),
             actionSize: 48,
-            actionEnabled: !this.generating && this.draft.trim().length > 0,
+            actionEnabled: this.draft.trim().length > 0,
             emphasized: true,
             onAction: () => this.send()
           })
         }
-        .width('100%')
-        .alignItems(VerticalAlign.Center)
-        .padding({ left: 16, right: 8, top: 6, bottom: 6 })
-        .borderRadius(28)
-        .backgroundEffect({ radius: 30, color: $r('app.color.immersive_plane_strong'), saturation: 1.08 })
-        .border({ width: 0.5, color: $r('app.color.immersive_edge') })
-        .visualEffect(planeLightEffect())
       }
       .width('100%')
-      .padding({ left: 20, right: 18, bottom: 18 })
+      .alignItems(VerticalAlign.Center)
+      .padding({ left: 20, right: 18, top: 6, bottom: 18 })
+      .borderRadius(28)
+      .backgroundEffect({ radius: 30, color: $r('app.color.immersive_plane_strong'), saturation: 1.08 })
+      .border({ width: 0.5, color: $r('app.color.immersive_edge') })
+      .visualEffect(planeLightEffect())
     }
     .width('100%')
     .height('100%')

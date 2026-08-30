@@ -10,12 +10,13 @@ import { PageChrome } from '../components/PageChrome';
 @Component
 export struct PracticePage {
   journey: LearningJourney | undefined = undefined;
-  onSettings: () => void = () => {};
+  apiKeyConfigured: boolean = false;
   onStart: (scenario: PracticeScenario) => void = (scenario: PracticeScenario) => {};
 
   @State private catalog: LearningCatalog | undefined = undefined;
   @State private error: string = '';
   @State private scenarioIndex: number = 0;
+  @State private revealedIndex: number = -1;
 
   aboutToAppear(): void {
     try {
@@ -29,7 +30,7 @@ export struct PracticePage {
 
   build() {
     Column() {
-      PageChrome({ title: '对练', onSettings: this.onSettings })
+      PageChrome({ title: 'AI 对练' })
       if (this.error.length > 0) {
         Text(this.error)
           .layoutWeight(1)
@@ -107,14 +108,50 @@ export struct PracticePage {
             .lineHeight(22)
             .fontColor($r('app.color.ink_muted'))
         }
-        Row() {
+        if (this.revealedIndex === index) {
+          Column({ space: 7 }) {
+            Text('开场提示')
+              .fontSize(11)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.accent'))
+            Text(scenario.openingHint)
+              .width('100%')
+              .fontSize(18)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.ink'))
+              .lineHeight(29)
+          }
+          .width('100%')
+          .alignItems(HorizontalAlign.Start)
+          .padding({ left: 14, right: 14, top: 13, bottom: 13 })
+          .border({ width: { left: 3 }, color: $r('app.color.accent') })
+        } else {
+          Text(this.apiKeyConfigured ?
+            '先自己说一句，也可以直接进入角色对练。' :
+            '请先在「我的 > 设置」中配置 DeepSeek。')
+            .width('100%')
+            .fontSize(13)
+            .lineHeight(22)
+            .fontColor($r('app.color.ink_muted'))
+        }
+        Row({ space: 14 }) {
           Blank()
           ImmersiveAction({
-            label: '开始',
-            actionAccessibilityText: `开始${scenario.title}`,
+            label: this.revealedIndex === index ? '隐藏提示' : '查看提示',
+            actionAccessibilityText: `${this.revealedIndex === index ? '隐藏' : '查看'}${scenario.title}开场提示`,
             icon: $r('sys.symbol.arrow_right'),
             actionSize: 48,
             emphasized: true,
+            onAction: () => this.revealedIndex = this.revealedIndex === index ? -1 : index
+          })
+          ImmersiveAction({
+            label: '开始对练',
+            actionAccessibilityText: this.apiKeyConfigured ?
+              `开始${scenario.title}AI 对练` : '请先在我的设置中配置 DeepSeek',
+            icon: $r('sys.symbol.paperplane_fill'),
+            actionSize: 48,
+            emphasized: true,
+            actionEnabled: this.apiKeyConfigured,
             onAction: () => this.onStart(scenario)
           })
         }
@@ -134,4 +171,5 @@ export struct PracticePage {
     .shadow({ radius: 28, color: $r('app.color.gravity_glow'), offsetY: 12 })
     .visualEffect(planeLightEffect())
   }
+
 }

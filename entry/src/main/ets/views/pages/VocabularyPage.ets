@@ -2,20 +2,24 @@ import { common } from '@kit.AbilityKit';
 import { HdsListItem } from '@kit.UIDesignKit';
 import { FLOATING_TAB_CONTENT_INSET } from '../../common/AppTheme';
 import { LearningJourney, VocabularyEntry } from '../../model/ContentModels';
+import { AiInquiryContext } from '../../model/DeepSeekModels';
+import { AiInquiryFactory } from '../../services/AiInquiryFactory';
 import { ContentRepository } from '../../services/ContentRepository';
 import { VocabularyDataSource } from '../../services/VocabularyDataSource';
+import { AiAskAction } from '../components/AiAskAction';
 import { contentLightEffect, planeLightEffect } from '../components/ImmersiveCanvas';
 import { PageChrome } from '../components/PageChrome';
 
 @Component
 export struct VocabularyPage {
   journey: LearningJourney | undefined = undefined;
-  onSettings: () => void = () => {};
+  onAsk: (context: AiInquiryContext) => void = (context: AiInquiryContext) => {};
 
   @State private level: string = 'N5';
   @State private source: VocabularyEntry[] = [];
   @State private query: string = '';
   @State private focusWord: VocabularyEntry | undefined = undefined;
+  @State private selectedInquiryKey: string = '';
   @State private loadError: string = '';
   @State private journeyOnly: boolean = false;
   private dataSource: VocabularyDataSource = new VocabularyDataSource();
@@ -60,11 +64,29 @@ export struct VocabularyPage {
     }
     this.dataSource.reset(filtered);
     this.focusWord = filtered.length > 0 ? filtered[0] : undefined;
+    this.selectedInquiryKey = '';
+  }
+
+  private wordInquiryKey(item: VocabularyEntry): string {
+    return `word-${item.id}`;
+  }
+
+  private exampleInquiryKey(item: VocabularyEntry): string {
+    return `example-${item.id}`;
+  }
+
+  private toggleInquirySelection(key: string): void {
+    this.selectedInquiryKey = this.selectedInquiryKey === key ? '' : key;
+  }
+
+  private selectWord(item: VocabularyEntry): void {
+    this.focusWord = item;
+    this.toggleInquirySelection(this.wordInquiryKey(item));
   }
 
   build() {
     Column() {
-      PageChrome({ title: '单词', onSettings: this.onSettings })
+      PageChrome({ title: '单词' })
       if (this.journey !== undefined) {
         this.journeyBridge()
       }
@@ -193,33 +215,54 @@ export struct VocabularyPage {
   @Builder
   private wordStage(item: VocabularyEntry) {
     Column({ space: 18 }) {
-      Row() {
-        Text(item.word)
-          .fontSize(item.word.length > 7 ? 36 : 50)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.ink'))
-          .layoutWeight(1)
-        Column({ space: 5 }) {
-          Text(item.reading)
-            .fontSize(15)
-            .fontColor($r('app.color.accent'))
-          Text(item.level)
-            .fontSize(10)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.ink_muted'))
-            .letterSpacing(1)
+      Column({ space: 12 }) {
+        Row() {
+          Text(item.word)
+            .fontSize(item.word.length > 7 ? 36 : 50)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+            .layoutWeight(1)
+          Column({ space: 5 }) {
+            Text(item.reading)
+              .fontSize(15)
+              .fontColor($r('app.color.accent'))
+            Text(item.level)
+              .fontSize(10)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.ink_muted'))
+              .letterSpacing(1)
+          }
+          .alignItems(HorizontalAlign.End)
         }
-        .alignItems(HorizontalAlign.End)
+        .width('100%')
+        .alignItems(VerticalAlign.Bottom)
+
+        Text(item.meanings.join('；'))
+          .width('100%')
+          .fontSize(18)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.ink'))
+          .lineHeight(29)
       }
       .width('100%')
-      .alignItems(VerticalAlign.Bottom)
+      .alignItems(HorizontalAlign.Start)
+      .padding(12)
+      .borderRadius(20)
+      .backgroundColor(this.selectedInquiryKey === this.wordInquiryKey(item) ?
+        $r('app.color.accent_soft') : Color.Transparent)
+      .onClick(() => this.toggleInquirySelection(this.wordInquiryKey(item)))
 
-      Text(item.meanings.join('；'))
+      if (this.selectedInquiryKey === this.wordInquiryKey(item)) {
+        Row() {
+          Blank()
+          AiAskAction({
+            label: '问这个词',
+            onAsk: () => this.onAsk(AiInquiryFactory.word(item))
+          })
+        }
         .width('100%')
-        .fontSize(18)
-        .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.ink'))
-        .lineHeight(29)
+      }
+
       if (item.example !== undefined) {
         Column({ space: 6 }) {
           Text(item.example.japanese)
@@ -237,9 +280,25 @@ export struct VocabularyPage {
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
-        .width('91%')
-        .alignSelf(ItemAlign.End)
+        .width('100%')
         .alignItems(HorizontalAlign.Start)
+        .padding(12)
+        .borderRadius(18)
+        .backgroundColor(this.selectedInquiryKey === this.exampleInquiryKey(item) ?
+          $r('app.color.accent_soft') : Color.Transparent)
+        .onClick(() => this.toggleInquirySelection(this.exampleInquiryKey(item)))
+
+        if (this.selectedInquiryKey === this.exampleInquiryKey(item)) {
+          Row() {
+            Blank()
+            AiAskAction({
+              label: '问例句',
+              onAsk: () => this.onAsk(AiInquiryFactory.example(
+                item.example?.japanese ?? '', item.example?.english ?? '', item.word))
+            })
+          }
+          .width('100%')
+        }
       }
     }
     .width('100%')
@@ -277,6 +336,6 @@ export struct VocabularyPage {
     .width('100%')
     .padding({ top: 15, bottom: 15 })
     .visualEffect(contentLightEffect())
-    .onClick(() => this.focusWord = item)
+    .onClick(() => this.selectWord(item))
   }
 }

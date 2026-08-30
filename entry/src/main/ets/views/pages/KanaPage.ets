@@ -1,17 +1,21 @@
 import { common } from '@kit.AbilityKit';
 import { FLOATING_TAB_CONTENT_INSET } from '../../common/AppTheme';
 import { JourneyKanaFocus, KanaCell, KanaRow, LearningCatalog, LearningJourney } from '../../model/ContentModels';
+import { AiInquiryContext } from '../../model/DeepSeekModels';
+import { AiInquiryFactory } from '../../services/AiInquiryFactory';
 import { ContentRepository } from '../../services/ContentRepository';
+import { AiAskAction } from '../components/AiAskAction';
 import { contentLightEffect, planeLightEffect } from '../components/ImmersiveCanvas';
 import { PageChrome } from '../components/PageChrome';
 
 @Component
 export struct KanaPage {
   journey: LearningJourney | undefined = undefined;
-  onSettings: () => void = () => {};
+  onAsk: (context: AiInquiryContext) => void = (context: AiInquiryContext) => {};
 
   @State private catalog: LearningCatalog | undefined = undefined;
   @State private selected: KanaCell | undefined = undefined;
+  @State private selectionActive: boolean = false;
   @State private loadError: string = '';
 
   aboutToAppear(): void {
@@ -27,6 +31,7 @@ export struct KanaPage {
           this.selected = journeyCell;
         }
       }
+      this.selectionActive = false;
       this.loadError = '';
     } catch (error) {
       this.loadError = '假名资源没有正确载入';
@@ -35,7 +40,7 @@ export struct KanaPage {
 
   build() {
     Column() {
-      PageChrome({ title: '五十音', onSettings: this.onSettings })
+      PageChrome({ title: '五十音' })
       if (this.journey !== undefined && this.catalog !== undefined) {
         this.journeyBridge()
       }
@@ -76,6 +81,12 @@ export struct KanaPage {
               }
               .alignItems(HorizontalAlign.Start)
               Blank()
+              if (this.selected !== undefined && this.selectionActive) {
+                AiAskAction({
+                  label: '问这个音',
+                  onAsk: () => this.askSelectedKana()
+                })
+              }
             }
             .width('100%')
             .padding({ top: 40, bottom: 38, left: 12 })
@@ -128,6 +139,30 @@ export struct KanaPage {
     return undefined;
   }
 
+  private askSelectedKana(): void {
+    if (this.selected === undefined) {
+      return;
+    }
+    let cue: string = '';
+    const focuses: JourneyKanaFocus[] = this.journey?.kana ?? [];
+    for (let index: number = 0; index < focuses.length; index++) {
+      if (focuses[index].key === this.selected.key) {
+        cue = focuses[index].cue;
+        break;
+      }
+    }
+    this.onAsk(AiInquiryFactory.kana(this.selected, cue));
+  }
+
+  private selectKana(cell: KanaCell): void {
+    if (this.selected?.key === cell.key && this.selectionActive) {
+      this.selectionActive = false;
+      return;
+    }
+    this.selected = cell;
+    this.selectionActive = true;
+  }
+
   @Builder
   private journeyBridge() {
     Row({ space: 12 }) {
@@ -163,7 +198,7 @@ export struct KanaPage {
         .onClick(() => {
           const cell: KanaCell | undefined = this.findKana(focus.key);
           if (cell !== undefined) {
-            this.selected = cell;
+            this.selectKana(cell);
           }
         })
       })
@@ -221,7 +256,7 @@ export struct KanaPage {
                 $r('app.color.immersive_plane_strong') : Color.Transparent)
               .borderRadius(14)
               .visualEffect(contentLightEffect())
-              .onClick(() => this.selected = cell)
+              .onClick(() => this.selectKana(cell))
             }, (cell: KanaCell) => cell.key)
             if (row.cells.length < 5) {
               ForEach(new Array<number>(5 - row.cells.length).fill(0), (item: number, index: number) => {

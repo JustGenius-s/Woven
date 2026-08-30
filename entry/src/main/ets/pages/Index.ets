@@ -1,54 +1,57 @@
 import { common } from '@kit.AbilityKit';
-import { curves } from '@kit.ArkUI';
+import { curves, LengthUnit, window } from '@kit.ArkUI';
 import { BlurStrategy, DividerMode, HdsTabs } from '@kit.UIDesignKit';
+import { SymbolGlyphModifier } from '@ohos.arkui.modifier';
 import {
   CONTENT_MAX_WIDTH,
   FLOATING_TAB_BAR_BOTTOM_MARGIN,
-  FLOATING_TAB_BAR_HEIGHT,
   FLOATING_TAB_CONTENT_INSET,
   MOTION_DURATION
 } from '../common/AppTheme';
 import { preferredImmersiveMaterial } from '../common/ImmersiveMaterial';
 import { AppSection, LearningJourney, PracticeScenario } from '../model/ContentModels';
+import { AiInquiryContext } from '../model/DeepSeekModels';
 import { ContentRepository } from '../services/ContentRepository';
 import { LearningPreferences } from '../services/LearningPreferences';
 import { KanaPage } from '../views/pages/KanaPage';
 import { LearnPage } from '../views/pages/LearnPage';
 import { JourneyPage } from '../views/pages/JourneyPage';
-import { MaterialsPage } from '../views/pages/MaterialsPage';
+import { MePage } from '../views/pages/MePage';
 import { PracticePage } from '../views/pages/PracticePage';
 import { PracticeSessionPage } from '../views/pages/PracticeSessionPage';
 import { SettingsPage } from '../views/pages/SettingsPage';
 import { VocabularyPage } from '../views/pages/VocabularyPage';
 import { ImmersiveBackdrop } from '../views/components/ImmersiveCanvas';
+import { ContextAiPanel } from '../views/components/ContextAiPanel';
 
 @Entry
 @Component
 struct Index {
+  @Env(SystemProperties.WINDOW_AVOID_AREA) private avoidAreas: window.UIEnvWindowAvoidAreaInfoVP;
   @State private section: number = AppSection.LEARN;
-  @State private settingsOpen: boolean = false;
-  @State private gatewayUrl: string = '';
-  @State private appToken: string = '';
-  @State private model: string = '';
   @State private grammarIndex: number = 0;
+  @State private deepSeekApiKey: string = '';
+  @State private settingsOpen: boolean = false;
   @State private activeScenario: PracticeScenario | undefined = undefined;
   @State private journeys: LearningJourney[] = [];
   @State private currentJourney: LearningJourney | undefined = undefined;
   @State private journeyOpen: boolean = false;
   @State private journeyStage: number = 0;
   @State private journeyCompletedMask: number = 0;
+  @State private showHomeGuide: boolean = false;
+  @State private activeInquiry: AiInquiryContext | undefined = undefined;
+  @State private inquirySheetOpen: boolean = false;
 
   aboutToAppear(): void {
     const context: common.Context = this.getUIContext().getHostContext() as common.Context;
     const storedSection: number = LearningPreferences.section(context);
-    this.section = storedSection >= AppSection.LEARN && storedSection <= AppSection.PRACTICE ?
+    this.section = storedSection >= AppSection.LEARN && storedSection <= AppSection.ME ?
       storedSection : AppSection.LEARN;
-    this.gatewayUrl = LearningPreferences.gatewayUrl(context);
-    this.appToken = LearningPreferences.appToken(context);
-    this.model = LearningPreferences.model(context);
     this.grammarIndex = LearningPreferences.grammarIndex(context);
+    this.deepSeekApiKey = LearningPreferences.deepSeekApiKey(context);
     this.journeyStage = LearningPreferences.journeyStage(context);
     this.journeyCompletedMask = LearningPreferences.journeyCompletedMask(context);
+    this.showHomeGuide = LearningPreferences.shouldShowHomeGuide(context);
     try {
       this.journeys = ContentRepository.loadJourneys(context);
       const savedJourneyId: string = LearningPreferences.journeyId(context);
@@ -70,18 +73,45 @@ struct Index {
     LearningPreferences.saveSection(this.getUIContext().getHostContext() as common.Context, section);
   }
 
-  private saveSettings(gatewayUrl: string, appToken: string, model: string): void {
-    this.gatewayUrl = gatewayUrl;
-    this.appToken = appToken;
-    this.model = model;
-    LearningPreferences.saveAiSettings(this.getUIContext().getHostContext() as common.Context,
-      gatewayUrl, appToken, model);
-    this.settingsOpen = false;
-  }
-
   private saveGrammarIndex(index: number): void {
     this.grammarIndex = index;
     LearningPreferences.saveGrammarIndex(this.getUIContext().getHostContext() as common.Context, index);
+  }
+
+  private saveDeepSeekApiKey(apiKey: string): void {
+    this.deepSeekApiKey = apiKey;
+    LearningPreferences.saveDeepSeekApiKey(
+      this.getUIContext().getHostContext() as common.Context, apiKey);
+  }
+
+  private startPractice(scenario: PracticeScenario): void {
+    this.getUIContext().animateTo({ curve: curves.springMotion(0.4, 0.84, 0.18) }, () => {
+      this.activeScenario = scenario;
+    });
+  }
+
+  private closePractice(): void {
+    this.getUIContext().animateTo({ curve: curves.springMotion(0.36, 0.9, 0.14) }, () => {
+      this.activeScenario = undefined;
+    });
+  }
+
+  private openInquiry(context: AiInquiryContext): void {
+    if (this.deepSeekApiKey.trim().length === 0) {
+      this.settingsOpen = true;
+      return;
+    }
+    this.activeInquiry = context;
+    this.inquirySheetOpen = true;
+  }
+
+  private closeInquiry(): void {
+    this.inquirySheetOpen = false;
+  }
+
+  private finishInquiryDismissal(): void {
+    this.inquirySheetOpen = false;
+    this.activeInquiry = undefined;
   }
 
   private openJourney(journey: LearningJourney): void {
@@ -106,18 +136,6 @@ struct Index {
     });
   }
 
-  private startPractice(scenario: PracticeScenario): void {
-    this.getUIContext().animateTo({ curve: curves.springMotion(0.4, 0.84, 0.18) }, () => {
-      this.activeScenario = scenario;
-    });
-  }
-
-  private closePractice(): void {
-    this.getUIContext().animateTo({ curve: curves.springMotion(0.36, 0.9, 0.14) }, () => {
-      this.activeScenario = undefined;
-    });
-  }
-
   private saveJourneyProgress(journeyId: string, stage: number, completedMask: number): void {
     this.journeyStage = stage;
     this.journeyCompletedMask = completedMask;
@@ -125,20 +143,38 @@ struct Index {
       journeyId, stage, completedMask);
   }
 
-  @Builder
-  private tabItem(section: AppSection, symbol: Resource, label: string) {
-    Column({ space: 3 }) {
-      SymbolGlyph(symbol)
-        .fontSize(20)
-        .fontColor([this.section === section ? $r('app.color.accent') : $r('app.color.ink_muted')])
-      Text(label)
-        .fontSize(10)
-        .fontWeight(this.section === section ? FontWeight.Medium : FontWeight.Regular)
-        .fontColor(this.section === section ? $r('app.color.ink') : $r('app.color.ink_muted'))
-    }
-    .width('100%')
-    .height(54)
-    .justifyContent(FlexAlign.Center)
+  private dismissHomeGuide(): void {
+    this.getUIContext().animateTo({ curve: curves.springMotion(0.38, 0.88, 0.16) }, () => {
+      this.showHomeGuide = false;
+    });
+    LearningPreferences.saveHomeGuideSeen(this.getUIContext().getHostContext() as common.Context);
+  }
+
+  private topSafeInset(): number {
+    return Math.max(this.avoidAreas.statusBar.topRect.height, this.avoidAreas.cutout.topRect.height,
+      this.avoidAreas.navigationIndicator.topRect.height);
+  }
+
+  private bottomSafeInset(): number {
+    return Math.max(this.avoidAreas.navigationIndicator.bottomRect.height, this.avoidAreas.cutout.bottomRect.height,
+      this.avoidAreas.statusBar.bottomRect.height);
+  }
+
+  private leftSafeInset(): number {
+    return Math.max(this.avoidAreas.cutout.leftRect.width, this.avoidAreas.navigationIndicator.leftRect.width,
+      this.avoidAreas.statusBar.leftRect.width);
+  }
+
+  private rightSafeInset(): number {
+    return Math.max(this.avoidAreas.cutout.rightRect.width, this.avoidAreas.navigationIndicator.rightRect.width,
+      this.avoidAreas.statusBar.rightRect.width);
+  }
+
+  private tabSymbol(normalSymbol: Resource, selectedSymbol: Resource): TabBarSymbol {
+    return {
+      normal: new SymbolGlyphModifier(normalSymbol),
+      selected: new SymbolGlyphModifier(selectedSymbol)
+    };
   }
 
   build() {
@@ -159,9 +195,7 @@ struct Index {
       if (this.activeScenario !== undefined) {
         PracticeSessionPage({
           scenario: this.activeScenario,
-          gatewayUrl: this.gatewayUrl,
-          appToken: this.appToken,
-          model: this.model,
+          apiKey: this.deepSeekApiKey,
           onExit: () => this.closePractice()
         })
         .width('100%')
@@ -169,18 +203,26 @@ struct Index {
         .transition(TransitionEffect.OPACITY
           .combine(TransitionEffect.scale({ x: 0.94, y: 0.94 }))
           .animation({ curve: curves.springMotion(0.42, 0.82, 0.18) }))
+      } else if (this.settingsOpen) {
+        SettingsPage({
+          initialApiKey: this.deepSeekApiKey,
+          onBack: () => this.settingsOpen = false,
+          onSave: (apiKey: string) => this.saveDeepSeekApiKey(apiKey)
+        })
+        .width('100%')
+        .constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
+        .transition(TransitionEffect.OPACITY
+          .combine(TransitionEffect.scale({ x: 0.97, y: 0.97 }))
+          .animation({ curve: curves.springMotion(0.4, 0.86, 0.16) }))
       } else if (this.journeyOpen && this.currentJourney !== undefined) {
         JourneyPage({
           journey: this.currentJourney,
           initialStage: this.journeyStage,
           initialCompletedMask: this.journeyCompletedMask,
-          gatewayUrl: this.gatewayUrl,
-          appToken: this.appToken,
-          model: this.model,
+          onAsk: (context: AiInquiryContext) => this.openInquiry(context),
           onBack: () => this.closeJourney(),
           onProgress: (journeyId: string, stage: number, completedMask: number) =>
-            this.saveJourneyProgress(journeyId, stage, completedMask),
-          onStartPractice: (scenario: PracticeScenario) => this.startPractice(scenario)
+            this.saveJourneyProgress(journeyId, stage, completedMask)
         })
         .width('100%')
         .constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
@@ -188,74 +230,66 @@ struct Index {
           .combine(TransitionEffect.translate({ y: 22 }))
           .combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))
           .animation({ curve: curves.springMotion(0.46, 0.84, 0.18) }))
-      } else if (this.settingsOpen) {
-        SettingsPage({
-          initialGatewayUrl: this.gatewayUrl,
-          initialAppToken: this.appToken,
-          initialModel: this.model,
-          onClose: () => this.settingsOpen = false,
-          onSave: (gatewayUrl: string, appToken: string, model: string) =>
-            this.saveSettings(gatewayUrl, appToken, model)
-        })
-        .width('100%')
-        .constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
-        .transition(TransitionEffect.OPACITY
-          .combine(TransitionEffect.scale({ x: 0.97, y: 0.97 }))
-          .animation({ curve: curves.springMotion(0.4, 0.86, 0.16) }))
       } else {
         HdsTabs({ barPosition: BarPosition.End, index: this.section }) {
           TabContent() {
             LearnPage({
-              gatewayUrl: this.gatewayUrl,
-              appToken: this.appToken,
-              model: this.model,
               savedLessonIndex: this.grammarIndex,
               journeys: this.journeys,
               currentJourney: this.currentJourney,
               journeyStage: this.journeyStage,
               journeyCompletedMask: this.journeyCompletedMask,
+              showHomeGuide: this.showHomeGuide,
               onLessonChange: (index: number) => this.saveGrammarIndex(index),
               onJourney: (journey: LearningJourney) => this.openJourney(journey),
-              onSettings: () => this.settingsOpen = true,
-              onPractice: () => this.selectSection(AppSection.PRACTICE)
+              onAsk: (context: AiInquiryContext) => this.openInquiry(context),
+              onDismissHomeGuide: () => this.dismissHomeGuide()
             })
           }
-          .tabBar(this.tabItem(AppSection.LEARN, $r('sys.symbol.bookmark'), '旅程'))
+          .tabBar(BottomTabBarStyle.of(this.tabSymbol(
+            $r('sys.symbol.book_pages'), $r('sys.symbol.book_pages_fill')), '旅程'))
 
           TabContent() {
-            KanaPage({ journey: this.currentJourney, onSettings: () => this.settingsOpen = true })
-          }
-          .tabBar(this.tabItem(AppSection.KANA, $r('sys.symbol.square_and_pencil'), '假名'))
-
-          TabContent() {
-            VocabularyPage({ journey: this.currentJourney, onSettings: () => this.settingsOpen = true })
-          }
-          .tabBar(this.tabItem(AppSection.VOCABULARY, $r('sys.symbol.magnifyingglass'), '词库'))
-
-          TabContent() {
-            MaterialsPage({
-              gatewayUrl: this.gatewayUrl,
-              appToken: this.appToken,
-              model: this.model,
-              onSettings: () => this.settingsOpen = true
+            KanaPage({
+              journey: this.currentJourney,
+              onAsk: (context: AiInquiryContext) => this.openInquiry(context)
             })
           }
-          .tabBar(this.tabItem(AppSection.MATERIALS, $r('sys.symbol.envelope'), '输入'))
+          .tabBar(BottomTabBarStyle.of(this.tabSymbol(
+            $r('sys.symbol.character_square'), $r('sys.symbol.character_square_fill')), '假名'))
+
+          TabContent() {
+            VocabularyPage({
+              journey: this.currentJourney,
+              onAsk: (context: AiInquiryContext) => this.openInquiry(context)
+            })
+          }
+          .tabBar(BottomTabBarStyle.of(this.tabSymbol(
+            $r('sys.symbol.translate_square'), $r('sys.symbol.translate_square_fill')), '词库'))
 
           TabContent() {
             PracticePage({
               journey: this.currentJourney,
-              onSettings: () => this.settingsOpen = true,
+              apiKeyConfigured: this.deepSeekApiKey.length > 0,
               onStart: (scenario: PracticeScenario) => this.startPractice(scenario)
             })
           }
-          .tabBar(this.tabItem(AppSection.PRACTICE, $r('sys.symbol.message'), '对练'))
+          .tabBar(BottomTabBarStyle.of(this.tabSymbol(
+            $r('sys.symbol.message'), $r('sys.symbol.message_fill')), '对练'))
+
+          TabContent() {
+            MePage({
+              journey: this.currentJourney,
+              onSettings: () => this.settingsOpen = true
+            })
+          }
+          .tabBar(BottomTabBarStyle.of(this.tabSymbol(
+            $r('sys.symbol.person'), $r('sys.symbol.person_fill')), '我的'))
         }
         .width('100%')
         .height('100%')
         .constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
         .barMode(BarMode.Fixed)
-        .barHeight(FLOATING_TAB_BAR_HEIGHT)
         .scrollable(false)
         .animationDuration(MOTION_DURATION)
         .barOverlap(true)
@@ -272,8 +306,7 @@ struct Index {
           adaptToHandedness: true,
           lightColor: $r('app.color.accent'),
           systemMaterialEffect: preferredImmersiveMaterial(),
-          thermoCtrl: true,
-          barOpacity: 0.94
+          thermoCtrl: true
         })
         .onChange((section: number) => {
           if (section !== this.section) {
@@ -287,20 +320,53 @@ struct Index {
     }
     .width('100%')
     .height('100%')
+    .bindSheet($$this.inquirySheetOpen, this.aiInquirySheet(), {
+      height: SheetSize.LARGE,
+      preferType: SheetType.BOTTOM,
+      radius: { value: 32, unit: LengthUnit.VP },
+      dragBar: true,
+      showClose: true,
+      title: { title: '问 AI', subtitle: '围绕当前内容连续追问' },
+      backgroundColor: $r('app.color.surface_raised'),
+      maskColor: '#33202124',
+      blurStyle: BlurStyle.COMPONENT_REGULAR,
+      keyboardAvoidMode: SheetKeyboardAvoidMode.TRANSLATE_AND_SCROLL,
+      onDisappear: () => this.finishInquiryDismissal()
+    })
+    .padding({
+      top: this.topSafeInset(),
+      bottom: this.bottomSafeInset(),
+      left: this.leftSafeInset(),
+      right: this.rightSafeInset()
+    })
     .backgroundColor(Color.Transparent)
   }
 
+  @Builder
+  private aiInquirySheet() {
+    if (this.activeInquiry !== undefined) {
+      ContextAiPanel({
+        context: this.activeInquiry,
+        apiKey: this.deepSeekApiKey
+      })
+    }
+  }
+
   onBackPress(): boolean {
+    if (this.inquirySheetOpen) {
+      this.closeInquiry();
+      return true;
+    }
     if (this.activeScenario !== undefined) {
       this.closePractice();
       return true;
     }
-    if (this.journeyOpen) {
-      this.closeJourney();
-      return true;
-    }
     if (this.settingsOpen) {
       this.settingsOpen = false;
+      return true;
+    }
+    if (this.journeyOpen) {
+      this.closeJourney();
       return true;
     }
     if (this.section !== AppSection.LEARN) {

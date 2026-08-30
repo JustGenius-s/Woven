@@ -2,8 +2,8 @@ export enum AppSection {
   LEARN = 0,
   KANA = 1,
   VOCABULARY = 2,
-  MATERIALS = 3,
-  PRACTICE = 4
+  PRACTICE = 3,
+  ME = 4
 }
 
 export interface KanaCell {
@@ -164,37 +164,4 @@ export interface VocabularyEntry {
   meanings: string[];
   common: boolean;
   example?: VocabularyExample;
-}
-
-export interface NewsItem {
-  id: string;
-  title: string;
-  summary: string;
-  url: string;
-  publishedAt?: string;
-}
-
-export interface NewsSnapshot {
-  source: string;
-  sourceUrl: string;
-  fetchedAt: string;
-  stale: boolean;
-  items: NewsItem[];
-}
-
-export interface NewsArticle {
-  url: string;
-  title: string;
-  body: string;
-  imageUrl?: string;
-  publishedAt?: string;
-  complete: boolean;
-}
-
-export interface VideoStudyItem {
-  id: string;
-  title: string;
-  url: string;
-  transcript: string;
-  createdAt: number;
 }

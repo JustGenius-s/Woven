@@ -10,10 +10,12 @@ import {
   KanaRow,
   LearningCatalog,
   LearningJourney,
-  PracticeScenario,
   VocabularyEntry
 } from '../../model/ContentModels';
+import { AiInquiryContext } from '../../model/DeepSeekModels';
+import { AiInquiryFactory } from '../../services/AiInquiryFactory';
 import { ContentRepository } from '../../services/ContentRepository';
+import { AiAskAction } from '../components/AiAskAction';
 import { ImmersiveAction } from '../components/ImmersiveAction';
 import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
 import { contentLightEffect, ImmersivePlane, planeLightEffect } from '../components/ImmersiveCanvas';
@@ -64,13 +66,10 @@ export struct JourneyPage {
   journey: LearningJourney = EMPTY_JOURNEY;
   initialStage: number = 0;
   initialCompletedMask: number = 0;
-  gatewayUrl: string = '';
-  appToken: string = '';
-  model: string = '';
+  onAsk: (context: AiInquiryContext) => void = (context: AiInquiryContext) => {};
   onBack: () => void = () => {};
   onProgress: (journeyId: string, stage: number, completedMask: number) => void =
     (journeyId: string, stage: number, completedMask: number) => {};
-  onStartPractice: (scenario: PracticeScenario) => void = (scenario: PracticeScenario) => {};
 
   @State private stageIndex: number = 0;
   @State private completedMask: number = 0;
@@ -81,6 +80,7 @@ export struct JourneyPage {
   @State private grammarEntries: GrammarIndexEntry[] = [];
   @State private selectedKanaIndex: number = 0;
   @State private selectedWordIndex: number = 0;
+  @State private selectedInquiryKey: string = '';
   @State private showDialogueNotes: boolean = false;
   @State private selectedAnswerIndex: number = -1;
   @State private showFullGrammar: boolean = false;
@@ -153,8 +153,49 @@ export struct JourneyPage {
     return 0;
   }
 
+  private askSelectedKana(): void {
+    if (this.kanaCells.length === 0) {
+      return;
+    }
+    const index: number = Math.min(this.selectedKanaIndex, this.kanaCells.length - 1);
+    const cueIndex: number = Math.min(index, this.journey.kana.length - 1);
+    const cue: string = cueIndex >= 0 ? this.journey.kana[cueIndex].cue : '';
+    this.onAsk(AiInquiryFactory.kana(this.kanaCells[index], cue));
+  }
+
+  private askSelectedWord(): void {
+    if (this.words.length === 0) {
+      return;
+    }
+    const index: number = Math.min(this.selectedWordIndex, this.words.length - 1);
+    this.onAsk(AiInquiryFactory.word(this.words[index]));
+  }
+
+  private askDialogueLine(line: DialogueLine): void {
+    if (this.dialogue !== undefined) {
+      this.onAsk(AiInquiryFactory.dialogue(this.dialogue, line));
+    }
+  }
+
+  private toggleInquirySelection(key: string): void {
+    this.selectedInquiryKey = this.selectedInquiryKey === key ? '' : key;
+  }
+
+  private selectKanaForInquiry(index: number): void {
+    this.selectedKanaIndex = index;
+    this.toggleInquirySelection(`kana-${index}`);
+  }
+
+  private selectWordForInquiry(index: number): void {
+    this.selectedWordIndex = index;
+    this.toggleInquirySelection(`word-${index}`);
+  }
+
   private selectStage(index: number): void {
     const next: number = Math.max(0, Math.min(index, JOURNEY_STAGE_LABELS.length - 1));
+    if (next !== this.stageIndex) {
+      this.selectedInquiryKey = '';
+    }
     this.stageIndex = next;
     this.onProgress(this.journey.id, next, this.completedMask);
   }
@@ -165,17 +206,17 @@ export struct JourneyPage {
     this.getUIContext().animateTo({ curve: curves.springMotion(0.38, 0.8, 0.2) }, () => {
       this.completedMask = nextMask;
       this.stageIndex = next;
+      this.selectedInquiryKey = '';
     });
     this.onProgress(this.journey.id, next, nextMask);
   }
 
-  private startPractice(): void {
+  private completePractice(): void {
     const nextMask: number = this.completedMask | (1 << 5);
     this.getUIContext().animateTo({ curve: curves.springMotion(0.34, 0.84, 0.18) }, () => {
       this.completedMask = nextMask;
     });
     this.onProgress(this.journey.id, 5, nextMask);
-    this.onStartPractice(this.journey.practice);
   }
 
   private answer(index: number): void {
@@ -212,10 +253,8 @@ export struct JourneyPage {
       GrammarPage({
         entries: this.grammarEntries,
         initialIndex: this.grammarIndex(),
-        gatewayUrl: this.gatewayUrl,
-        appToken: this.appToken,
-        model: this.model,
         onIndexChange: (index: number) => {},
+        onAsk: this.onAsk,
         onBack: () => this.setFullGrammar(false)
       })
       .transition(TransitionEffect.OPACITY
@@ -409,12 +448,23 @@ export struct JourneyPage {
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
         .lineHeight(46)
+        .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+        .borderRadius(12)
+        .backgroundColor(this.selectedInquiryKey === 'scene' ?
+          $r('app.color.accent_soft') : Color.Transparent)
+        .onClick(() => this.toggleInquirySelection('scene'))
       Text(this.journey.goal)
         .width('100%')
         .fontSize(15)
         .fontColor($r('app.color.ink_muted'))
         .lineHeight(25)
       Row() {
+        if (this.selectedInquiryKey === 'scene') {
+          AiAskAction({
+            label: '问这句话',
+            onAsk: () => this.onAsk(AiInquiryFactory.grammar(this.journey.opening, this.journey.title))
+          })
+        }
         Blank()
         ImmersiveAction({
           label: '拆开这句话',
@@ -479,7 +529,7 @@ export struct JourneyPage {
             color: $r('app.color.gravity_glow'), offsetY: 3 })
           .animation({ curve: curves.responsiveSpringMotion(0.18, 0.84, 0.12) })
           .visualEffect(contentLightEffect())
-          .onClick(() => this.selectedKanaIndex = index)
+          .onClick(() => this.selectKanaForInquiry(index))
         })
       }
       .width('100%')
@@ -518,6 +568,12 @@ export struct JourneyPage {
       }
       .alignItems(HorizontalAlign.Start)
       Blank()
+      if (this.selectedInquiryKey === `kana-${this.selectedKanaIndex}`) {
+        AiAskAction({
+          label: '问这个音',
+          onAsk: () => this.askSelectedKana()
+        })
+      }
     }
     .width('100%')
     .padding(24)
@@ -557,7 +613,7 @@ export struct JourneyPage {
           .shadow({ radius: this.selectedWordIndex === index ? 10 : 0,
             color: $r('app.color.gravity_glow'), offsetY: 3 })
           .animation({ curve: curves.responsiveSpringMotion(0.18, 0.84, 0.12) })
-          .onClick(() => this.selectedWordIndex = index)
+          .onClick(() => this.selectWordForInquiry(index))
       })
     }
     .width('100%')
@@ -611,6 +667,16 @@ export struct JourneyPage {
           .fontColor($r('app.color.ink_muted'))
           .lineHeight(28)
       }
+      if (this.selectedInquiryKey === `word-${this.selectedWordIndex}`) {
+        Row() {
+          Blank()
+          AiAskAction({
+            label: '问这个词',
+            onAsk: () => this.askSelectedWord()
+          })
+        }
+        .width('100%')
+      }
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
@@ -638,11 +704,21 @@ export struct JourneyPage {
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.ink'))
             .lineHeight(28)
+          if (this.selectedInquiryKey === `grammar-example-${index}`) {
+            AiAskAction({
+              label: '问 AI',
+              onAsk: () => this.onAsk(AiInquiryFactory.grammar(example, this.journey.grammarPattern))
+            })
+          }
         }
         .width('100%')
-        .padding({ top: 15, bottom: 15 })
+        .padding({ left: 10, right: 10, top: 15, bottom: 15 })
+        .borderRadius(14)
+        .backgroundColor(this.selectedInquiryKey === `grammar-example-${index}` ?
+          $r('app.color.accent_soft') : Color.Transparent)
         .border({ width: { bottom: index + 1 < this.journey.grammarExamples.length ? 0.5 : 0 },
           color: $r('app.color.line') })
+        .onClick(() => this.toggleInquirySelection(`grammar-example-${index}`))
       })
     }
     .width('100%')
@@ -681,11 +757,27 @@ export struct JourneyPage {
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
         .lineHeight(48)
+        .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+        .borderRadius(12)
+        .backgroundColor(this.selectedInquiryKey === 'grammar-pattern' ?
+          $r('app.color.accent_soft') : Color.Transparent)
+        .onClick(() => this.toggleInquirySelection('grammar-pattern'))
       Text(this.journey.grammarMeaning)
         .width('100%')
         .fontSize(15)
         .fontColor($r('app.color.ink_muted'))
         .lineHeight(25)
+      if (this.selectedInquiryKey === 'grammar-pattern') {
+        Row() {
+          Blank()
+          AiAskAction({
+            label: '问这个句型',
+            onAsk: () => this.onAsk(AiInquiryFactory.grammar(
+              `${this.journey.grammarPattern}\n${this.journey.grammarMeaning}`, this.journey.title))
+          })
+        }
+        .width('100%')
+      }
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
@@ -744,6 +836,12 @@ export struct JourneyPage {
                 .fontColor($r('app.color.ink_muted'))
                 .textAlign(line.learner === true ? TextAlign.End : TextAlign.Start)
             }
+            if (this.selectedInquiryKey === `dialogue-${index}`) {
+              AiAskAction({
+                label: '问这句',
+                onAsk: () => this.askDialogueLine(line)
+              })
+            }
           }
           .width(line.learner === true ? '82%' : '90%')
           .alignItems(line.learner === true ? HorizontalAlign.End : HorizontalAlign.Start)
@@ -752,9 +850,13 @@ export struct JourneyPage {
           }
         }
         .width('100%')
-        .padding({ top: 16, bottom: 16 })
+        .padding({ left: 10, right: 10, top: 16, bottom: 16 })
+        .borderRadius(14)
+        .backgroundColor(this.selectedInquiryKey === `dialogue-${index}` ?
+          $r('app.color.accent_soft') : Color.Transparent)
         .border({ width: { bottom: index + 1 < (this.dialogue?.lines.length ?? 0) ? 0.5 : 0 },
           color: $r('app.color.line') })
+        .onClick(() => this.toggleInquirySelection(`dialogue-${index}`))
       })
     }
     .width('100%')
@@ -863,28 +965,43 @@ export struct JourneyPage {
 
   @Builder
   private practiceLaunchPlane() {
-    Row({ space: 16 }) {
-      Column({ space: 6 }) {
-        Text('进入真实角色对练')
-          .fontSize(19)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.ink'))
-        Text(`${this.journey.practice.learnerRole}  ×  ${this.journey.practice.aiRole}`)
-          .fontSize(12)
-          .fontColor($r('app.color.ink_muted'))
+    Column({ space: 14 }) {
+      Row({ space: 16 }) {
+        Column({ space: 6 }) {
+          Text('离线开口任务')
+            .fontSize(19)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+          Text(`${this.journey.practice.learnerRole}  ×  ${this.journey.practice.aiRole}`)
+            .fontSize(12)
+            .fontColor($r('app.color.ink_muted'))
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+        ImmersiveAction({
+          label: (this.completedMask & (1 << 5)) !== 0 ? '已完成' : '标记完成',
+          actionAccessibilityText: `完成${this.journey.practice.title}开口任务`,
+          icon: $r('sys.symbol.paperplane_fill'),
+          emphasized: true,
+          onAction: () => this.completePractice()
+        })
       }
-      .layoutWeight(1)
-      .alignItems(HorizontalAlign.Start)
-      ImmersiveAction({
-        actionAccessibilityText: `开始${this.journey.practice.title}`,
-        icon: $r('sys.symbol.paperplane_fill'),
-        actionSize: 48,
-        emphasized: true,
-        onAction: () => this.startPractice()
-      })
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+      Text(this.journey.practice.openingHint)
+        .width('100%')
+        .fontSize(17)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.ink'))
+        .lineHeight(28)
+      Text('不依赖网络：先遮住提示说一遍，再打开核对表达。')
+        .width('100%')
+        .fontSize(12)
+        .fontColor($r('app.color.ink_muted'))
+        .lineHeight(20)
     }
     .width('100%')
     .padding(20)
-    .alignItems(VerticalAlign.Center)
+    .alignItems(HorizontalAlign.Start)
   }
 }

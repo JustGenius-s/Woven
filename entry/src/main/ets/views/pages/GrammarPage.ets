@@ -9,14 +9,13 @@ import {
   GrammarVocabularyEntry,
   InlineSegment
 } from '../../model/ContentModels';
-import { ResponseInputMessage, ResponsesCreateRequest } from '../../model/AiModels';
+import { AiInquiryContext } from '../../model/DeepSeekModels';
+import { AiInquiryFactory } from '../../services/AiInquiryFactory';
 import { ContentRepository } from '../../services/ContentRepository';
 import { GrammarParser } from '../../services/GrammarParser';
-import { ResponsesClient } from '../../services/ResponsesClient';
+import { AiAskAction } from '../components/AiAskAction';
 import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
-import { ImmersiveAction } from '../components/ImmersiveAction';
 import { contentLightEffect, planeLightEffect } from '../components/ImmersiveCanvas';
-import { InlineAiResult } from '../components/PageChrome';
 
 const EMPTY_GRAMMAR_ENTRY: GrammarIndexEntry = {
   id: '',
@@ -36,10 +35,8 @@ const EMPTY_GRAMMAR_BLOCK: GrammarBlock = {
 export struct GrammarPage {
   entries: GrammarIndexEntry[] = [];
   initialIndex: number = 0;
-  gatewayUrl: string = '';
-  appToken: string = '';
-  model: string = '';
   onIndexChange: (index: number) => void = (index: number) => {};
+  onAsk: (context: AiInquiryContext) => void = (context: AiInquiryContext) => {};
   onBack: () => void = () => {};
 
   @State private lessonIndex: number = 0;
@@ -87,9 +84,7 @@ export struct GrammarPage {
         ForEach(this.entries, (entry: GrammarIndexEntry, index: number) => {
           GrammarLessonPage({
             entry: entry,
-            gatewayUrl: this.gatewayUrl,
-            appToken: this.appToken,
-            model: this.model,
+            onAsk: this.onAsk,
             onNext: () => {
               if (index === this.lessonIndex) {
                 this.nextLesson();
@@ -118,19 +113,14 @@ export struct GrammarPage {
 @Component
 struct GrammarLessonPage {
   entry: GrammarIndexEntry = EMPTY_GRAMMAR_ENTRY;
-  gatewayUrl: string = '';
-  appToken: string = '';
-  model: string = '';
+  onAsk: (context: AiInquiryContext) => void = (context: AiInquiryContext) => {};
   onNext: () => void = () => {};
 
   @State private lesson: GrammarLesson | undefined = undefined;
   @State private document: GrammarDocument | undefined = undefined;
   @State private loadError: string = '';
-  @State private aiText: string = '';
-  @State private aiLoading: boolean = false;
-  @State private aiError: string = '';
   @State private reachedEnd: boolean = false;
-  private aiClient?: ResponsesClient;
+  @State private selectedBlockIndex: number = -1;
 
   aboutToAppear(): void {
     if (this.lesson !== undefined) {
@@ -144,44 +134,6 @@ struct GrammarLessonPage {
     } catch (error) {
       this.loadError = '这一课没有正确载入';
     }
-  }
-
-  aboutToDisappear(): void {
-    this.aiClient?.cancel();
-  }
-
-  private askAi(): void {
-    if (this.lesson === undefined || this.aiLoading) {
-      return;
-    }
-    this.aiClient = new ResponsesClient(this.gatewayUrl, this.appToken);
-    this.aiText = '';
-    this.aiError = '';
-    this.aiLoading = true;
-    const input: ResponseInputMessage[] = [{
-      role: 'user',
-      content: [{
-        type: 'input_text',
-        text: `请基于下面课程，提炼三个真正需要记住的判断，并给一个自然日语微型对话。不要复述目录。\n\n${this.lesson.content.slice(0, 14000)}`
-      }]
-    }];
-    const body: ResponsesCreateRequest = {
-      model: this.model,
-      instructions: '你是严谨的日语教师。用简洁中文讲解，日语例句保留日文并标出必要读音。不编造课文中没有的规则。输出纯文本。',
-      input: input,
-      stream: true,
-      store: false
-    };
-    this.aiClient.stream(body, {
-      onDelta: (delta: string) => this.aiText += delta,
-      onCompleted: (responseId: string) => this.aiLoading = false,
-      onError: (message: string) => {
-        this.aiLoading = false;
-        this.aiError = message;
-      }
-    }).catch(() => {
-      this.aiLoading = false;
-    });
   }
 
   build() {
@@ -238,28 +190,27 @@ struct GrammarLessonPage {
 
         ForEach(this.document?.blocks ?? [], (block: GrammarBlock, index: number) => {
           ListItem() {
-            GrammarBlockView({ block: block, vocabulary: this.document?.vocabulary ?? [] })
+            GrammarBlockView({
+              block: block,
+              vocabulary: this.document?.vocabulary ?? [],
+              source: this.entry.title,
+              onAsk: this.onAsk,
+              selectionActive: this.selectedBlockIndex === index,
+              onSelectionChange: (selected: boolean) => {
+                if (selected) {
+                  this.selectedBlockIndex = index;
+                } else if (this.selectedBlockIndex === index) {
+                  this.selectedBlockIndex = -1;
+                }
+              }
+            })
           }
         }, (block: GrammarBlock, index: number) => `${this.entry.id}-${index}`)
 
         ListItem() {
-          Column({ space: 16 }) {
-            InlineAiResult({ title: '本课提炼', text: this.aiText, loading: this.aiLoading, error: this.aiError })
-            if (!this.aiLoading && this.aiText.length === 0) {
-              ImmersiveAction({
-                label: 'AI 讲解',
-                actionAccessibilityText: '生成本课 AI 讲解',
-                icon: $r('sys.symbol.dot_radiowaves_left_and_right'),
-                emphasized: true,
-                onAction: () => this.askAi()
-              })
-            }
-            Column()
-              .height(34)
-          }
+          Column()
+            .height(FLOATING_TAB_CONTENT_INSET)
           .width('100%')
-          .alignItems(HorizontalAlign.Start)
-          .padding({ top: 10, bottom: FLOATING_TAB_CONTENT_INSET })
         }
       }
       .width('100%')
@@ -298,21 +249,50 @@ struct GrammarLessonPage {
 struct GrammarBlockView {
   block: GrammarBlock = EMPTY_GRAMMAR_BLOCK;
   vocabulary: GrammarVocabularyEntry[] = [];
+  source: string = '';
+  onAsk: (context: AiInquiryContext) => void = (context: AiInquiryContext) => {};
+  selectionActive: boolean = false;
+  onSelectionChange: (selected: boolean) => void = (selected: boolean) => {};
   @State private selectedWord: string = '';
   @State private selectedReading: string = '';
   @State private selectedMeaning: string = '';
+  @State private selectedListIndex: number = -1;
+  @State private blockSelected: boolean = false;
 
   private select(segment: InlineSegment): void {
     if (!segment.annotated) {
+      if (this.selectionActive && this.blockSelected) {
+        this.blockSelected = false;
+        this.onSelectionChange(false);
+      } else {
+        this.selectedWord = '';
+        this.blockSelected = true;
+        this.onSelectionChange(true);
+      }
       return;
     }
-    if (this.selectedWord === segment.word) {
+    if (this.selectionActive && this.selectedWord === segment.word) {
       this.selectedWord = '';
+      this.onSelectionChange(false);
       return;
     }
+    this.blockSelected = false;
     this.selectedWord = segment.word;
     this.selectedReading = segment.reading;
     this.selectedMeaning = segment.meaning;
+    this.onSelectionChange(true);
+  }
+
+  private selectListItem(index: number): void {
+    if (this.selectionActive && this.selectedListIndex === index) {
+      this.selectedListIndex = -1;
+      this.onSelectionChange(false);
+      return;
+    }
+    this.selectedWord = '';
+    this.blockSelected = false;
+    this.selectedListIndex = index;
+    this.onSelectionChange(true);
   }
 
   build() {
@@ -385,8 +365,20 @@ struct GrammarBlockView {
               .fontSize(16)
               .fontColor($r('app.color.ink'))
               .lineHeight(27)
+            if (this.selectionActive && this.selectedListIndex === index) {
+              AiAskAction({
+                label: '问 AI',
+                onAsk: () => this.onAsk(AiInquiryFactory.grammar(item, this.source))
+              })
+            }
           }
+          .width('100%')
           .alignItems(VerticalAlign.Top)
+          .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+          .borderRadius(14)
+          .backgroundColor(this.selectionActive && this.selectedListIndex === index ?
+            $r('app.color.accent_soft') : Color.Transparent)
+          .onClick(() => this.selectListItem(index))
         })
       }
       .width('100%')
@@ -423,18 +415,17 @@ struct GrammarBlockView {
               .fontColor(segment.annotated ? $r('app.color.accent') : $r('app.color.ink'))
               .fontWeight(segment.annotated ? FontWeight.Medium : FontWeight.Regular)
               .lineHeight(29)
-              .backgroundColor(Color.Transparent)
-              .onHover((isHover: boolean) => {
-                if (isHover && segment.annotated && this.selectedWord !== segment.word) {
-                  this.select(segment);
-                }
-              })
+              .backgroundColor(this.selectionActive &&
+                ((segment.annotated && this.selectedWord === segment.word) ||
+                  (!segment.annotated && this.blockSelected)) ?
+                $r('app.color.accent_soft') : Color.Transparent)
+              .borderRadius(4)
               .onClick(() => this.select(segment))
           }, (segment: InlineSegment, index: number) => `${index}-${segment.text}`)
         }
         .width('100%')
 
-        if (this.selectedWord.length > 0) {
+        if (this.selectionActive && this.selectedWord.length > 0) {
           Row({ space: 8 }) {
             Text(this.selectedWord)
               .fontSize(14)
@@ -447,11 +438,27 @@ struct GrammarBlockView {
               .layoutWeight(1)
               .fontSize(13)
               .fontColor($r('app.color.ink'))
+            AiAskAction({
+              label: '问这个词',
+              onAsk: () => this.onAsk(AiInquiryFactory.grammar(
+                `${this.selectedWord}（${this.selectedReading}）：${this.selectedMeaning}\n${this.block.text}`,
+                this.source))
+            })
           }
           .width('100%')
           .padding({ left: 14, top: 8, bottom: 8 })
           .border({ width: { left: 2 }, color: $r('app.color.accent') })
           .visualEffect(contentLightEffect())
+        }
+        if (this.selectionActive && this.blockSelected) {
+          Row() {
+            Blank()
+            AiAskAction({
+              label: '问这段',
+              onAsk: () => this.onAsk(AiInquiryFactory.grammar(this.block.text, this.source))
+            })
+          }
+          .width('100%')
         }
       }
       .width('100%')

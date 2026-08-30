@@ -6,9 +6,6 @@ export struct ImmersiveBackdrop {
   @BuilderParam canvasContent: () => void = this.emptyContent;
 
   @State private settled: boolean = false;
-  @State private lightX: number = 80;
-  @State private lightY: number = 130;
-  @State private lightIntensity: number = 0;
 
   aboutToAppear(): void {
     setTimeout(() => this.settled = true, 60);
@@ -73,45 +70,11 @@ export struct ImmersiveBackdrop {
         .hitTestBehavior(HitTestMode.None)
 
       this.canvasContent()
-
-      Column()
-        .width(1)
-        .height(1)
-        .position({ x: this.lightX, y: this.lightY })
-        .visualEffect(new hdsEffect.HdsEffectBuilder()
-          .pointLight({
-            options: {
-              color: $r('app.color.immersive_light'),
-              intensity: this.lightIntensity,
-              height: 150,
-              bloom: 0.34
-            }
-          })
-          .buildEffect())
-        .hitTestBehavior(HitTestMode.None)
     }
     .width('100%')
     .height('100%')
     .clip(true)
     .backgroundColor($r('app.color.surface'))
-    .onTouch((event: TouchEvent) => this.trackLight(event))
-  }
-
-  private trackLight(event: TouchEvent): void {
-    if (event.touches.length === 0) {
-      return;
-    }
-    if (event.type === TouchType.Down || event.type === TouchType.Move) {
-      this.lightX = event.touches[0].x;
-      this.lightY = event.touches[0].y;
-      this.getUIContext().animateTo({ duration: 120, curve: Curve.EaseOut }, () => {
-        this.lightIntensity = 2.6;
-      });
-    } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-      this.getUIContext().animateTo({ duration: 520, curve: Curve.EaseOut }, () => {
-        this.lightIntensity = 0;
-      });
-    }
   }
 }
 
@@ -182,33 +145,5 @@ export function contentLightEffect(): VisualEffect {
 export function planeLightEffect(): VisualEffect {
   return new hdsEffect.HdsEffectBuilder()
     .pointLight({ illuminatedType: hdsEffect.PointLightIlluminatedType.BORDER_CONTENT })
-    .buildEffect();
-}
-
-export function aiFlowEffect(active: boolean): VisualEffect {
-  if (!active) {
-    return new hdsEffect.HdsEffectBuilder()
-      .pointLight({ illuminatedType: hdsEffect.PointLightIlluminatedType.BORDER_CONTENT })
-      .buildEffect();
-  }
-  return new hdsEffect.HdsEffectBuilder()
-    .pointLight({ illuminatedType: hdsEffect.PointLightIlluminatedType.BORDER_CONTENT })
-    .shaderEffect({
-      effectType: hdsEffect.EffectType.DUAL_EDGE_FLOW_LIGHT,
-      animation: {
-        duration: 1900,
-        iterations: -1,
-        curve: Curve.EaseInOut,
-        expectedFrameRateRange: {
-          min: hdsEffect.FrameRateType.FRAME_RATE_15,
-          expected: hdsEffect.FrameRateType.FRAME_RATE_30,
-          max: hdsEffect.FrameRateType.FRAME_RATE_60
-        }
-      },
-      params: {
-        firstEdgeFlowLight: { startPos: 0.02, endPos: 0.18, color: $r('app.color.accent') },
-        secondEdgeFlowLight: { startPos: 0.52, endPos: 0.68, color: $r('app.color.immersive_cool') }
-      }
-    })
     .buildEffect();
 }
