@@ -52,6 +52,40 @@ export interface PracticeScenario {
   openingHint: string;
 }
 
+export interface JourneyKanaFocus {
+  key: string;
+  cue: string;
+}
+
+export interface JourneyChallenge {
+  prompt: string;
+  options: string[];
+  answerIndex: number;
+  explanation: string;
+}
+
+export interface LearningJourney {
+  id: string;
+  order: number;
+  title: string;
+  japaneseTitle: string;
+  setting: string;
+  level: string;
+  duration: string;
+  goal: string;
+  opening: string;
+  kana: JourneyKanaFocus[];
+  vocabularyLevel: string;
+  wordIds: string[];
+  grammarLessonId: string;
+  grammarPattern: string;
+  grammarMeaning: string;
+  grammarExamples: string[];
+  dialogueId: string;
+  practice: PracticeScenario;
+  challenge: JourneyChallenge;
+}
+
 export interface LearningCatalog {
   schemaVersion: number;
   kanaGroups: KanaGroups;
@@ -164,4 +198,3 @@ export interface VideoStudyItem {
   transcript: string;
   createdAt: number;
 }
-

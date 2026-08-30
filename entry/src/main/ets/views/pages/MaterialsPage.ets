@@ -1,4 +1,5 @@
 import { common } from '@kit.AbilityKit';
+import { curves } from '@kit.ArkUI';
 import {
   NewsArticle,
   NewsItem,
@@ -6,7 +7,7 @@ import {
   VideoStudyItem
 } from '../../model/ContentModels';
 import { ResponseInputMessage, ResponsesCreateRequest } from '../../model/AiModels';
-import { compactDate, FLOATING_TAB_CONTENT_INSET } from '../../common/AppTheme';
+import { compactDate, FLOATING_TAB_CONTENT_INSET, MOTION_DURATION } from '../../common/AppTheme';
 import { showImmersiveNotice } from '../../common/ImmersiveNotice';
 import { LearningPreferences } from '../../services/LearningPreferences';
 import { NewsClient } from '../../services/NewsClient';
@@ -187,7 +188,8 @@ export struct MaterialsPage {
       .index(this.newsIndex)
       .indicator(false)
       .loop(false)
-      .duration(280)
+      .duration(MOTION_DURATION)
+      .curve(curves.springMotion(0.42, 0.86, 0.16))
       .layoutWeight(1)
       .onChange((index: number) => this.newsIndex = index)
     }

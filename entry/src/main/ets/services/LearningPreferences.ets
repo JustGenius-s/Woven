@@ -9,6 +9,9 @@ const KEY_MODEL: string = 'model';
 const KEY_GRAMMAR_INDEX: string = 'grammar_index';
 const KEY_SECTION: string = 'section';
 const KEY_VIDEOS: string = 'videos';
+const KEY_JOURNEY_ID: string = 'journey_id';
+const KEY_JOURNEY_STAGE: string = 'journey_stage';
+const KEY_JOURNEY_COMPLETED_MASK: string = 'journey_completed_mask';
 
 export class LearningPreferences {
   private static store(context: common.Context): preferences.Preferences {
@@ -55,6 +58,18 @@ export class LearningPreferences {
     return LearningPreferences.readNumber(context, KEY_SECTION, 0);
   }
 
+  static journeyId(context: common.Context): string {
+    return LearningPreferences.readString(context, KEY_JOURNEY_ID, 'first-meeting');
+  }
+
+  static journeyStage(context: common.Context): number {
+    return LearningPreferences.readNumber(context, KEY_JOURNEY_STAGE, 0);
+  }
+
+  static journeyCompletedMask(context: common.Context): number {
+    return LearningPreferences.readNumber(context, KEY_JOURNEY_COMPLETED_MASK, 0);
+  }
+
   static videos(context: common.Context): VideoStudyItem[] {
     const raw: string = LearningPreferences.readString(context, KEY_VIDEOS, '[]');
     try {
@@ -90,6 +105,19 @@ export class LearningPreferences {
     try {
       const store: preferences.Preferences = LearningPreferences.store(context);
       store.putSync(KEY_SECTION, section);
+      store.flush();
+    } catch (error) {
+      return;
+    }
+  }
+
+  static saveJourneyProgress(context: common.Context, journeyId: string, stage: number,
+    completedMask: number): void {
+    try {
+      const store: preferences.Preferences = LearningPreferences.store(context);
+      store.putSync(KEY_JOURNEY_ID, journeyId);
+      store.putSync(KEY_JOURNEY_STAGE, stage);
+      store.putSync(KEY_JOURNEY_COMPLETED_MASK, completedMask);
       store.flush();
     } catch (error) {
       return;

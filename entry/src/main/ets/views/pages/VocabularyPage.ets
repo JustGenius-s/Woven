@@ -1,7 +1,7 @@
 import { common } from '@kit.AbilityKit';
 import { HdsListItem } from '@kit.UIDesignKit';
 import { FLOATING_TAB_CONTENT_INSET } from '../../common/AppTheme';
-import { VocabularyEntry } from '../../model/ContentModels';
+import { LearningJourney, VocabularyEntry } from '../../model/ContentModels';
 import { ContentRepository } from '../../services/ContentRepository';
 import { VocabularyDataSource } from '../../services/VocabularyDataSource';
 import { contentLightEffect, planeLightEffect } from '../components/ImmersiveCanvas';
@@ -9,6 +9,7 @@ import { PageChrome } from '../components/PageChrome';
 
 @Component
 export struct VocabularyPage {
+  journey: LearningJourney | undefined = undefined;
   onSettings: () => void = () => {};
 
   @State private level: string = 'N5';
@@ -16,10 +17,16 @@ export struct VocabularyPage {
   @State private query: string = '';
   @State private focusWord: VocabularyEntry | undefined = undefined;
   @State private loadError: string = '';
+  @State private journeyOnly: boolean = false;
   private dataSource: VocabularyDataSource = new VocabularyDataSource();
 
   aboutToAppear(): void {
-    this.loadLevel(this.level);
+    if (this.journey !== undefined) {
+      this.journeyOnly = true;
+      this.loadLevel(this.journey.vocabularyLevel);
+    } else {
+      this.loadLevel(this.level);
+    }
   }
 
   private loadLevel(level: string): void {
@@ -39,18 +46,15 @@ export struct VocabularyPage {
 
   private applyFilter(): void {
     const needle: string = this.query.trim().toLowerCase();
-    if (needle.length === 0) {
-      this.dataSource.reset(this.source);
-      if (this.focusWord === undefined && this.source.length > 0) {
-        this.focusWord = this.source[0];
-      }
-      return;
-    }
     const filtered: VocabularyEntry[] = [];
     for (let index: number = 0; index < this.source.length; index++) {
       const item: VocabularyEntry = this.source[index];
       const meaning: string = item.meanings.join(' ');
-      if (`${item.word}\n${item.reading}\n${meaning}`.toLowerCase().includes(needle)) {
+      const belongsToJourney: boolean = this.journey === undefined ||
+        this.journey.wordIds.includes(item.id);
+      const matchesQuery: boolean = needle.length === 0 ||
+        `${item.word}\n${item.reading}\n${meaning}`.toLowerCase().includes(needle);
+      if ((!this.journeyOnly || belongsToJourney) && matchesQuery) {
         filtered.push(item);
       }
     }
@@ -61,13 +65,19 @@ export struct VocabularyPage {
   build() {
     Column() {
       PageChrome({ title: '单词', onSettings: this.onSettings })
+      if (this.journey !== undefined) {
+        this.journeyBridge()
+      }
       Row({ space: 18 }) {
         ForEach(['N5', 'N4', 'N3', 'N2', 'N1'], (level: string) => {
           Text(level)
             .fontSize(13)
             .fontWeight(this.level === level ? FontWeight.Bold : FontWeight.Regular)
             .fontColor(this.level === level ? $r('app.color.accent') : $r('app.color.ink_muted'))
-            .onClick(() => this.loadLevel(level))
+            .onClick(() => {
+              this.journeyOnly = false;
+              this.loadLevel(level);
+            })
         })
       }
       .width('100%')
@@ -78,7 +88,7 @@ export struct VocabularyPage {
         SymbolGlyph($r('sys.symbol.magnifyingglass'))
           .fontSize(17)
           .fontColor([$r('app.color.ink_muted')])
-        TextInput({ text: this.query, placeholder: `搜索 ${this.level}` })
+        TextInput({ text: this.query, placeholder: this.journeyOnly ? '搜索本次旅程' : `搜索 ${this.level}` })
           .layoutWeight(1)
           .height('100%')
           .fontSize(14)
@@ -141,6 +151,43 @@ export struct VocabularyPage {
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Transparent)
+  }
+
+  @Builder
+  private journeyBridge() {
+    Row({ space: 14 }) {
+      Column({ space: 3 }) {
+        Text('当前旅程词组')
+          .fontSize(10)
+          .fontColor($r('app.color.accent'))
+        Text(this.journey?.title ?? '')
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.ink'))
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+      Text(this.journeyOnly ? '查看完整词库' : `只看 ${this.journey?.wordIds.length ?? 0} 个词`)
+        .fontSize(12)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.accent'))
+        .padding({ left: 12, right: 12, top: 9, bottom: 9 })
+        .borderRadius(16)
+        .backgroundColor($r('app.color.accent_soft'))
+        .onClick(() => {
+          if (this.journeyOnly) {
+            this.journeyOnly = false;
+            this.applyFilter();
+          } else {
+            this.journeyOnly = true;
+            this.query = '';
+            this.loadLevel(this.journey?.vocabularyLevel ?? 'N5');
+          }
+        })
+    }
+    .width('100%')
+    .padding({ left: 24, right: 24, top: 4, bottom: 8 })
+    .visualEffect(contentLightEffect())
   }
 
   @Builder

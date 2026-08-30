@@ -1,5 +1,7 @@
 /.hvigor/
 /.idea/
+/build/
+**/.DS_Store
 /node_modules/
 /oh_modules/
 /entry/oh_modules/

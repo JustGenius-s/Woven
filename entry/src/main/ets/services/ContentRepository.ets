@@ -4,6 +4,7 @@ import {
   ContentManifest,
   GrammarIndexEntry,
   GrammarLesson,
+  LearningJourney,
   LearningCatalog,
   VocabularyEntry
 } from '../model/ContentModels';
@@ -15,6 +16,10 @@ export class ContentRepository {
 
   static loadManifest(context: common.Context): ContentManifest {
     return JSON.parse(ContentRepository.readText(context, 'content/manifest.json')) as ContentManifest;
+  }
+
+  static loadJourneys(context: common.Context): LearningJourney[] {
+    return JSON.parse(ContentRepository.readText(context, 'content/journeys.json')) as LearningJourney[];
   }
 
   static loadGrammarIndex(context: common.Context): GrammarIndexEntry[] {

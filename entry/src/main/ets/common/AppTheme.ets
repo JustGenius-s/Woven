@@ -2,8 +2,8 @@ export const APP_HORIZONTAL_PADDING: number = 24;
 export const FLOATING_TAB_BAR_HEIGHT: number = 64;
 export const FLOATING_TAB_BAR_BOTTOM_MARGIN: number = 12;
 export const FLOATING_TAB_CONTENT_INSET: number = 120;
-export const CONTENT_MAX_WIDTH: number = 760;
-export const MOTION_DURATION: number = 260;
+export const CONTENT_MAX_WIDTH: number = 840;
+export const MOTION_DURATION: number = 320;
 
 export function levelAccent(level: string): ResourceColor {
   if (level === 'N5' || level === '入门') {

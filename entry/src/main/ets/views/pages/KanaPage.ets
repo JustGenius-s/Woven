@@ -1,12 +1,13 @@
 import { common } from '@kit.AbilityKit';
 import { FLOATING_TAB_CONTENT_INSET } from '../../common/AppTheme';
-import { KanaCell, KanaRow, LearningCatalog } from '../../model/ContentModels';
+import { JourneyKanaFocus, KanaCell, KanaRow, LearningCatalog, LearningJourney } from '../../model/ContentModels';
 import { ContentRepository } from '../../services/ContentRepository';
 import { contentLightEffect, planeLightEffect } from '../components/ImmersiveCanvas';
 import { PageChrome } from '../components/PageChrome';
 
 @Component
 export struct KanaPage {
+  journey: LearningJourney | undefined = undefined;
   onSettings: () => void = () => {};
 
   @State private catalog: LearningCatalog | undefined = undefined;
@@ -20,6 +21,12 @@ export struct KanaPage {
       if (this.catalog.kanaGroups.basic.length > 0 && this.catalog.kanaGroups.basic[0].cells.length > 0) {
         this.selected = this.catalog.kanaGroups.basic[0].cells[0];
       }
+      if (this.journey !== undefined && this.journey.kana.length > 0) {
+        const journeyCell: KanaCell | undefined = this.findKana(this.journey.kana[0].key);
+        if (journeyCell !== undefined) {
+          this.selected = journeyCell;
+        }
+      }
       this.loadError = '';
     } catch (error) {
       this.loadError = '假名资源没有正确载入';
@@ -29,6 +36,9 @@ export struct KanaPage {
   build() {
     Column() {
       PageChrome({ title: '五十音', onSettings: this.onSettings })
+      if (this.journey !== undefined && this.catalog !== undefined) {
+        this.journeyBridge()
+      }
       if (this.loadError.length > 0) {
         Text(this.loadError)
           .layoutWeight(1)
@@ -97,6 +107,70 @@ export struct KanaPage {
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Transparent)
+  }
+
+  private findKana(key: string): KanaCell | undefined {
+    if (this.catalog === undefined) {
+      return undefined;
+    }
+    const groups: KanaRow[][] = [this.catalog.kanaGroups.basic, this.catalog.kanaGroups.voiced,
+      this.catalog.kanaGroups.contracted];
+    for (let groupIndex: number = 0; groupIndex < groups.length; groupIndex++) {
+      for (let rowIndex: number = 0; rowIndex < groups[groupIndex].length; rowIndex++) {
+        const row: KanaRow = groups[groupIndex][rowIndex];
+        for (let cellIndex: number = 0; cellIndex < row.cells.length; cellIndex++) {
+          if (row.cells[cellIndex].key === key) {
+            return row.cells[cellIndex];
+          }
+        }
+      }
+    }
+    return undefined;
+  }
+
+  @Builder
+  private journeyBridge() {
+    Row({ space: 12 }) {
+      Column({ space: 3 }) {
+        Text('当前旅程')
+          .fontSize(10)
+          .fontColor($r('app.color.accent'))
+        Text(this.journey?.title ?? '')
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.ink'))
+      }
+      .width(82)
+      .alignItems(HorizontalAlign.Start)
+      ForEach(this.journey?.kana ?? [], (focus: JourneyKanaFocus) => {
+        Column({ space: 2 }) {
+          Text(focus.key)
+            .fontSize(20)
+            .fontWeight(this.selected?.key === focus.key ? FontWeight.Bold : FontWeight.Medium)
+            .fontColor(this.selected?.key === focus.key ? $r('app.color.accent') : $r('app.color.ink'))
+          Text(focus.cue)
+            .fontSize(8)
+            .fontColor($r('app.color.ink_muted'))
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+        .layoutWeight(1)
+        .height(48)
+        .justifyContent(FlexAlign.Center)
+        .borderRadius(14)
+        .backgroundColor(this.selected?.key === focus.key ?
+          $r('app.color.accent_soft') : Color.Transparent)
+        .onClick(() => {
+          const cell: KanaCell | undefined = this.findKana(focus.key);
+          if (cell !== undefined) {
+            this.selected = cell;
+          }
+        })
+      })
+    }
+    .width('100%')
+    .padding({ left: 22, right: 22, top: 6, bottom: 10 })
+    .visualEffect(contentLightEffect())
   }
 
   @Builder

@@ -1,0 +1,202 @@
+[
+  {
+    "id": "first-meeting",
+    "order": 1,
+    "title": "初次见面",
+    "japaneseTitle": "はじめまして",
+    "setting": "オフィス",
+    "level": "入门",
+    "duration": "约 12 分钟",
+    "goal": "从认出关键假名开始，完成一段自然的自我介绍。",
+    "opening": "はじめまして。李です。",
+    "kana": [
+      { "key": "は", "cue": "はじめまして" },
+      { "key": "じ", "cue": "はじめまして" },
+      { "key": "め", "cue": "名前" },
+      { "key": "し", "cue": "私" }
+    ],
+    "vocabularyLevel": "N5",
+    "wordIds": ["jmdict-1311110", "jmdict-1531710", "jmdict-1198550", "jmdict-1547720"],
+    "grammarLessonId": "grammar-n5-01",
+    "grammarPattern": "私は〜です",
+    "grammarMeaning": "用「は」提出自己这个话题，再用「です」完成礼貌判断。",
+    "grammarExamples": ["私は李です。", "会社員です。", "上海から来ました。"],
+    "dialogueId": "first-meeting",
+    "practice": {
+      "id": "journey-first-meeting",
+      "title": "办公室初识",
+      "setting": "加入新团队的第一天",
+      "learnerRole": "新同事",
+      "aiRole": "田中同事",
+      "level": "入门",
+      "goal": "介绍姓名、来自哪里，并自然结束寒暄。",
+      "openingHint": "可以先说：はじめまして。李です。"
+    },
+    "challenge": {
+      "prompt": "想说“我来自上海”，哪一句最自然？",
+      "options": ["上海へ来ました。", "上海から来ました。", "上海で来ました。"],
+      "answerIndex": 1,
+      "explanation": "出发点用「から」。这里表达从上海来到现在的地方。"
+    }
+  },
+  {
+    "id": "convenience",
+    "order": 2,
+    "title": "便利店结账",
+    "japaneseTitle": "コンビニで",
+    "setting": "コンビニ",
+    "level": "入门",
+    "duration": "约 14 分钟",
+    "goal": "听懂店员的问题，并用支付方式自然完成结账。",
+    "opening": "カードでお願いします。",
+    "kana": [
+      { "key": "ふ", "cue": "ふくろ" },
+      { "key": "ろ", "cue": "ふくろ" },
+      { "key": "か", "cue": "カード" },
+      { "key": "で", "cue": "カードで" }
+    ],
+    "vocabularyLevel": "N5",
+    "wordIds": ["jmdict-1582120", "jmdict-1589730", "jmdict-1001820", "jmdict-1184270"],
+    "grammarLessonId": "grammar-n5-02",
+    "grammarPattern": "〜でお願いします",
+    "grammarMeaning": "「で」标记采用的方式。结账时可以直接替换卡、现金等支付方式。",
+    "grammarExamples": ["カードでお願いします。", "現金でお願いします。", "袋を一枚お願いします。"],
+    "dialogueId": "convenience",
+    "practice": {
+      "id": "journey-convenience",
+      "title": "便利店结账",
+      "setting": "晚间的东京便利店",
+      "learnerRole": "顾客",
+      "aiRole": "店员",
+      "level": "入门",
+      "goal": "回答是否需要袋子，听懂金额并说明支付方式。",
+      "openingHint": "商品放到柜台后，先听店员开口。"
+    },
+    "challenge": {
+      "prompt": "想说“请刷卡”，应该怎么回应？",
+      "options": ["カードをお願いします。", "カードでお願いします。", "カードからお願いします。"],
+      "answerIndex": 1,
+      "explanation": "支付手段用「で」。这句话在结账场景中简洁而自然。"
+    }
+  },
+  {
+    "id": "restaurant",
+    "order": 3,
+    "title": "餐厅点单",
+    "japaneseTitle": "おすすめは？",
+    "setting": "レストラン",
+    "level": "入门",
+    "duration": "约 15 分钟",
+    "goal": "询问推荐、听懂回答，再完整点下一份餐。",
+    "opening": "今日のおすすめは何ですか。",
+    "kana": [
+      { "key": "さ", "cue": "さかな" },
+      { "key": "か", "cue": "さかな" },
+      { "key": "た", "cue": "たべる" },
+      { "key": "べ", "cue": "たべる" }
+    ],
+    "vocabularyLevel": "N5",
+    "wordIds": ["jmdict-1554310", "jmdict-1578010", "jmdict-1358280", "jmdict-1600430"],
+    "grammarLessonId": "grammar-n5-01",
+    "grammarPattern": "〜は何ですか",
+    "grammarMeaning": "先用「は」锁定想问的话题，再用「何ですか」询问具体内容。",
+    "grammarExamples": ["おすすめは何ですか。", "今日の魚は何ですか。", "飲み物は何ですか。"],
+    "dialogueId": "restaurant",
+    "practice": {
+      "id": "journey-restaurant",
+      "title": "餐厅点单",
+      "setting": "午餐时间的小餐馆",
+      "learnerRole": "顾客",
+      "aiRole": "店员",
+      "level": "入门",
+      "goal": "询问今日推荐，并确认一份主食和饮料。",
+      "openingHint": "可以先说：おすすめは何ですか。"
+    },
+    "challenge": {
+      "prompt": "还没决定吃什么，最适合先问哪一句？",
+      "options": ["おすすめは何ですか。", "魚を何ですか。", "何がおすすめをしますか。"],
+      "answerIndex": 0,
+      "explanation": "「おすすめ」作为话题，用「は」提出，再用「何ですか」询问。"
+    }
+  },
+  {
+    "id": "station",
+    "order": 4,
+    "title": "车站问路",
+    "japaneseTitle": "駅で聞く",
+    "setting": "駅",
+    "level": "基础",
+    "duration": "约 16 分钟",
+    "goal": "问清站台、路线和是否换乘，并听懂行动指令。",
+    "opening": "渋谷へはどう行けばいいですか。",
+    "kana": [
+      { "key": "え", "cue": "えき" },
+      { "key": "き", "cue": "えき" },
+      { "key": "で", "cue": "でんしゃ" },
+      { "key": "ん", "cue": "でんしゃ" }
+    ],
+    "vocabularyLevel": "N5",
+    "wordIds": ["jmdict-1175140", "jmdict-1443530", "jmdict-1355120", "jmdict-1578850"],
+    "grammarLessonId": "grammar-n5-05",
+    "grammarPattern": "〜てください",
+    "grammarMeaning": "把动作变成て形，再接「ください」，用于礼貌地给出具体指引。",
+    "grammarExamples": ["電車に乗ってください。", "二番線へ行ってください。", "ここで待ってください。"],
+    "dialogueId": "station",
+    "practice": {
+      "id": "journey-station",
+      "title": "车站问路",
+      "setting": "新宿站的换乘通道",
+      "learnerRole": "游客",
+      "aiRole": "站务员",
+      "level": "基础",
+      "goal": "问去涩谷的路线，并确认站台和换乘。",
+      "openingHint": "可以先说：すみません、渋谷へはどう行けばいいですか。"
+    },
+    "challenge": {
+      "prompt": "站务员想说“请乘坐电车”，哪一句正确？",
+      "options": ["電車に乗るください。", "電車を乗ってください。", "電車に乗ってください。"],
+      "answerIndex": 2,
+      "explanation": "「乗る」的て形是「乗って」，乘坐对象通常用助词「に」。"
+    }
+  },
+  {
+    "id": "hotel",
+    "order": 5,
+    "title": "酒店入住",
+    "japaneseTitle": "チェックイン",
+    "setting": "ホテル",
+    "level": "基础",
+    "duration": "约 16 分钟",
+    "goal": "说明预约信息，完成入住，并确认早餐时间。",
+    "opening": "予約した王です。",
+    "kana": [
+      { "key": "へ", "cue": "へや" },
+      { "key": "や", "cue": "へや" },
+      { "key": "あ", "cue": "あさ" },
+      { "key": "さ", "cue": "あさ" }
+    ],
+    "vocabularyLevel": "N5",
+    "wordIds": ["jmdict-1122650", "jmdict-1499320", "jmdict-1260490", "jmdict-1315920"],
+    "grammarLessonId": "grammar-n5-02",
+    "grammarPattern": "〜から〜まで",
+    "grammarMeaning": "「から」标记开始点，「まで」标记结束点，时间和地点都能使用。",
+    "grammarExamples": ["朝七時から十時までです。", "駅からホテルまで歩きます。", "今日から三日間です。"],
+    "dialogueId": "hotel",
+    "practice": {
+      "id": "journey-hotel",
+      "title": "酒店入住",
+      "setting": "酒店前台",
+      "learnerRole": "住客",
+      "aiRole": "前台人员",
+      "level": "基础",
+      "goal": "报出预约姓名，确认房间并询问早餐时间。",
+      "openingHint": "可以先说：予約した王です。チェックインをお願いします。"
+    },
+    "challenge": {
+      "prompt": "想说“早餐从七点到十点”，哪一句正确？",
+      "options": ["朝食は七時で十時です。", "朝食は七時から十時までです。", "朝食は七時へ十時にです。"],
+      "answerIndex": 1,
+      "explanation": "时间范围使用「开始时间 + から + 结束时间 + まで」。"
+    }
+  }
+]

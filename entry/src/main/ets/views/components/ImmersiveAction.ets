@@ -44,7 +44,7 @@ export struct ImmersiveAction {
   private actionButton(): ActionBarButton {
     return new ActionBarButton({
       width: LengthMetrics.vp(this.actionSize),
-      backgroundColor: ColorMetrics.rgba(216, 98, 85, this.emphasized ? 0.18 : 0.06),
+      backgroundColor: ColorMetrics.rgba(46, 91, 244, this.emphasized ? 0.2 : 0.07),
       enabled: this.actionEnabled,
       iconSize: LengthMetrics.vp(Math.max(17, this.actionSize - 27)),
       baseIconSymbolGlyphModifier: this.symbolModifier(),

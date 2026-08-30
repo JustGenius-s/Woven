@@ -1,5 +1,6 @@
 import { common } from '@kit.AbilityKit';
-import { FLOATING_TAB_CONTENT_INSET } from '../../common/AppTheme';
+import { curves } from '@kit.ArkUI';
+import { FLOATING_TAB_CONTENT_INSET, MOTION_DURATION } from '../../common/AppTheme';
 import {
   GrammarBlock,
   GrammarDocument,
@@ -100,7 +101,8 @@ export struct GrammarPage {
       .index(this.lessonIndex)
       .indicator(false)
       .loop(false)
-      .duration(280)
+      .duration(MOTION_DURATION)
+      .curve(curves.springMotion(0.42, 0.86, 0.16))
       .layoutWeight(1)
       .onChange((index: number) => {
         this.lessonIndex = index;

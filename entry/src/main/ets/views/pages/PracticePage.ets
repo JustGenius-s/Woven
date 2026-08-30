@@ -1,5 +1,7 @@
 import { common } from '@kit.AbilityKit';
-import { LearningCatalog, PracticeScenario } from '../../model/ContentModels';
+import { curves } from '@kit.ArkUI';
+import { MOTION_DURATION } from '../../common/AppTheme';
+import { LearningCatalog, LearningJourney, PracticeScenario } from '../../model/ContentModels';
 import { ContentRepository } from '../../services/ContentRepository';
 import { ImmersiveAction } from '../components/ImmersiveAction';
 import { planeLightEffect } from '../components/ImmersiveCanvas';
@@ -7,6 +9,7 @@ import { PageChrome } from '../components/PageChrome';
 
 @Component
 export struct PracticePage {
+  journey: LearningJourney | undefined = undefined;
   onSettings: () => void = () => {};
   onStart: (scenario: PracticeScenario) => void = (scenario: PracticeScenario) => {};
 
@@ -36,14 +39,18 @@ export struct PracticePage {
       } else {
         Column() {
           Swiper() {
+            if (this.journey !== undefined) {
+              this.scenarioStage(this.journey.practice, 0, true)
+            }
             ForEach(this.catalog?.practiceScenarios ?? [], (scenario: PracticeScenario, index: number) => {
-              this.scenarioStage(scenario, index)
+              this.scenarioStage(scenario, index + (this.journey === undefined ? 0 : 1), false)
             }, (scenario: PracticeScenario) => scenario.id)
           }
           .index(this.scenarioIndex)
           .indicator(false)
           .loop(false)
-          .duration(320)
+          .duration(MOTION_DURATION)
+          .curve(curves.springMotion(0.42, 0.86, 0.16))
           .layoutWeight(1)
           .onChange((index: number) => this.scenarioIndex = index)
         }
@@ -57,7 +64,7 @@ export struct PracticePage {
   }
 
   @Builder
-  private scenarioStage(scenario: PracticeScenario, index: number) {
+  private scenarioStage(scenario: PracticeScenario, index: number, journeyLinked: boolean) {
     Stack({ alignContent: Alignment.BottomStart }) {
       Text((index + 1).toString().padStart(2, '0'))
         .fontSize(132)
@@ -68,7 +75,7 @@ export struct PracticePage {
 
       Column({ space: 18 }) {
         Row() {
-          Text(scenario.level)
+          Text(journeyLinked ? '当前旅程  最后一环' : scenario.level)
             .fontSize(10)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.accent'))
@@ -93,6 +100,13 @@ export struct PracticePage {
           .fontSize(16)
           .lineHeight(27)
           .fontColor($r('app.color.ink_muted'))
+        if (journeyLinked) {
+          Text('前面的假名、词汇、句型和会话会在这里汇合。')
+            .width('100%')
+            .fontSize(13)
+            .lineHeight(22)
+            .fontColor($r('app.color.ink_muted'))
+        }
         Row() {
           Blank()
           ImmersiveAction({
@@ -117,7 +131,7 @@ export struct PracticePage {
     .clip(true)
     .backgroundEffect({ radius: 38, color: $r('app.color.immersive_plane_strong'), saturation: 1.1 })
     .border({ width: 0.5, color: $r('app.color.immersive_edge') })
-    .shadow({ radius: 28, color: '#16000000', offsetY: 12 })
+    .shadow({ radius: 28, color: $r('app.color.gravity_glow'), offsetY: 12 })
     .visualEffect(planeLightEffect())
   }
 }
