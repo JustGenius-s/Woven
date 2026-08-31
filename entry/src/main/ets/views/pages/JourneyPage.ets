@@ -84,6 +84,10 @@ export struct JourneyPage {
   @State private selectedAnswerIndex: number = -1;
   @State private showFullGrammar: boolean = false;
   @State private loadError: string = '';
+  private stageScrollers: Scroller[] = [
+    new Scroller(), new Scroller(), new Scroller(),
+    new Scroller(), new Scroller(), new Scroller()
+  ];
 
   aboutToAppear(): void {
     this.stageIndex = Math.max(0, Math.min(this.initialStage, JOURNEY_STAGE_LABELS.length - 1));
@@ -271,9 +275,26 @@ export struct JourneyPage {
         ImmersiveBackChrome({
           title: this.journey.title,
           subtitle: this.journey.setting,
-          onBack: this.onBack
+          onBack: this.onBack,
+          scrollers: this.stageScrollers,
+          pageContent: () => {
+            this.journeyContent()
+          }
         })
-        if (this.loadError.length > 0) {
+      }
+      .width('100%')
+      .height('100%')
+      .backgroundColor(Color.Transparent)
+      .transition(TransitionEffect.OPACITY
+        .combine(TransitionEffect.scale({ x: 0.985, y: 0.985 }))
+        .animation({ curve: curves.springMotion(0.4, 0.88, 0.14) }))
+    }
+  }
+
+  @Builder
+  private journeyContent() {
+    Column() {
+      if (this.loadError.length > 0) {
           Column({ space: 12 }) {
             Text('旅程暂时无法展开')
               .fontSize(24)
@@ -300,15 +321,11 @@ export struct JourneyPage {
           .curve(curves.springMotion(0.42, 0.86, 0.16))
           .layoutWeight(1)
           .onChange((index: number) => this.selectStage(index))
-        }
       }
-      .width('100%')
-      .height('100%')
-      .backgroundColor(Color.Transparent)
-      .transition(TransitionEffect.OPACITY
-        .combine(TransitionEffect.scale({ x: 0.985, y: 0.985 }))
-        .animation({ curve: curves.springMotion(0.4, 0.88, 0.14) }))
     }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(Color.Transparent)
   }
 
   @Builder
@@ -370,7 +387,7 @@ export struct JourneyPage {
 
   @Builder
   private stagePage(index: number) {
-    Scroll() {
+    Scroll(this.stageScrollers[index]) {
       Column({ space: 20 }) {
         if (index === 0) {
           this.sceneStage()
@@ -394,6 +411,7 @@ export struct JourneyPage {
     .height('100%')
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.Spring)
+    .clip(false)
   }
 
   @Builder

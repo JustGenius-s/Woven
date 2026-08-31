@@ -29,8 +29,17 @@ export struct PracticePage {
   }
 
   build() {
+    PageChrome({
+      title: '场景探索',
+      pageContent: () => {
+        this.practiceContent()
+      }
+    })
+  }
+
+  @Builder
+  private practiceContent() {
     Column() {
-      PageChrome({ title: '场景探索' })
       if (this.error.length > 0) {
         Text(this.error)
           .layoutWeight(1)

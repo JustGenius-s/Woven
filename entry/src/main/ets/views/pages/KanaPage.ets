@@ -18,6 +18,7 @@ export struct KanaPage {
   @State private catalog: LearningCatalog | undefined = undefined;
   @State private selected: KanaCell | undefined = undefined;
   @State private loadError: string = '';
+  private pageScroller: Scroller = new Scroller();
 
   aboutToAppear(): void {
     try {
@@ -42,8 +43,18 @@ export struct KanaPage {
   }
 
   build() {
+    PageChrome({
+      title: '五十音',
+      scrollers: [this.pageScroller],
+      pageContent: () => {
+        this.pageContent()
+      }
+    })
+  }
+
+  @Builder
+  private pageContent() {
     Column() {
-      PageChrome({ title: '五十音' })
       if (this.journey !== undefined && this.catalog !== undefined) {
         this.journeyBridge()
       }
@@ -55,7 +66,7 @@ export struct KanaPage {
           .textAlign(TextAlign.Center)
           .padding(28)
       } else if (this.catalog !== undefined) {
-        List({ space: 0 }) {
+        List({ space: 0, scroller: this.pageScroller }) {
           ListItem() {
             this.group('清音', this.catalog?.kanaGroups.basic ?? [])
           }
@@ -119,6 +130,7 @@ export struct KanaPage {
         .padding({ left: 14, right: 14 })
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring)
+        .clip(false)
       }
     }
     .width('100%')

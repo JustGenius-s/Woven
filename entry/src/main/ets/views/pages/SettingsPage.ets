@@ -10,6 +10,7 @@ export struct SettingsPage {
 
   @State private apiKey: string = '';
   @State private deepSeekSheetOpen: boolean = false;
+  private pageScroller: Scroller = new Scroller();
 
   aboutToAppear(): void {
     this.apiKey = this.initialApiKey;
@@ -51,9 +52,35 @@ export struct SettingsPage {
 
   build() {
     Column() {
-      ImmersiveBackChrome({ title: '设置', onBack: this.onBack })
+      ImmersiveBackChrome({
+        title: '设置',
+        onBack: this.onBack,
+        scrollers: [this.pageScroller],
+        pageContent: () => {
+          this.pageContent()
+        }
+      })
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(Color.Transparent)
+    .bindSheet($$this.deepSeekSheetOpen, this.deepSeekSheet(), {
+      height: SheetSize.FIT_CONTENT,
+      detents: [SheetSize.FIT_CONTENT, SheetSize.LARGE],
+      preferType: SheetType.BOTTOM,
+      title: { title: 'DeepSeek' },
+      dragBar: true,
+      showClose: true,
+      blurStyle: BlurStyle.COMPONENT_REGULAR,
+      backgroundColor: $r('app.color.surface_raised'),
+      maskColor: '#52000000',
+      onDisappear: () => this.deepSeekSheetOpen = false
+    })
+  }
 
-      List() {
+  @Builder
+  private pageContent() {
+      List({ scroller: this.pageScroller }) {
         ListItem() {
           Row() {
             Column() {
@@ -71,22 +98,7 @@ export struct SettingsPage {
       .padding({ left: 16, right: 16, top: 20, bottom: 40 })
       .scrollBar(BarState.Off)
       .edgeEffect(EdgeEffect.Spring)
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(Color.Transparent)
-    .bindSheet($$this.deepSeekSheetOpen, this.deepSeekSheet(), {
-      height: SheetSize.FIT_CONTENT,
-      detents: [SheetSize.FIT_CONTENT, SheetSize.LARGE],
-      preferType: SheetType.BOTTOM,
-      title: { title: 'DeepSeek' },
-      dragBar: true,
-      showClose: true,
-      blurStyle: BlurStyle.COMPONENT_REGULAR,
-      backgroundColor: $r('app.color.surface_raised'),
-      maskColor: '#52000000',
-      onDisappear: () => this.deepSeekSheetOpen = false
-    })
+      .clip(false)
   }
 
   @Builder

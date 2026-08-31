@@ -1,8 +1,13 @@
 import { common } from '@kit.AbilityKit';
-import { curves } from '@kit.ArkUI';
-import { BlurStrategy, DividerMode, HdsTabs } from '@kit.UIDesignKit';
-import { FLOATING_TAB_CONTENT_INSET, MOTION_DURATION } from '../../common/AppTheme';
-import { preferredImmersiveMaterial } from '../../common/ImmersiveMaterial';
+import {
+  BorderRadiusMode,
+  ItemRestriction,
+  LengthMetrics,
+  SegmentButton,
+  SegmentButtonOptions,
+  SegmentButtonTextItem
+} from '@kit.ArkUI';
+import { FLOATING_TAB_CONTENT_INSET } from '../../common/AppTheme';
 import {
   LearningCatalog,
   MusicLine,
@@ -40,8 +45,34 @@ export struct ExplorePage {
   @State private detailOpen: boolean = false;
   @State private detailKind: number = 0;
   @State private detailIndex: number = -1;
+  @State private exploreTabIndexes: number[] = [0];
+  @State private exploreTabOptions: SegmentButtonOptions = SegmentButtonOptions.tab({
+    buttons: [
+      { text: '音乐' },
+      { text: '阅读' },
+      { text: '场景' }
+    ] as ItemRestriction<SegmentButtonTextItem>,
+    fontColor: $r('app.color.ink_muted'),
+    selectedFontColor: $r('app.color.ink'),
+    fontSize: 15,
+    selectedFontSize: 15,
+    fontWeight: FontWeight.Regular,
+    selectedFontWeight: FontWeight.Medium,
+    backgroundColor: $r('app.color.immersive_plane'),
+    selectedBackgroundColor: $r('app.color.immersive_plane_strong'),
+    backgroundBlurStyle: BlurStyle.COMPONENT_REGULAR,
+    borderRadiusMode: BorderRadiusMode.CUSTOM,
+    backgroundBorderRadius: LengthMetrics.vp(22),
+    itemBorderRadius: LengthMetrics.vp(19),
+    buttonPadding: 2,
+    textPadding: { left: 8, right: 8, top: 8, bottom: 8 }
+  });
+  private musicScroller: Scroller = new Scroller();
+  private readingScroller: Scroller = new Scroller();
+  private scenarioScroller: Scroller = new Scroller();
 
   aboutToAppear(): void {
+    this.exploreTabIndexes = [this.selectedTab];
     try {
       const context: common.Context = this.getUIContext().getHostContext() as common.Context;
       this.catalog = ContentRepository.loadCatalog(context);
@@ -56,8 +87,15 @@ export struct ExplorePage {
     }
   }
 
-  private columns(): string {
-    return this.pageWidth >= 700 ? '1fr 1fr' : '1fr';
+  private cardFlowWidth(): Length {
+    if (this.pageWidth < 700) {
+      return '100%';
+    }
+    return Math.max(280, (this.pageWidth - 50) / 2);
+  }
+
+  private cardRightMargin(index: number): number {
+    return this.pageWidth >= 700 && index % 2 === 0 ? 14 : 0;
   }
 
   private updatePageWidth(width: Length): void {
@@ -162,45 +200,49 @@ export struct ExplorePage {
     this.onAsk(AiInquiryFactory.selection(selection, `阅读 · ${reading.title}`, detail));
   }
 
+  private selectExploreTab(index: number): void {
+    if (index < 0 || index > 2 || this.exploreTabIndexes[0] === index) {
+      return;
+    }
+    this.exploreTabIndexes = [index];
+    this.onTabChange(index);
+  }
+
+  private activeExploreTab(): number {
+    return this.exploreTabIndexes.length > 0 ? this.exploreTabIndexes[0] : this.selectedTab;
+  }
+
+  @Builder
+  private exploreTabSelector() {
+    Row() {
+      SegmentButton({
+        options: this.exploreTabOptions,
+        selectedIndexes: this.exploreTabIndexes,
+        onItemClicked: (index: number) => this.selectExploreTab(index)
+      })
+        .layoutWeight(1)
+        .height(44)
+        .clip(true)
+        .visualEffect(planeLightEffect())
+    }
+    .width('100%')
+    .height(60)
+    .padding({ left: 18, right: 18, bottom: 8 })
+  }
+
   build() {
     Column() {
-      PageChrome({ title: '探索', largeTitle: false })
-
-      if (this.loadError.length > 0) {
-        Text(this.loadError)
-          .layoutWeight(1)
-          .fontSize(15)
-          .fontColor($r('app.color.danger'))
-          .textAlign(TextAlign.Center)
-          .padding(28)
-      } else {
-        HdsTabs({ barPosition: BarPosition.Start, index: this.selectedTab }) {
-          TabContent() {
-            this.musicPage()
-          }
-          .tabBar(SubTabBarStyle.of('音乐'))
-
-          TabContent() {
-            this.readingPage()
-          }
-          .tabBar(SubTabBarStyle.of('阅读'))
-
-          TabContent() {
-            this.scenarioPage()
-          }
-          .tabBar(SubTabBarStyle.of('场景'))
+      PageChrome({
+        title: '探索',
+        bottomHeight: 60,
+        scrollers: [this.musicScroller, this.readingScroller, this.scenarioScroller],
+        bottomContent: () => {
+          this.exploreTabSelector()
+        },
+        pageContent: () => {
+          this.exploreContent()
         }
-        .layoutWeight(1)
-        .width('100%')
-        .barMode(BarMode.Fixed)
-        .scrollable(false)
-        .animationDuration(MOTION_DURATION)
-        .barBackgroundColor(Color.Transparent)
-        .blurStrategy(BlurStrategy.ADAPTIVE)
-        .divider({ mode: DividerMode.NONE })
-        .barOverlap(false)
-        .onChange((index: number) => this.onTabChange(index))
-      }
+      })
     }
     .width('100%')
     .height('100%')
@@ -220,22 +262,44 @@ export struct ExplorePage {
   }
 
   @Builder
-  private musicPage() {
-    Grid() {
-      ForEach(this.musicTracks, (track: MusicTrack, index: number) => {
-        GridItem() {
-          this.musicCard(track, index)
-        }
-      }, (track: MusicTrack) => track.id)
+  private exploreContent() {
+    if (this.loadError.length > 0) {
+      Text(this.loadError)
+        .width('100%')
+        .height('100%')
+        .fontSize(15)
+        .fontColor($r('app.color.danger'))
+        .textAlign(TextAlign.Center)
+        .padding(28)
+    } else if (this.activeExploreTab() === 0) {
+      this.musicPage()
+    } else if (this.activeExploreTab() === 1) {
+      this.readingPage()
+    } else {
+      this.scenarioPage()
     }
-    .columnsTemplate(this.columns())
-    .columnsGap(14)
-    .rowsGap(14)
+  }
+
+  @Builder
+  private musicPage() {
+    Scroll(this.musicScroller) {
+      Flex({ direction: FlexDirection.Row, wrap: FlexWrap.Wrap }) {
+        ForEach(this.musicTracks, (track: MusicTrack, index: number) => {
+          Column() {
+            this.musicCard(track, index)
+          }
+          .width(this.cardFlowWidth())
+          .margin({ right: this.cardRightMargin(index), bottom: 14 })
+        }, (track: MusicTrack) => track.id)
+      }
+      .width('100%')
+    }
     .width('100%')
     .height('100%')
     .padding({ left: 18, right: 18, top: 16, bottom: FLOATING_TAB_CONTENT_INSET })
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.Spring)
+    .clip(false)
   }
 
   @Builder
@@ -323,21 +387,24 @@ export struct ExplorePage {
 
   @Builder
   private readingPage() {
-    Grid() {
-      ForEach(this.readingWorks, (reading: ReadingWork, index: number) => {
-        GridItem() {
-          this.readingCard(reading, index)
-        }
-      }, (reading: ReadingWork) => reading.id)
+    Scroll(this.readingScroller) {
+      Flex({ direction: FlexDirection.Row, wrap: FlexWrap.Wrap }) {
+        ForEach(this.readingWorks, (reading: ReadingWork, index: number) => {
+          Column() {
+            this.readingCard(reading, index)
+          }
+          .width(this.cardFlowWidth())
+          .margin({ right: this.cardRightMargin(index), bottom: 14 })
+        }, (reading: ReadingWork) => reading.id)
+      }
+      .width('100%')
     }
-    .columnsTemplate(this.columns())
-    .columnsGap(14)
-    .rowsGap(14)
     .width('100%')
     .height('100%')
     .padding({ left: 18, right: 18, top: 16, bottom: FLOATING_TAB_CONTENT_INSET })
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.Spring)
+    .clip(false)
   }
 
   @Builder
@@ -431,21 +498,24 @@ export struct ExplorePage {
 
   @Builder
   private scenarioPage() {
-    Grid() {
-      ForEach(this.catalog?.practiceScenarios ?? [], (scenario: PracticeScenario, index: number) => {
-        GridItem() {
-          this.scenarioCard(scenario, index)
-        }
-      }, (scenario: PracticeScenario) => scenario.id)
+    Scroll(this.scenarioScroller) {
+      Flex({ direction: FlexDirection.Row, wrap: FlexWrap.Wrap }) {
+        ForEach(this.catalog?.practiceScenarios ?? [], (scenario: PracticeScenario, index: number) => {
+          Column() {
+            this.scenarioCard(scenario, index)
+          }
+          .width(this.cardFlowWidth())
+          .margin({ right: this.cardRightMargin(index), bottom: 14 })
+        }, (scenario: PracticeScenario) => scenario.id)
+      }
+      .width('100%')
     }
-    .columnsTemplate(this.columns())
-    .columnsGap(14)
-    .rowsGap(14)
     .width('100%')
     .height('100%')
     .padding({ left: 18, right: 18, top: 16, bottom: FLOATING_TAB_CONTENT_INSET })
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.Spring)
+    .clip(false)
   }
 
   @Builder

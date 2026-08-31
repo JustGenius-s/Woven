@@ -186,15 +186,22 @@ export struct PracticeSessionPage {
   }
 
   build() {
+    ImmersiveBackChrome({
+      title: this.scenario.title,
+      subtitle: this.scenario.setting,
+      closeIcon: true,
+      onBack: this.onExit,
+      scrollers: [this.scroller],
+      pageContent: () => {
+        this.sessionContent()
+      }
+    })
+  }
+
+  @Builder
+  private sessionContent() {
     Stack({ alignContent: Alignment.Bottom }) {
       Column() {
-        ImmersiveBackChrome({
-          title: this.scenario.title,
-          subtitle: this.scenario.setting,
-          closeIcon: true,
-          onBack: this.onExit
-        })
-
         List({ space: 0, scroller: this.scroller }) {
           ForEach(this.messages, (message: PracticeMessage) => {
             ListItem() {
@@ -272,6 +279,7 @@ export struct PracticeSessionPage {
         .width('100%')
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring)
+        .clip(false)
       }
       .width('100%')
       .height('100%')

@@ -7,12 +7,21 @@ import { PageChrome } from '../components/PageChrome';
 export struct MePage {
   journey: LearningJourney | undefined = undefined;
   onSettings: () => void = () => {};
+  private pageScroller: Scroller = new Scroller();
 
   build() {
-    Column() {
-      PageChrome({ title: '我的' })
+    PageChrome({
+      title: '我的',
+      scrollers: [this.pageScroller],
+      pageContent: () => {
+        this.pageContent()
+      }
+    })
+  }
 
-      Scroll() {
+  @Builder
+  private pageContent() {
+      Scroll(this.pageScroller) {
         Column() {
           Column({ space: 24 }) {
             this.profileCard()
@@ -25,13 +34,11 @@ export struct MePage {
         .alignItems(HorizontalAlign.Center)
         .padding({ left: 16, right: 16, top: 18, bottom: FLOATING_TAB_CONTENT_INSET })
       }
-      .layoutWeight(1)
+      .width('100%')
+      .height('100%')
       .scrollBar(BarState.Off)
       .edgeEffect(EdgeEffect.Spring)
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(Color.Transparent)
+      .clip(false)
   }
 
   @Builder

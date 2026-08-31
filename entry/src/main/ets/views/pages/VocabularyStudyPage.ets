@@ -11,7 +11,8 @@ import {
   VocabularyLearningStore
 } from '../../services/VocabularyLearningStore';
 import { aiTextSelectionMenu } from '../components/AiTextSelection';
-import { contentLightEffect, planeLightEffect } from '../components/ImmersiveCanvas';
+import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
+import { planeLightEffect } from '../components/ImmersiveCanvas';
 
 const JOURNEY_WORD_STAGE_MASK: number = 1 << 2;
 const JOURNEY_GRAMMAR_STAGE_MASK: number = 1 << 3;
@@ -286,7 +287,26 @@ export struct VocabularyStudyPage {
 
   build() {
     Column() {
-      this.studyChrome()
+      ImmersiveBackChrome({
+        title: this.level,
+        subtitle: `${Math.min(this.currentWordIndex + 1, this.resultCount)} / ${this.resultCount}`,
+        onBack: this.onBack,
+        pageContent: () => {
+          this.studyContent()
+        }
+      })
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(Color.Transparent)
+    .onAreaChange((oldArea: Area, newArea: Area) => {
+      this.updatePageSize(newArea.width, newArea.height);
+    })
+  }
+
+  @Builder
+  private studyContent() {
+    Column() {
       if (this.loadError.length > 0) {
         Text(this.loadError)
           .layoutWeight(1)
@@ -331,49 +351,6 @@ export struct VocabularyStudyPage {
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Transparent)
-    .onAreaChange((oldArea: Area, newArea: Area) => {
-      this.updatePageSize(newArea.width, newArea.height);
-    })
-  }
-
-  @Builder
-  private studyChrome() {
-    Row() {
-      Button({
-        type: ButtonType.Circle,
-        stateEffect: true
-      }) {
-        SymbolGlyph($r('sys.symbol.chevron_left'))
-          .fontSize(20)
-          .fontColor([$r('app.color.ink')])
-      }
-      .width(44)
-      .height(44)
-      .buttonStyle(ButtonStyleMode.NORMAL)
-      .accessibilityText('返回词库')
-      .onClick(this.onBack)
-
-      Blank()
-      Column({ space: 2 }) {
-        Text(this.level)
-          .fontSize(13)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.ink'))
-        Text(`${this.currentWordIndex + 1} / ${this.resultCount}`)
-          .fontSize(10)
-          .fontColor($r('app.color.ink_muted'))
-      }
-      .alignItems(HorizontalAlign.Center)
-      Blank()
-      Column()
-        .width(44)
-        .height(44)
-    }
-    .width('100%')
-    .height(56)
-    .padding({ left: 16, right: 16 })
-    .alignItems(VerticalAlign.Center)
-    .visualEffect(contentLightEffect())
   }
 
   @Builder

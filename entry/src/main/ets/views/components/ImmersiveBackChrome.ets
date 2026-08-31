@@ -1,8 +1,10 @@
+import { LengthMetrics } from '@kit.ArkUI';
 import {
   BlurStrategy,
   DividerShowType,
   HdsNavigation,
   HdsNavigationTitleMode,
+  ScrollEffectType,
   TitleSize
 } from '@kit.UIDesignKit';
 import { preferredImmersiveMaterial } from '../../common/ImmersiveMaterial';
@@ -12,19 +14,33 @@ export struct ImmersiveBackChrome {
   title: string = '';
   subtitle: string = '';
   closeIcon: boolean = false;
+  scrollers: Scroller[] = [];
   onBack: () => void = () => {};
+  @BuilderParam pageContent: () => void = this.emptyPageContent;
+
+  @Builder
+  private emptyPageContent() {
+  }
 
   build() {
     HdsNavigation() {
-      Column()
-        .width('100%')
-        .height('100%')
+      this.pageContent()
     }
     .titleBar({
+      enableComponentSafeArea: true,
       style: {
+        scrollEffectOpts: {
+          enableScrollEffect: true,
+          scrollEffectType: ScrollEffectType.GRADIENT_BLUR,
+          enableRefreshOffsetChange: true,
+          blurEffectiveStartOffset: LengthMetrics.vp(0),
+          blurEffectiveEndOffset: LengthMetrics.vp(24)
+        },
         originalStyle: {
           backgroundStyle: {
-            backgroundColor: Color.Transparent
+            backgroundColor: Color.Transparent,
+            maskExtraHeight: 0,
+            blurRadius: 0
           },
           contentStyle: {
             titleStyle: {
@@ -36,7 +52,15 @@ export struct ImmersiveBackChrome {
             }
           }
         },
+        scrollEffectStyle: {
+          backgroundStyle: {
+            backgroundColor: Color.Transparent,
+            maskExtraHeight: 0,
+            blurRadius: 40
+          }
+        },
         blurStrategy: BlurStrategy.ADAPTIVE,
+        thermoCtrl: true,
         systemMaterialEffect: preferredImmersiveMaterial()
       },
       content: {
@@ -56,9 +80,13 @@ export struct ImmersiveBackChrome {
         }
       }
     })
+    .mode(NavigationMode.Stack)
     .titleMode(HdsNavigationTitleMode.MINI)
+    .bindToScrollable(this.scrollers)
+    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
     .width('100%')
-    .height(56)
+    .height('100%')
+    .clip(false)
     .backgroundColor(Color.Transparent)
   }
 }

@@ -182,11 +182,6 @@ struct Index {
     this.activeInquiry = undefined;
   }
 
-  private topSafeInset(): number {
-    return Math.max(this.avoidAreas.statusBar.topRect.height, this.avoidAreas.cutout.topRect.height,
-      this.avoidAreas.navigationIndicator.topRect.height);
-  }
-
   private bottomSafeInset(): number {
     return Math.max(this.avoidAreas.navigationIndicator.bottomRect.height, this.avoidAreas.cutout.bottomRect.height,
       this.avoidAreas.statusBar.bottomRect.height);
@@ -404,7 +399,6 @@ struct Index {
     .width('100%')
     .height('100%')
     .padding({
-      top: this.topSafeInset(),
       bottom: this.shellBottomInset(),
       left: this.leftSafeInset(),
       right: this.rightSafeInset()

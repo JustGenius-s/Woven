@@ -1,8 +1,10 @@
+import { LengthMetrics } from '@kit.ArkUI';
 import {
   BlurStrategy,
   DividerShowType,
   HdsNavigation,
   HdsNavigationTitleMode,
+  ScrollEffectType,
   TitleSize
 } from '@kit.UIDesignKit';
 import { preferredImmersiveMaterial } from '../../common/ImmersiveMaterial';
@@ -15,9 +17,15 @@ export struct PageChrome {
   customTitle: boolean = false;
   showSearchAction: boolean = false;
   bottomHeight: number = 0;
+  scrollers: Scroller[] = [];
   onSearch: () => void = () => {};
+  @BuilderParam pageContent: () => void = this.emptyPageContent;
   @BuilderParam bottomContent: () => void = this.emptyBottomContent;
   @BuilderParam customTitleContent: () => void = this.emptyCustomTitleContent;
+
+  @Builder
+  private emptyPageContent() {
+  }
 
   @Builder
   private emptyBottomContent() {
@@ -27,21 +35,25 @@ export struct PageChrome {
   private emptyCustomTitleContent() {
   }
 
-  private titleHeight(): number {
-    return this.largeTitle ? 112 : 56;
-  }
-
   build() {
     HdsNavigation() {
-      Column()
-        .width('100%')
-        .height('100%')
+      this.pageContent()
     }
     .titleBar({
+      enableComponentSafeArea: true,
       style: {
+        scrollEffectOpts: {
+          enableScrollEffect: true,
+          scrollEffectType: ScrollEffectType.GRADIENT_BLUR,
+          enableRefreshOffsetChange: true,
+          blurEffectiveStartOffset: LengthMetrics.vp(0),
+          blurEffectiveEndOffset: LengthMetrics.vp(24)
+        },
         originalStyle: {
           backgroundStyle: {
-            backgroundColor: Color.Transparent
+            backgroundColor: Color.Transparent,
+            maskExtraHeight: 0,
+            blurRadius: 0
           },
           contentStyle: {
             titleStyle: {
@@ -53,7 +65,15 @@ export struct PageChrome {
             }
           }
         },
+        scrollEffectStyle: {
+          backgroundStyle: {
+            backgroundColor: Color.Transparent,
+            maskExtraHeight: 0,
+            blurRadius: 40
+          }
+        },
         blurStrategy: BlurStrategy.ADAPTIVE,
+        thermoCtrl: true,
         systemMaterialEffect: preferredImmersiveMaterial()
       },
       content: {
@@ -83,10 +103,14 @@ export struct PageChrome {
         }
       }
     })
+    .mode(NavigationMode.Stack)
     .titleMode(this.largeTitle ? HdsNavigationTitleMode.FULL : HdsNavigationTitleMode.MINI)
     .hideBackButton(true)
+    .bindToScrollable(this.scrollers)
+    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
     .width('100%')
-    .height(this.titleHeight() + this.bottomHeight)
+    .height('100%')
+    .clip(false)
     .backgroundColor(Color.Transparent)
   }
 }

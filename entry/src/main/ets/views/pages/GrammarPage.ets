@@ -42,9 +42,14 @@ export struct GrammarPage {
   onBack: () => void = () => {};
 
   @State private lessonIndex: number = 0;
+  private lessonScrollers: Scroller[] = [];
 
   aboutToAppear(): void {
     this.lessonIndex = Math.max(0, Math.min(this.initialIndex, this.entries.length - 1));
+    this.lessonScrollers = [];
+    for (let index: number = 0; index < this.entries.length; index++) {
+      this.lessonScrollers.push(new Scroller());
+    }
   }
 
   private jumpLevel(level: string): void {
@@ -93,8 +98,19 @@ export struct GrammarPage {
   }
 
   build() {
+    ImmersiveBackChrome({
+      title: '语法',
+      onBack: this.onBack,
+      scrollers: this.lessonScrollers,
+      pageContent: () => {
+        this.grammarContent()
+      }
+    })
+  }
+
+  @Builder
+  private grammarContent() {
     Column() {
-      ImmersiveBackChrome({ title: '语法', onBack: this.onBack })
       ChipGroup({
         items: this.levelChipItems(),
         selectedIndexes: this.selectedLevelIndexes(),
@@ -120,6 +136,7 @@ export struct GrammarPage {
         ForEach(this.entries, (entry: GrammarIndexEntry, index: number) => {
           GrammarLessonPage({
             entry: entry,
+            scroller: this.lessonScrollers[index],
             onAsk: this.onAsk,
             onNext: () => {
               if (index === this.lessonIndex) {
@@ -149,6 +166,7 @@ export struct GrammarPage {
 @Component
 struct GrammarLessonPage {
   entry: GrammarIndexEntry = EMPTY_GRAMMAR_ENTRY;
+  scroller: Scroller = new Scroller();
   onAsk: (context: AiInquiryContext) => void = (context: AiInquiryContext) => {};
   onNext: () => void = () => {};
 
@@ -189,7 +207,7 @@ struct GrammarLessonPage {
       .justifyContent(FlexAlign.Center)
       .padding(28)
     } else if (this.lesson !== undefined && this.document !== undefined) {
-      List({ space: 0 }) {
+      List({ space: 0, scroller: this.scroller }) {
         ListItem() {
           Column({ space: 10 }) {
             Row({ space: 8 }) {
@@ -260,6 +278,7 @@ struct GrammarLessonPage {
       .padding({ left: 16, right: 16 })
       .scrollBar(BarState.Off)
       .edgeEffect(EdgeEffect.Spring)
+      .clip(false)
       .onReachEnd(() => this.reachedEnd = true)
       .parallelGesture(
         PanGesture({ direction: PanDirection.Vertical, distance: 12 })

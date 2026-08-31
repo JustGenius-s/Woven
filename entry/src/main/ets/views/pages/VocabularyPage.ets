@@ -36,6 +36,8 @@ export struct VocabularyPage {
   @State private pageWidth: number = 360;
   private dataSource: VocabularyDataSource = new VocabularyDataSource();
   private learnedWordIds: Set<string> = new Set<string>();
+  private homeScroller: Scroller = new Scroller();
+  private searchScroller: Scroller = new Scroller();
 
   aboutToAppear(): void {
     const context: common.Context = this.getUIContext().getHostContext() as common.Context;
@@ -258,8 +260,12 @@ export struct VocabularyPage {
         PageChrome({
           largeTitle: false,
           customTitle: true,
+          scrollers: [this.homeScroller, this.searchScroller],
           customTitleContent: () => {
             this.searchTitleContent()
+          },
+          pageContent: () => {
+            this.vocabularyContent()
           }
         })
       } else {
@@ -267,9 +273,24 @@ export struct VocabularyPage {
           title: '词库',
           largeTitle: false,
           showSearchAction: true,
-          onSearch: () => this.openSearch()
+          scrollers: [this.homeScroller, this.searchScroller],
+          onSearch: () => this.openSearch(),
+          pageContent: () => {
+            this.vocabularyContent()
+          }
         })
+      }
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(Color.Transparent)
+    .onAreaChange((oldArea: Area, newArea: Area) => this.updatePageWidth(newArea.width))
+  }
 
+  @Builder
+  private vocabularyContent() {
+    Column() {
+      if (!this.searchActive) {
         ChipGroup({
           items: this.levelChipItems(),
           selectedIndexes: this.selectedLevelIndexes(),
@@ -308,7 +329,6 @@ export struct VocabularyPage {
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Transparent)
-    .onAreaChange((oldArea: Area, newArea: Area) => this.updatePageWidth(newArea.width))
   }
 
   @Builder
@@ -338,7 +358,7 @@ export struct VocabularyPage {
 
   @Builder
   private vocabularyHome() {
-    List({ space: 0 }) {
+    List({ space: 0, scroller: this.homeScroller }) {
       ListItem() {
         Swiper() {
           this.levelDeck()
@@ -389,6 +409,7 @@ export struct VocabularyPage {
     .width('100%')
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.Spring)
+    .clip(false)
   }
 
   @Builder
@@ -556,7 +577,7 @@ export struct VocabularyPage {
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
       } else {
-        List({ space: 0 }) {
+        List({ space: 0, scroller: this.searchScroller }) {
           LazyForEach(this.dataSource, (item: VocabularyEntry) => {
             ListItem() {
               this.wordRow(item, this.filtered)
@@ -572,6 +593,7 @@ export struct VocabularyPage {
         .padding({ left: 20, right: 20 })
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring)
+        .clip(false)
       }
     }
     .layoutWeight(1)

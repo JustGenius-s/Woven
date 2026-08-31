@@ -38,6 +38,7 @@ export struct LearnPage {
   @State private manifest: ContentManifest | undefined = undefined;
   @State private loadError: string = '';
   @State private pressedCard: number = -1;
+  private progressScroller: Scroller = new Scroller();
 
   aboutToAppear(): void {
     try {
@@ -198,18 +199,27 @@ export struct LearnPage {
 
   @Builder
   private progressHome() {
-    Column() {
-      PageChrome({ title: '旅程' })
+    PageChrome({
+      title: '旅程',
+      scrollers: [this.progressScroller],
+      pageContent: () => {
+        this.progressHomeContent()
+      }
+    })
+  }
 
-      if (this.loadError.length > 0) {
+  @Builder
+  private progressHomeContent() {
+    if (this.loadError.length > 0) {
         Text(this.loadError)
-          .layoutWeight(1)
+          .width('100%')
+          .height('100%')
           .fontSize(15)
           .fontColor($r('app.color.danger'))
           .textAlign(TextAlign.Center)
           .padding(28)
-      } else {
-        List({ space: 14 }) {
+    } else {
+        List({ space: 14, scroller: this.progressScroller }) {
           ListItem() {
             this.journeyCard(
               0,
@@ -302,12 +312,9 @@ export struct LearnPage {
         .padding({ left: 18, right: 18, top: 8, bottom: FLOATING_TAB_CONTENT_INSET })
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring)
+        .clip(false)
         .alignListItem(ListItemAlign.Center)
-      }
     }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(Color.Transparent)
   }
 
   @Builder
