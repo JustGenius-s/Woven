@@ -13,6 +13,8 @@ import { preferredImmersiveMaterial } from '../../common/ImmersiveMaterial';
 export struct PageChrome {
   eyebrow: string = '';
   title: string = '';
+  // true  -> FREE: large title that shrinks to the MINI height while scrolling.
+  // false -> MINI: fixed compact title (56vp).
   largeTitle: boolean = true;
   customTitle: boolean = false;
   showSearchAction: boolean = false;
@@ -40,6 +42,10 @@ export struct PageChrome {
       this.pageContent()
     }
     .titleBar({
+      // ignoreLayoutSafeArea below lets the title bar background bleed into the
+      // status bar; this flag keeps the title text and menu out of that region.
+      // It defaults to false, so without it nothing avoids the status bar.
+      avoidLayoutSafeArea: true,
       enableComponentSafeArea: true,
       style: {
         scrollEffectOpts: {
@@ -104,7 +110,11 @@ export struct PageChrome {
       }
     })
     .mode(NavigationMode.Stack)
-    .titleMode(this.largeTitle ? HdsNavigationTitleMode.FULL : HdsNavigationTitleMode.MINI)
+    // FREE keeps the large title but collapses it to the MINI height on scroll,
+    // so a page never holds the full 112vp once the user starts reading. FULL
+    // would pin it at 112vp permanently, which reads as a large gap under the
+    // status bar.
+    .titleMode(this.largeTitle ? HdsNavigationTitleMode.FREE : HdsNavigationTitleMode.MINI)
     .hideBackButton(true)
     .bindToScrollable(this.scrollers)
     .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])

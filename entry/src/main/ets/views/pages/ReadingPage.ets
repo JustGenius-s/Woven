@@ -79,6 +79,10 @@ const READER_THEMES: ReaderThemeOption[] = [
   }
 ];
 
+// Height HdsNavigation's MINI title bar occupies in layout. Hiding the bar
+// reclaims exactly this much, so the content must compensate to avoid a jump.
+const READER_TITLE_BAR_HEIGHT: number = 56;
+
 // Keep this page on system ArkUI components. Reader Kit's kitview HSP is not present on simulators
 // and some unsupported devices, where a static Reader Kit import aborts before fallback code can run.
 @Component
@@ -430,6 +434,10 @@ export struct ReadingPage {
       )
     }
     .titleBar({
+      // This page declares its own titleBar instead of using ImmersiveBackChrome,
+      // so it needs the same opt-in: keep the back button and title below the
+      // status bar while the bar background still extends into it.
+      avoidLayoutSafeArea: true,
       enableComponentSafeArea: true,
       style: {
         originalStyle: {
@@ -675,7 +683,14 @@ export struct ReadingPage {
       .padding({
         left: compact ? 34 : 28,
         right: compact ? 34 : 28,
-        top: compact ? 94 : 112,
+        // HdsNavigation has no overlay/stack title bar mode (plain Navigation
+        // has BarStyle.STACK; HDS does not expose barStyle at all), so
+        // hideTitleBar(true) removes the bar's 56vp (MINI) layout height and
+        // the content area shifts up by that much — the text visibly jumps.
+        // Adding the reclaimed height back as top padding keeps the first line
+        // at the same screen position while the reading area gains the space
+        // at the bottom instead.
+        top: (compact ? 94 : 112) + (this.controlsVisible ? 0 : READER_TITLE_BAR_HEIGHT),
         bottom: 96
       })
     }

@@ -367,24 +367,31 @@ export struct VocabularyPage {
   private vocabularyHome() {
     List({ space: 0, scroller: this.homeScroller }) {
       ListItem() {
-        Swiper() {
-          this.levelDeck()
-          if (this.journey !== undefined) {
-            this.journeyDeck()
+        Column() {
+          Swiper() {
+            this.levelDeck()
+            if (this.journey !== undefined) {
+              this.journeyDeck()
+            }
           }
+          .index(this.heroIndex)
+          .displayCount(this.heroDisplayCount())
+          .nextMargin(this.heroDisplayCount() === 1 && this.journey !== undefined ? 34 : 0, true)
+          .indicator(false)
+          .loop(false)
+          .duration(MOTION_DURATION)
+          .curve(curves.springMotion(0.42, 0.86, 0.16))
+          .itemSpace(this.heroDisplayCount() === 1 ? 12 : 16)
+          .height(286)
+          .width('100%')
+          .onChange((index: number) => this.heroIndex = index)
         }
-        .index(this.heroIndex)
-        .displayCount(this.heroDisplayCount())
-        .nextMargin(this.heroDisplayCount() === 1 && this.journey !== undefined ? 34 : 0, true)
-        .indicator(false)
-        .loop(false)
-        .duration(MOTION_DURATION)
-        .curve(curves.springMotion(0.42, 0.86, 0.16))
-        .itemSpace(this.heroDisplayCount() === 1 ? 12 : 16)
-        .height(286)
+        // Swiper has no padding attribute, so the side insets belong on the
+        // wrapper: this keeps the deck aligned with the 20vp gutters used by
+        // the sections below and stops the nextMargin peek from spilling past
+        // the screen edge.
         .width('100%')
-        .padding({ left: 20, right: this.heroDisplayCount() === 1 ? 0 : 20 })
-        .onChange((index: number) => this.heroIndex = index)
+        .padding({ left: 20, right: 20 })
       }
 
       if (this.recentLearnedEntries().length > 0) {

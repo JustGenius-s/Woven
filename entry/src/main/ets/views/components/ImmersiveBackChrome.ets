@@ -27,6 +27,9 @@ export struct ImmersiveBackChrome {
       this.pageContent()
     }
     .titleBar({
+      // Keep the back button and title below the status bar while the bar
+      // background still extends into it. Defaults to false when omitted.
+      avoidLayoutSafeArea: true,
       enableComponentSafeArea: true,
       style: {
         scrollEffectOpts: {
