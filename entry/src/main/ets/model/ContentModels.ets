@@ -56,6 +56,7 @@ export interface MusicLine {
   text: string;
   reading: string;
   meaning: string;
+  startMs: number;
 }
 
 export interface MusicTrack {
@@ -65,6 +66,9 @@ export interface MusicTrack {
   artist: string;
   level: string;
   focus: string;
+  audioSource: string;
+  artworkName: string;
+  durationMs: number;
   lines: MusicLine[];
 }
 

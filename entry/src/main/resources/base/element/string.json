@@ -147,6 +147,10 @@
     {
       "name": "distributed_datasync_reason",
       "value": "用于在登录同一华为账号的设备间同步学习进度、已学内容和对话记录。"
+    },
+    {
+      "name": "background_audio_reason",
+      "value": "用于在锁屏或切换到其他应用后继续播放探索中的音乐。"
     }
   ]
 }

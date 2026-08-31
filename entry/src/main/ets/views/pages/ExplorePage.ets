@@ -10,16 +10,12 @@ import {
 import { FLOATING_TAB_CONTENT_INSET } from '../../common/AppTheme';
 import {
   LearningCatalog,
-  MusicLine,
   MusicTrack,
   PracticeScenario,
-  ReadingPassage,
   ReadingWork
 } from '../../model/ContentModels';
 import { AiInquiryContext } from '../../model/DeepSeekModels';
-import { AiInquiryFactory } from '../../services/AiInquiryFactory';
 import { ContentRepository } from '../../services/ContentRepository';
-import { aiTextSelectionMenu } from '../components/AiTextSelection';
 import { planeLightEffect } from '../components/ImmersiveCanvas';
 import { PageChrome } from '../components/PageChrome';
 
@@ -31,8 +27,10 @@ export struct ExplorePage {
   @Prop scenarioIndex: number = -1;
   apiKeyConfigured: boolean = false;
   onTabChange: (index: number) => void = (index: number) => {};
-  onMusicChange: (index: number) => void = (index: number) => {};
-  onReadingChange: (index: number) => void = (index: number) => {};
+  onOpenMusic: (track: MusicTrack, index: number) => void =
+    (track: MusicTrack, index: number) => {};
+  onOpenReading: (reading: ReadingWork, index: number) => void =
+    (reading: ReadingWork, index: number) => {};
   onScenarioChange: (index: number) => void = (index: number) => {};
   onStartScenario: (scenario: PracticeScenario) => void = (scenario: PracticeScenario) => {};
   onAsk: (context: AiInquiryContext) => void = (context: AiInquiryContext) => {};
@@ -42,9 +40,6 @@ export struct ExplorePage {
   @State private readingWorks: ReadingWork[] = [];
   @State private loadError: string = '';
   @State private pageWidth: number = 360;
-  @State private detailOpen: boolean = false;
-  @State private detailKind: number = 0;
-  @State private detailIndex: number = -1;
   @State private exploreTabIndexes: number[] = [0];
   @State private exploreTabOptions: SegmentButtonOptions = SegmentButtonOptions.tab({
     buttons: [
@@ -151,17 +146,17 @@ export struct ExplorePage {
   }
 
   private openMusic(index: number): void {
-    this.detailKind = 0;
-    this.detailIndex = index;
-    this.onMusicChange(index);
-    this.detailOpen = true;
+    if (index < 0 || index >= this.musicTracks.length) {
+      return;
+    }
+    this.onOpenMusic(this.musicTracks[index], index);
   }
 
   private openReading(index: number): void {
-    this.detailKind = 1;
-    this.detailIndex = index;
-    this.onReadingChange(index);
-    this.detailOpen = true;
+    if (index < 0 || index >= this.readingWorks.length) {
+      return;
+    }
+    this.onOpenReading(this.readingWorks[index], index);
   }
 
   private startScenario(scenario: PracticeScenario, index: number): void {
@@ -170,34 +165,6 @@ export struct ExplorePage {
     }
     this.onScenarioChange(index);
     this.onStartScenario(scenario);
-  }
-
-  private selectedMusic(): MusicTrack | undefined {
-    if (this.detailKind !== 0 || this.detailIndex < 0 || this.detailIndex >= this.musicTracks.length) {
-      return undefined;
-    }
-    return this.musicTracks[this.detailIndex];
-  }
-
-  private selectedReading(): ReadingWork | undefined {
-    if (this.detailKind !== 1 || this.detailIndex < 0 || this.detailIndex >= this.readingWorks.length) {
-      return undefined;
-    }
-    return this.readingWorks[this.detailIndex];
-  }
-
-  private askMusicSelection(selection: string, track: MusicTrack, line?: MusicLine): void {
-    const detail: string = line === undefined ?
-      `曲目：${track.title}\n主题：${track.focus}\n等级：${track.level}` :
-      `曲目：${track.title}\n原句：${line.text}\n读音：${line.reading}\n释义：${line.meaning}`;
-    this.onAsk(AiInquiryFactory.selection(selection, `音乐 · ${track.title}`, detail));
-  }
-
-  private askReadingSelection(selection: string, reading: ReadingWork, passage?: ReadingPassage): void {
-    const detail: string = passage === undefined ?
-      `作品：${reading.title}\n作者：${reading.author}\n简介：${reading.summary}` :
-      `作品：${reading.title}\n作者：${reading.author}\n原文：${passage.text}\n学习提示：${passage.note}`;
-    this.onAsk(AiInquiryFactory.selection(selection, `阅读 · ${reading.title}`, detail));
   }
 
   private selectExploreTab(index: number): void {
@@ -248,17 +215,6 @@ export struct ExplorePage {
     .height('100%')
     .backgroundColor(Color.Transparent)
     .onAreaChange((oldArea: Area, newArea: Area) => this.updatePageWidth(newArea.width))
-    .bindSheet($$this.detailOpen, this.detailSheet(), {
-      height: SheetSize.LARGE,
-      preferType: SheetType.BOTTOM,
-      title: { title: this.detailKind === 0 ? '音乐' : '阅读' },
-      dragBar: true,
-      showClose: true,
-      blurStyle: BlurStyle.COMPONENT_REGULAR,
-      backgroundColor: $r('app.color.surface_raised'),
-      maskColor: '#33202124',
-      onDisappear: () => this.detailOpen = false
-    })
   }
 
   @Builder
@@ -606,191 +562,4 @@ export struct ExplorePage {
     .accessibilityText(`${scenario.title}，${scenario.setting}，${scenario.level}`)
   }
 
-  @Builder
-  private detailSheet() {
-    if (this.detailKind === 0) {
-      this.musicDetail()
-    } else {
-      this.readingDetail()
-    }
-  }
-
-  @Builder
-  private musicDetail() {
-    if (this.selectedMusic() !== undefined) {
-      List({ space: 0 }) {
-        ListItem() {
-          Column({ space: 7 }) {
-            Image(this.musicArtwork(this.selectedMusic()?.id ?? ''))
-              .width('100%')
-              .height(246)
-              .borderRadius(26)
-              .objectFit(ImageFit.Cover)
-              .margin({ bottom: 15 })
-            Text(this.selectedMusic()?.title ?? '')
-              .width('100%')
-              .fontSize(34)
-              .fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.ink'))
-              .copyOption(CopyOptions.LocalDevice)
-              .editMenuOptions(aiTextSelectionMenu(this.selectedMusic()?.title ?? '',
-                (selection: string) => this.askMusicSelection(selection, this.selectedMusic() as MusicTrack)))
-            Text(`${this.selectedMusic()?.chineseTitle ?? ''} · ${this.selectedMusic()?.artist ?? ''}`)
-              .width('100%')
-              .fontSize(14)
-              .fontColor($r('app.color.ink_muted'))
-            Text(this.selectedMusic()?.focus ?? '')
-              .width('100%')
-              .fontSize(13)
-              .fontColor($r('app.color.accent'))
-              .margin({ top: 5 })
-          }
-          .width('100%')
-          .alignItems(HorizontalAlign.Start)
-          .padding({ left: 22, right: 22, top: 12, bottom: 22 })
-        }
-
-        ForEach(this.selectedMusic()?.lines ?? [], (line: MusicLine) => {
-          ListItem() {
-            Column({ space: 7 }) {
-              Text(line.text)
-                .width('100%')
-                .fontSize(21)
-                .fontWeight(FontWeight.Medium)
-                .fontColor($r('app.color.ink'))
-                .lineHeight(31)
-                .copyOption(CopyOptions.LocalDevice)
-                .editMenuOptions(aiTextSelectionMenu(line.text,
-                  (selection: string) => this.askMusicSelection(
-                    selection, this.selectedMusic() as MusicTrack, line)))
-              Text(line.reading)
-                .width('100%')
-                .fontSize(13)
-                .fontColor($r('app.color.accent'))
-                .copyOption(CopyOptions.LocalDevice)
-              Text(line.meaning)
-                .width('100%')
-                .fontSize(14)
-                .fontColor($r('app.color.ink_muted'))
-                .copyOption(CopyOptions.LocalDevice)
-            }
-            .width('100%')
-            .alignItems(HorizontalAlign.Start)
-            .padding({ left: 22, right: 22, top: 18, bottom: 18 })
-            .border({ width: { top: 0.5 }, color: $r('app.color.line') })
-          }
-        }, (line: MusicLine) => line.text)
-      }
-      .width('100%')
-      .height('100%')
-      .scrollBar(BarState.Off)
-      .edgeEffect(EdgeEffect.Spring)
-    }
-  }
-
-  @Builder
-  private readingDetail() {
-    if (this.selectedReading() !== undefined) {
-      List({ space: 0 }) {
-        ListItem() {
-          Column({ space: 7 }) {
-            Image(this.readingArtwork(this.selectedReading()?.id ?? ''))
-              .width('100%')
-              .height(232)
-              .borderRadius(26)
-              .objectFit(ImageFit.Cover)
-              .margin({ bottom: 15 })
-            Text(`${this.selectedReading()?.genre ?? ''} · ${this.selectedReading()?.level ?? ''}`)
-              .width('100%')
-              .fontSize(12)
-              .fontWeight(FontWeight.Medium)
-              .fontColor($r('app.color.accent'))
-            Text(this.selectedReading()?.title ?? '')
-              .width('100%')
-              .fontSize(32)
-              .fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.ink'))
-              .copyOption(CopyOptions.LocalDevice)
-              .editMenuOptions(aiTextSelectionMenu(this.selectedReading()?.title ?? '',
-                (selection: string) => this.askReadingSelection(
-                  selection, this.selectedReading() as ReadingWork)))
-            Text(`${this.selectedReading()?.author ?? ''} · ${this.selectedReading()?.titleReading ?? ''}`)
-              .width('100%')
-              .fontSize(14)
-              .fontColor($r('app.color.accent'))
-              .copyOption(CopyOptions.LocalDevice)
-            Text(this.selectedReading()?.summary ?? '')
-              .width('100%')
-              .fontSize(14)
-              .lineHeight(22)
-              .fontColor($r('app.color.ink_muted'))
-          }
-          .width('100%')
-          .alignItems(HorizontalAlign.Start)
-          .padding({ left: 22, right: 22, top: 12, bottom: 22 })
-        }
-
-        ForEach(this.selectedReading()?.passages ?? [], (passage: ReadingPassage) => {
-          ListItem() {
-            Column({ space: 7 }) {
-              Text(passage.text)
-                .width('100%')
-                .fontSize(21)
-                .fontWeight(FontWeight.Medium)
-                .fontColor($r('app.color.ink'))
-                .lineHeight(31)
-                .copyOption(CopyOptions.LocalDevice)
-                .editMenuOptions(aiTextSelectionMenu(passage.text,
-                  (selection: string) => this.askReadingSelection(
-                    selection, this.selectedReading() as ReadingWork, passage)))
-              Text(passage.note)
-                .width('100%')
-                .fontSize(14)
-                .lineHeight(22)
-                .fontColor($r('app.color.ink_muted'))
-                .copyOption(CopyOptions.LocalDevice)
-            }
-            .width('100%')
-            .alignItems(HorizontalAlign.Start)
-            .padding({ left: 22, right: 22, top: 18, bottom: 18 })
-            .border({ width: { top: 0.5 }, color: $r('app.color.line') })
-          }
-        }, (passage: ReadingPassage) => passage.text)
-
-        ListItem() {
-          Column({ space: 7 }) {
-            Text('内容来源')
-              .width('100%')
-              .fontSize(12)
-              .fontWeight(FontWeight.Medium)
-              .fontColor($r('app.color.accent'))
-            Text(this.selectedReading()?.sourceName ?? '')
-              .width('100%')
-              .fontSize(14)
-              .fontWeight(FontWeight.Medium)
-              .fontColor($r('app.color.ink'))
-              .copyOption(CopyOptions.LocalDevice)
-            Text(this.selectedReading()?.sourceUrl ?? '')
-              .width('100%')
-              .fontSize(12)
-              .fontColor($r('app.color.ink_muted'))
-              .copyOption(CopyOptions.LocalDevice)
-            Text(this.selectedReading()?.rights ?? '')
-              .width('100%')
-              .fontSize(12)
-              .lineHeight(19)
-              .fontColor($r('app.color.ink_muted'))
-          }
-          .width('100%')
-          .alignItems(HorizontalAlign.Start)
-          .padding({ left: 22, right: 22, top: 22, bottom: 36 })
-          .border({ width: { top: 0.5 }, color: $r('app.color.line') })
-        }
-      }
-      .width('100%')
-      .height('100%')
-      .scrollBar(BarState.Off)
-      .edgeEffect(EdgeEffect.Spring)
-    }
-  }
 }

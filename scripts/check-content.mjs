@@ -1,4 +1,4 @@
-import { readdir, readFile } from 'node:fs/promises'
+import { readdir, readFile, stat } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -29,8 +29,22 @@ if (!catalog.kanaGroups?.basic?.length || !catalog.dialogues?.length || !catalog
 }
 
 const musicTracks = JSON.parse(await readFile(resolve(contentRoot, 'music.json'), 'utf8'))
-if (musicTracks.length < 3 || musicTracks.some((track) => !track.id || !track.title || track.lines?.length < 3)) {
+if (musicTracks.length < 3 || musicTracks.some((track) => !track.id || !track.title ||
+  !track.audioSource || !track.artworkName || track.durationMs <= 0 || track.lines?.length < 3)) {
   throw new Error('Bundled music learning content is incomplete.')
+}
+for (const track of musicTracks) {
+  const audioFile = await stat(resolve(contentRoot, '..', track.audioSource))
+  if (!audioFile.isFile() || audioFile.size < 1000) {
+    throw new Error(`Music source ${track.audioSource} is missing or incomplete.`)
+  }
+  let previousStart = -1
+  for (const line of track.lines) {
+    if (!Number.isInteger(line.startMs) || line.startMs <= previousStart || line.startMs >= track.durationMs) {
+      throw new Error(`Music timeline ${track.id} is not strictly ordered.`)
+    }
+    previousStart = line.startMs
+  }
 }
 
 const readingWorks = JSON.parse(await readFile(resolve(contentRoot, 'reading.json'), 'utf8'))
@@ -38,6 +52,12 @@ const readingIds = new Set(readingWorks.map((work) => work.id))
 if (readingWorks.length < 5 || readingIds.size !== readingWorks.length ||
   readingWorks.some((work) => !work.title || !work.author || !work.sourceUrl || work.passages?.length < 3)) {
   throw new Error('Bundled open reading content is incomplete.')
+}
+for (const work of readingWorks) {
+  const readerBook = await stat(resolve(contentRoot, `../reader/${work.id}.epub`))
+  if (!readerBook.isFile() || readerBook.size < 1000) {
+    throw new Error(`Reader book ${work.id}.epub is missing or incomplete.`)
+  }
 }
 
 const openSources = JSON.parse(await readFile(resolve(contentRoot, 'open-sources.json'), 'utf8'))

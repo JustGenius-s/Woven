@@ -104,6 +104,14 @@ export class LearningSyncCoordinator {
       LearningSyncCoordinator.progressRecord('music.current', itemId, index, ''));
   }
 
+  static saveMusicPosition(context: common.Context, trackId: string, positionMs: number): void {
+    if (trackId.length === 0) {
+      return;
+    }
+    LearningSyncStore.upsertProgress(context,
+      LearningSyncCoordinator.musicPositionRecord(trackId, positionMs));
+  }
+
   static saveReadingProgress(context: common.Context, index: number): void {
     let itemId: string = '';
     try {
@@ -152,6 +160,10 @@ export class LearningSyncCoordinator {
       'kana.current', LearningPreferences.kanaKey(context), 0, '', now));
     progress.push(LearningSyncCoordinator.grammarSeed(context, now));
     progress.push(LearningSyncCoordinator.musicSeed(context, now));
+    const musicPosition: SyncProgressRecord | undefined = LearningSyncCoordinator.musicPositionSeed(context, now);
+    if (musicPosition !== undefined) {
+      progress.push(musicPosition);
+    }
     progress.push(LearningSyncCoordinator.readingSeed(context, now));
     progress.push(LearningSyncCoordinator.scenarioSeed(context, now));
 
@@ -205,6 +217,22 @@ export class LearningSyncCoordinator {
       itemId = '';
     }
     return LearningSyncCoordinator.progressRecord('music.current', itemId, index, '', updatedAt);
+  }
+
+  private static musicPositionSeed(context: common.Context,
+    updatedAt: number): SyncProgressRecord | undefined {
+    const index: number = LearningPreferences.musicIndex(context);
+    try {
+      const tracks: MusicTrack[] = ContentRepository.loadMusicTracks(context);
+      if (index >= 0 && index < tracks.length) {
+        const track: MusicTrack = tracks[index];
+        return LearningSyncCoordinator.musicPositionRecord(
+          track.id, LearningPreferences.musicPosition(context, track.id), updatedAt);
+      }
+    } catch (error) {
+      return undefined;
+    }
+    return undefined;
   }
 
   private static readingSeed(context: common.Context, updatedAt: number): SyncProgressRecord {
@@ -302,6 +330,8 @@ export class LearningSyncCoordinator {
         LearningSyncCoordinator.indexForMusic(music, tracks));
     }
 
+    LearningSyncCoordinator.applyMusicPositions(context, records);
+
     const reading: SyncProgressRecord | undefined = LearningSyncCoordinator.latest(records, 'reading.current');
     if (reading !== undefined) {
       const works: ReadingWork[] = ContentRepository.loadReadingWorks(context);
@@ -378,6 +408,25 @@ export class LearningSyncCoordinator {
     return result;
   }
 
+  private static applyMusicPositions(context: common.Context, records: SyncProgressRecord[]): void {
+    const latestByTrack: Map<string, SyncProgressRecord> = new Map<string, SyncProgressRecord>();
+    for (let index: number = 0; index < records.length; index++) {
+      const record: SyncProgressRecord = records[index];
+      if (record.courseId !== DEFAULT_COURSE_SCOPE.courseId ||
+        record.targetLocale !== DEFAULT_COURSE_SCOPE.targetLocale || record.kind !== 'music.position' ||
+        record.deleted || record.itemId.length === 0) {
+        continue;
+      }
+      const previous: SyncProgressRecord | undefined = latestByTrack.get(record.itemId);
+      if (previous === undefined || record.updatedAt > previous.updatedAt) {
+        latestByTrack.set(record.itemId, record);
+      }
+    }
+    latestByTrack.forEach((record: SyncProgressRecord, trackId: string) => {
+      LearningPreferences.saveMusicPosition(context, trackId, record.numericValue);
+    });
+  }
+
   private static indexForGrammar(record: SyncProgressRecord, entries: GrammarIndexEntry[]): number {
     for (let index: number = 0; index < entries.length; index++) {
       if (entries[index].id === record.itemId) {
@@ -432,6 +481,22 @@ export class LearningSyncCoordinator {
       itemId: itemId,
       numericValue: numericValue,
       textValue: textValue,
+      updatedAt: updatedAt,
+      deleted: false
+    };
+  }
+
+  private static musicPositionRecord(trackId: string, positionMs: number,
+    updatedAt: number = Date.now()): SyncProgressRecord {
+    return {
+      recordId: `${DEFAULT_COURSE_SCOPE.courseId}:progress:music.position:${trackId}`,
+      courseId: DEFAULT_COURSE_SCOPE.courseId,
+      targetLocale: DEFAULT_COURSE_SCOPE.targetLocale,
+      supportLocale: DEFAULT_COURSE_SCOPE.supportLocale,
+      kind: 'music.position',
+      itemId: trackId,
+      numericValue: Math.max(0, Math.floor(positionMs)),
+      textValue: '',
       updatedAt: updatedAt,
       deleted: false
     };

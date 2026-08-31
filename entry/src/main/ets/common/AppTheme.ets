@@ -1,6 +1,6 @@
 export const APP_HORIZONTAL_PADDING: number = 24;
 export const FLOATING_TAB_BAR_BOTTOM_MARGIN: number = 12;
-export const FLOATING_TAB_CONTENT_INSET: number = 120;
+export const FLOATING_TAB_CONTENT_INSET: number = 170;
 export const CONTENT_MAX_WIDTH: number = 840;
 export const MOTION_DURATION: number = 320;
 

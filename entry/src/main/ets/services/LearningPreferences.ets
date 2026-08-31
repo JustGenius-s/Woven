@@ -13,6 +13,7 @@ const KEY_HOME_GUIDE_SEEN: string = 'home_guide_seen';
 const KEY_KANA_KEY: string = 'kana_key';
 const KEY_EXPLORE_TAB: string = 'explore_tab';
 const KEY_MUSIC_INDEX: string = 'music_index';
+const KEY_MUSIC_POSITION_PREFIX: string = 'music_position_';
 const KEY_READING_INDEX: string = 'reading_index';
 const KEY_SCENARIO_INDEX: string = 'scenario_index';
 
@@ -109,6 +110,12 @@ export class LearningPreferences {
     return LearningPreferences.readCourseNumber(context, KEY_MUSIC_INDEX, -1, courseId);
   }
 
+  static musicPosition(context: common.Context, trackId: string,
+    courseId: string = DEFAULT_COURSE_ID): number {
+    return LearningPreferences.readCourseNumber(
+      context, LearningPreferences.musicPositionKey(trackId), 0, courseId);
+  }
+
   static readingIndex(context: common.Context, courseId: string = DEFAULT_COURSE_ID): number {
     return LearningPreferences.readCourseNumber(context, KEY_READING_INDEX, -1, courseId);
   }
@@ -181,6 +188,16 @@ export class LearningPreferences {
     LearningPreferences.saveCourseNumber(context, KEY_MUSIC_INDEX, index, courseId);
   }
 
+  static saveMusicPosition(context: common.Context, trackId: string, positionMs: number,
+    courseId: string = DEFAULT_COURSE_ID): void {
+    LearningPreferences.saveCourseNumber(
+      context,
+      LearningPreferences.musicPositionKey(trackId),
+      Math.max(0, Math.floor(positionMs)),
+      courseId
+    );
+  }
+
   static saveReadingIndex(context: common.Context, index: number,
     courseId: string = DEFAULT_COURSE_ID): void {
     LearningPreferences.saveCourseNumber(context, KEY_READING_INDEX, index, courseId);
@@ -242,6 +259,10 @@ export class LearningPreferences {
   private static saveCourseNumber(context: common.Context, key: string, value: number,
     courseId: string): void {
     LearningPreferences.saveNumber(context, LearningPreferences.courseKey(key, courseId), value);
+  }
+
+  private static musicPositionKey(trackId: string): string {
+    return `${KEY_MUSIC_POSITION_PREFIX}${trackId.replace(/[^A-Za-z0-9_-]/g, '_')}`;
   }
 
 }

@@ -6,11 +6,14 @@
     "artist": "言葉 Original",
     "level": "N5",
     "focus": "时间、车站与移动",
+    "audioSource": "audio/morning-train.wav",
+    "artworkName": "music_morning_train",
+    "durationMs": 32000,
     "lines": [
-      { "text": "朝の電車に 風が乗る", "reading": "あさの でんしゃに かぜが のる", "meaning": "清晨的风乘上电车。" },
-      { "text": "眠い町から 光が出る", "reading": "ねむい まちから ひかりが でる", "meaning": "光从沉睡的街道升起。" },
-      { "text": "次の駅まで 夢を見よう", "reading": "つぎの えきまで ゆめを みよう", "meaning": "在抵达下一站前，再做一会儿梦吧。" },
-      { "text": "今日も静かに 始まっていく", "reading": "きょうも しずかに はじまっていく", "meaning": "今天也静静地开始了。" }
+      { "text": "朝の電車に 風が乗る", "reading": "あさの でんしゃに かぜが のる", "meaning": "清晨的风乘上电车。", "startMs": 0 },
+      { "text": "眠い町から 光が出る", "reading": "ねむい まちから ひかりが でる", "meaning": "光从沉睡的街道升起。", "startMs": 8000 },
+      { "text": "次の駅まで 夢を見よう", "reading": "つぎの えきまで ゆめを みよう", "meaning": "在抵达下一站前，再做一会儿梦吧。", "startMs": 16000 },
+      { "text": "今日も静かに 始まっていく", "reading": "きょうも しずかに はじまっていく", "meaning": "今天也静静地开始了。", "startMs": 24000 }
     ]
   },
   {
@@ -20,11 +23,14 @@
     "artist": "言葉 Original",
     "level": "N5",
     "focus": "天气、饮品与等待",
+    "audioSource": "audio/rain-cafe.wav",
+    "artworkName": "music_rain_cafe",
+    "durationMs": 32000,
     "lines": [
-      { "text": "窓に雨の音がする", "reading": "まどに あめの おとが する", "meaning": "窗边传来雨声。" },
-      { "text": "温かいコーヒーを一つ", "reading": "あたたかい コーヒーを ひとつ", "meaning": "请给我一杯热咖啡。" },
-      { "text": "君を待つ午後は長い", "reading": "きみを まつ ごごは ながい", "meaning": "等待你的午后格外漫长。" },
-      { "text": "でもこの席が好きだ", "reading": "でも この せきが すきだ", "meaning": "但我喜欢这个座位。" }
+      { "text": "窓に雨の音がする", "reading": "まどに あめの おとが する", "meaning": "窗边传来雨声。", "startMs": 0 },
+      { "text": "温かいコーヒーを一つ", "reading": "あたたかい コーヒーを ひとつ", "meaning": "请给我一杯热咖啡。", "startMs": 8000 },
+      { "text": "君を待つ午後は長い", "reading": "きみを まつ ごごは ながい", "meaning": "等待你的午后格外漫长。", "startMs": 16000 },
+      { "text": "でもこの席が好きだ", "reading": "でも この せきが すきだ", "meaning": "但我喜欢这个座位。", "startMs": 24000 }
     ]
   },
   {
@@ -34,11 +40,14 @@
     "artist": "言葉 Original",
     "level": "N4",
     "focus": "计划、方向与发现",
+    "audioSource": "audio/small-trip.wav",
+    "artworkName": "music_small_trip",
+    "durationMs": 32000,
     "lines": [
-      { "text": "地図を閉じて 歩いてみよう", "reading": "ちずを とじて あるいてみよう", "meaning": "合上地图，试着走走吧。" },
-      { "text": "知らない道に 花が咲く", "reading": "しらない みちに はなが さく", "meaning": "陌生的路边开着花。" },
-      { "text": "遠くなくても 旅になる", "reading": "とおくなくても たびに なる", "meaning": "即使不远，也能成为旅行。" },
-      { "text": "新しい風を 覚えて帰る", "reading": "あたらしい かぜを おぼえて かえる", "meaning": "记住新的风，再踏上归途。" }
+      { "text": "地図を閉じて 歩いてみよう", "reading": "ちずを とじて あるいてみよう", "meaning": "合上地图，试着走走吧。", "startMs": 0 },
+      { "text": "知らない道に 花が咲く", "reading": "しらない みちに はなが さく", "meaning": "陌生的路边开着花。", "startMs": 8000 },
+      { "text": "遠くなくても 旅になる", "reading": "とおくなくても たびに なる", "meaning": "即使不远，也能成为旅行。", "startMs": 16000 },
+      { "text": "新しい風を 覚えて帰る", "reading": "あたらしい かぜを おぼえて かえる", "meaning": "记住新的风，再踏上归途。", "startMs": 24000 }
     ]
   },
   {
@@ -48,11 +57,14 @@
     "artist": "言葉 Original",
     "level": "N4",
     "focus": "回忆、书信与过去时",
+    "audioSource": "audio/seaside-letter.wav",
+    "artworkName": "music_seaside_letter",
+    "durationMs": 32000,
     "lines": [
-      { "text": "青い便箋に 夏を書く", "reading": "あおい びんせんに なつを かく", "meaning": "在蓝色信纸上写下夏天。" },
-      { "text": "あの日の波は 高かった", "reading": "あのひの なみは たかかった", "meaning": "那天的海浪很高。" },
-      { "text": "言えなかったことを 今送る", "reading": "いえなかった ことを いま おくる", "meaning": "现在寄出当时没能说出口的话。" },
-      { "text": "返事はゆっくりでいい", "reading": "へんじは ゆっくりで いい", "meaning": "回信慢一点也没关系。" }
+      { "text": "青い便箋に 夏を書く", "reading": "あおい びんせんに なつを かく", "meaning": "在蓝色信纸上写下夏天。", "startMs": 0 },
+      { "text": "あの日の波は 高かった", "reading": "あのひの なみは たかかった", "meaning": "那天的海浪很高。", "startMs": 8000 },
+      { "text": "言えなかったことを 今送る", "reading": "いえなかった ことを いま おくる", "meaning": "现在寄出当时没能说出口的话。", "startMs": 16000 },
+      { "text": "返事はゆっくりでいい", "reading": "へんじは ゆっくりで いい", "meaning": "回信慢一点也没关系。", "startMs": 24000 }
     ]
   },
   {
@@ -62,11 +74,14 @@
     "artist": "言葉 Original",
     "level": "N3",
     "focus": "愿望、假设与未来",
+    "audioSource": "audio/look-at-stars.wav",
+    "artworkName": "music_look_at_stars",
+    "durationMs": 32000,
     "lines": [
-      { "text": "もしも明日が見えなくても", "reading": "もしも あしたが みえなくても", "meaning": "即使看不见明天。" },
-      { "text": "今夜の星は消えない", "reading": "こんやの ほしは きえない", "meaning": "今夜的星星也不会消失。" },
-      { "text": "迷った時は空を見よう", "reading": "まよった ときは そらを みよう", "meaning": "迷茫的时候就看看天空吧。" },
-      { "text": "小さな光が道になる", "reading": "ちいさな ひかりが みちに なる", "meaning": "微小的光也会成为道路。" }
+      { "text": "もしも明日が見えなくても", "reading": "もしも あしたが みえなくても", "meaning": "即使看不见明天。", "startMs": 0 },
+      { "text": "今夜の星は消えない", "reading": "こんやの ほしは きえない", "meaning": "今夜的星星也不会消失。", "startMs": 8000 },
+      { "text": "迷った時は空を見よう", "reading": "まよった ときは そらを みよう", "meaning": "迷茫的时候就看看天空吧。", "startMs": 16000 },
+      { "text": "小さな光が道になる", "reading": "ちいさな ひかりが みちに なる", "meaning": "微小的光也会成为道路。", "startMs": 24000 }
     ]
   }
 ]

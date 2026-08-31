@@ -6,6 +6,8 @@
   "packageManager": "pnpm@11.21.0",
   "scripts": {
     "build:hap": "sh scripts/build-hap.sh",
-    "check:content": "node scripts/check-content.mjs"
+    "check:content": "node scripts/check-content.mjs",
+    "generate:reader": "python3 scripts/generate-reader-books.py",
+    "generate:music": "python3 scripts/generate-demo-music.py"
   }
 }

@@ -9,8 +9,13 @@ import {
   MOTION_DURATION
 } from '../common/AppTheme';
 import { preferredImmersiveMaterial } from '../common/ImmersiveMaterial';
-import { AppSection, LearningJourney, PracticeScenario } from '../model/ContentModels';
+import { AppSection, LearningJourney, MusicTrack, PracticeScenario, ReadingWork } from '../model/ContentModels';
 import { AiInquiryContext } from '../model/DeepSeekModels';
+import {
+  emptyMusicPlaybackSnapshot,
+  MusicPlaybackListener,
+  MusicPlaybackSnapshot
+} from '../model/MusicPlaybackModels';
 import {
   CloudSyncPhase,
   CloudSyncSnapshot,
@@ -25,17 +30,21 @@ import {
 import { HuaweiAccountService } from '../services/HuaweiAccountService';
 import { LearningPreferences } from '../services/LearningPreferences';
 import { LearningSyncCoordinator } from '../services/LearningSyncCoordinator';
+import { MusicPlaybackService } from '../services/MusicPlaybackService';
 import { VocabularyLearningStore } from '../services/VocabularyLearningStore';
 import { ExplorePage } from '../views/pages/ExplorePage';
 import { KanaPage } from '../views/pages/KanaPage';
 import { LearnPage } from '../views/pages/LearnPage';
 import { MePage } from '../views/pages/MePage';
+import { MusicPlayerPage } from '../views/pages/MusicPlayerPage';
 import { PracticeSessionPage } from '../views/pages/PracticeSessionPage';
+import { ReadingPage } from '../views/pages/ReadingPage';
 import { SettingsPage } from '../views/pages/SettingsPage';
 import { VocabularyPage } from '../views/pages/VocabularyPage';
 import { VocabularyStudyPage } from '../views/pages/VocabularyStudyPage';
 import { ImmersiveBackdrop } from '../views/components/ImmersiveCanvas';
 import { ContextAiPanel } from '../views/components/ContextAiPanel';
+import { MusicMiniPlayer } from '../views/components/MusicMiniPlayer';
 
 @Entry
 @Component
@@ -46,6 +55,10 @@ struct Index {
   @State private deepSeekApiKey: string = '';
   @State private settingsOpen: boolean = false;
   @State private activeScenario: PracticeScenario | undefined = undefined;
+  @State private activeReading: ReadingWork | undefined = undefined;
+  @State private musicPlayerOpen: boolean = false;
+  @State private musicTracks: MusicTrack[] = [];
+  @State private musicPlayback: MusicPlaybackSnapshot = emptyMusicPlaybackSnapshot();
   @State private journeys: LearningJourney[] = [];
   @State private currentJourney: LearningJourney | undefined = undefined;
   @State private journeyStage: number = 0;
@@ -74,6 +87,12 @@ struct Index {
     phase: CloudSyncPhase.LOCAL_ONLY,
     lastSyncedAt: 0,
     detail: ''
+  };
+  private musicPlaybackListener: MusicPlaybackListener = (snapshot: MusicPlaybackSnapshot) => {
+    this.musicPlayback = snapshot;
+    if (snapshot.trackIndex >= 0) {
+      this.musicIndex = snapshot.trackIndex;
+    }
   };
 
   aboutToAppear(): void {
@@ -105,7 +124,18 @@ struct Index {
       this.journeys = [];
       this.currentJourney = undefined;
     }
+    try {
+      this.musicTracks = ContentRepository.loadMusicTracks(context);
+    } catch (error) {
+      this.musicTracks = [];
+    }
+    MusicPlaybackService.initialize(context, this.musicTracks);
+    MusicPlaybackService.subscribe(this.musicPlaybackListener);
     this.initializeAccountAndSync(context);
+  }
+
+  aboutToDisappear(): void {
+    MusicPlaybackService.unsubscribe(this.musicPlaybackListener);
   }
 
   private async initializeAccountAndSync(context: common.Context): Promise<void> {
@@ -157,6 +187,7 @@ struct Index {
     this.journeyCompletedMask = LearningPreferences.journeyCompletedMask(context);
     this.kanaKey = LearningPreferences.kanaKey(context);
     this.musicIndex = LearningPreferences.musicIndex(context);
+    MusicPlaybackService.initialize(context, this.musicTracks);
     this.readingIndex = LearningPreferences.readingIndex(context);
     this.scenarioIndex = LearningPreferences.scenarioIndex(context);
     this.learnedWordCount = VocabularyLearningStore.loadLearnedWords(context).length;
@@ -209,11 +240,45 @@ struct Index {
     LearningSyncCoordinator.saveMusicProgress(context, index);
   }
 
+  private openMusic(index: number, autoplay: boolean): void {
+    if (index < 0 || index >= this.musicTracks.length) {
+      return;
+    }
+    this.saveMusicIndex(index);
+    this.getUIContext().animateTo({ curve: curves.springMotion(0.42, 0.84, 0.18) }, () => {
+      this.musicPlayerOpen = true;
+    });
+    if (autoplay) {
+      MusicPlaybackService.playTrack(index);
+    } else {
+      MusicPlaybackService.prepareTrack(index);
+    }
+  }
+
+  private closeMusicPlayer(): void {
+    this.getUIContext().animateTo({ curve: curves.springMotion(0.38, 0.88, 0.16) }, () => {
+      this.musicPlayerOpen = false;
+    });
+  }
+
   private saveReadingIndex(index: number): void {
     this.readingIndex = index;
     const context: common.Context = this.getUIContext().getHostContext() as common.Context;
     LearningPreferences.saveReadingIndex(context, index);
     LearningSyncCoordinator.saveReadingProgress(context, index);
+  }
+
+  private openReading(reading: ReadingWork, index: number): void {
+    this.saveReadingIndex(index);
+    this.getUIContext().animateTo({ curve: curves.springMotion(0.42, 0.84, 0.18) }, () => {
+      this.activeReading = reading;
+    });
+  }
+
+  private closeReading(): void {
+    this.getUIContext().animateTo({ curve: curves.springMotion(0.38, 0.88, 0.16) }, () => {
+      this.activeReading = undefined;
+    });
   }
 
   private saveScenarioIndex(index: number): void {
@@ -283,9 +348,18 @@ struct Index {
   }
 
   private shellBottomInset(): number {
+    if (this.activeReading !== undefined) {
+      return 0;
+    }
     const tabsVisible: boolean = this.activeScenario === undefined && !this.settingsOpen &&
-      !this.vocabularyStudyOpen;
+      !this.vocabularyStudyOpen && this.activeReading === undefined && !this.musicPlayerOpen;
     return tabsVisible ? 0 : this.bottomSafeInset();
+  }
+
+  private miniPlayerVisible(): boolean {
+    return !this.musicPlayerOpen && this.activeReading === undefined && this.activeScenario === undefined &&
+      !this.settingsOpen && !this.vocabularyStudyOpen && this.musicPlayback.trackIndex >= 0 &&
+      this.musicPlayback.trackIndex < this.musicTracks.length;
   }
 
   private leftSafeInset(): number {
@@ -323,51 +397,78 @@ struct Index {
   private appShell() {
     Stack({ alignContent: Alignment.Bottom }) {
       Stack({ alignContent: Alignment.Center }) {
-        if (this.activeScenario !== undefined) {
-        PracticeSessionPage({
-          scenario: this.activeScenario,
-          apiKey: this.deepSeekApiKey,
-          onExit: () => this.closePractice()
-        })
-        .width('100%')
-        .constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
-        .transition(TransitionEffect.OPACITY
-          .combine(TransitionEffect.scale({ x: 0.94, y: 0.94 }))
-          .animation({ curve: curves.springMotion(0.42, 0.82, 0.18) }))
-      } else if (this.settingsOpen) {
-        SettingsPage({
-          initialApiKey: this.deepSeekApiKey,
-          account: this.accountSnapshot,
-          syncState: this.cloudSyncSnapshot,
-          onBack: () => this.settingsOpen = false,
-          onSave: (apiKey: string) => this.saveDeepSeekApiKey(apiKey),
-          onSync: () => this.syncLearningState(
-            this.getUIContext().getHostContext() as common.Context, true)
-        })
-        .width('100%')
-        .constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
-        .transition(TransitionEffect.OPACITY
-          .combine(TransitionEffect.scale({ x: 0.97, y: 0.97 }))
-          .animation({ curve: curves.springMotion(0.4, 0.86, 0.16) }))
-      } else if (this.vocabularyStudyOpen) {
-        VocabularyStudyPage({
-          level: this.vocabularyStudyLevel,
-          wordIds: this.vocabularyStudyWordIds,
-          initialWordId: this.vocabularyStudyWordId,
-          journey: this.currentJourney,
-          learnedGrammarIndex: this.grammarIndex,
-          journeyCompletedMask: this.journeyCompletedMask,
-          onAsk: (context: AiInquiryContext) => this.openInquiry(context),
-          onBack: () => this.closeVocabularyStudy(),
-          onToneChange: (toneIndex: number) => this.vocabularySceneTone = toneIndex
-        })
-        .width('100%')
-        .constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
-        .transition(TransitionEffect.OPACITY
-          .combine(TransitionEffect.translate({ y: 20 }))
-          .combine(TransitionEffect.scale({ x: 0.97, y: 0.97 }))
-          .animation({ curve: curves.springMotion(0.44, 0.84, 0.18) }))
-      } else {
+        if (this.musicPlayerOpen) {
+          MusicPlayerPage({
+            tracks: this.musicTracks,
+            snapshot: this.musicPlayback,
+            onBack: () => this.closeMusicPlayer(),
+            onToggle: () => MusicPlaybackService.toggle(),
+            onPrevious: () => MusicPlaybackService.previous(),
+            onNext: () => MusicPlaybackService.next(),
+            onSeek: (positionMs: number) => MusicPlaybackService.seek(positionMs),
+            onAsk: (context: AiInquiryContext) => this.openInquiry(context)
+          })
+          .width('100%')
+          .height('100%')
+          .transition(TransitionEffect.OPACITY
+            .combine(TransitionEffect.translate({ y: 18 }))
+            .animation({ curve: curves.springMotion(0.42, 0.84, 0.18) }))
+        } else if (this.activeReading !== undefined) {
+          ReadingPage({
+            reading: this.activeReading,
+            onBack: () => this.closeReading(),
+            onAsk: (context: AiInquiryContext) => this.openInquiry(context)
+          })
+          .width('100%')
+          .height('100%')
+          .transition(TransitionEffect.OPACITY
+            .combine(TransitionEffect.translate({ x: 24 }))
+            .animation({ curve: curves.springMotion(0.42, 0.84, 0.18) }))
+        } else if (this.activeScenario !== undefined) {
+          PracticeSessionPage({
+            scenario: this.activeScenario,
+            apiKey: this.deepSeekApiKey,
+            onExit: () => this.closePractice()
+          })
+          .width('100%')
+          .constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
+          .transition(TransitionEffect.OPACITY
+            .combine(TransitionEffect.scale({ x: 0.94, y: 0.94 }))
+            .animation({ curve: curves.springMotion(0.42, 0.82, 0.18) }))
+        } else if (this.settingsOpen) {
+          SettingsPage({
+            initialApiKey: this.deepSeekApiKey,
+            account: this.accountSnapshot,
+            syncState: this.cloudSyncSnapshot,
+            onBack: () => this.settingsOpen = false,
+            onSave: (apiKey: string) => this.saveDeepSeekApiKey(apiKey),
+            onSync: () => this.syncLearningState(
+              this.getUIContext().getHostContext() as common.Context, true)
+          })
+          .width('100%')
+          .constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
+          .transition(TransitionEffect.OPACITY
+            .combine(TransitionEffect.scale({ x: 0.97, y: 0.97 }))
+            .animation({ curve: curves.springMotion(0.4, 0.86, 0.16) }))
+        } else if (this.vocabularyStudyOpen) {
+          VocabularyStudyPage({
+            level: this.vocabularyStudyLevel,
+            wordIds: this.vocabularyStudyWordIds,
+            initialWordId: this.vocabularyStudyWordId,
+            journey: this.currentJourney,
+            learnedGrammarIndex: this.grammarIndex,
+            journeyCompletedMask: this.journeyCompletedMask,
+            onAsk: (context: AiInquiryContext) => this.openInquiry(context),
+            onBack: () => this.closeVocabularyStudy(),
+            onToneChange: (toneIndex: number) => this.vocabularySceneTone = toneIndex
+          })
+          .width('100%')
+          .constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
+          .transition(TransitionEffect.OPACITY
+            .combine(TransitionEffect.translate({ y: 20 }))
+            .combine(TransitionEffect.scale({ x: 0.97, y: 0.97 }))
+            .animation({ curve: curves.springMotion(0.44, 0.84, 0.18) }))
+        } else {
         HdsTabs({ barPosition: BarPosition.End, index: this.section }) {
           TabContent() {
             LearnPage({
@@ -417,8 +518,8 @@ struct Index {
               scenarioIndex: this.scenarioIndex,
               apiKeyConfigured: this.deepSeekApiKey.length > 0,
               onTabChange: (index: number) => this.saveExploreTab(index),
-              onMusicChange: (index: number) => this.saveMusicIndex(index),
-              onReadingChange: (index: number) => this.saveReadingIndex(index),
+              onOpenMusic: (track: MusicTrack, index: number) => this.openMusic(index, true),
+              onOpenReading: (reading: ReadingWork, index: number) => this.openReading(reading, index),
               onScenarioChange: (index: number) => this.saveScenarioIndex(index),
               onStartScenario: (scenario: PracticeScenario) => this.startPractice(scenario),
               onAsk: (context: AiInquiryContext) => this.openInquiry(context)
@@ -473,6 +574,21 @@ struct Index {
       .width('100%')
       .height('100%')
 
+      if (this.miniPlayerVisible()) {
+        MusicMiniPlayer({
+          tracks: this.musicTracks,
+          snapshot: this.musicPlayback,
+          onOpen: () => this.openMusic(this.musicPlayback.trackIndex, false),
+          onToggle: () => MusicPlaybackService.toggle(),
+          onNext: () => MusicPlaybackService.next()
+        })
+        .margin({ bottom: 84 })
+        .zIndex(8)
+        .transition(TransitionEffect.OPACITY
+          .combine(TransitionEffect.translate({ y: 18 }))
+          .animation({ curve: curves.springMotion(0.42, 0.84, 0.18) }))
+      }
+
       Column()
         .width(1)
         .height(1)
@@ -501,8 +617,8 @@ struct Index {
     .height('100%')
     .padding({
       bottom: this.shellBottomInset(),
-      left: this.leftSafeInset(),
-      right: this.rightSafeInset()
+      left: this.activeReading === undefined && !this.musicPlayerOpen ? this.leftSafeInset() : 0,
+      right: this.activeReading === undefined && !this.musicPlayerOpen ? this.rightSafeInset() : 0
     })
     .backgroundColor(Color.Transparent)
   }
@@ -527,6 +643,14 @@ struct Index {
   onBackPress(): boolean {
     if (this.inquiryPopupOpen) {
       this.closeInquiry();
+      return true;
+    }
+    if (this.activeReading !== undefined) {
+      this.closeReading();
+      return true;
+    }
+    if (this.musicPlayerOpen) {
+      this.closeMusicPlayer();
       return true;
     }
     if (this.activeScenario !== undefined) {
