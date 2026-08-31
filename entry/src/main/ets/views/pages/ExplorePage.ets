@@ -5,9 +5,9 @@ import {
   LengthMetrics,
   SegmentButton,
   SegmentButtonOptions,
-  SegmentButtonTextItem
+  SegmentButtonTextItem,
+  uiMaterial
 } from '@kit.ArkUI';
-import uiMaterial from '@ohos.arkui.uiMaterial';
 import { FLOATING_TAB_CONTENT_INSET } from '../../common/AppTheme';
 import {
   LearningCatalog,
@@ -57,8 +57,17 @@ export struct ExplorePage {
     selectedFontSize: 15,
     fontWeight: FontWeight.Regular,
     selectedFontWeight: FontWeight.Medium,
-    backgroundColor: $r('app.color.surface_raised'),
-    selectedBackgroundColor: $r('app.color.accent_soft'),
+    backgroundColor: Color.Transparent,
+    selectedBackgroundColor: Color.Transparent,
+    // The material is a property of the button itself, not of its container:
+    // setting systemMaterial on the parent Row only tinted that background and
+    // left the button drawing its own opaque plate. An opaque backgroundColor
+    // would also sit on top of the material and cancel it.
+    backgroundSystemMaterial: new uiMaterial.ImmersiveMaterial({
+      style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
+      colorInvert: true,
+      interactive: true
+    }),
     borderRadiusMode: BorderRadiusMode.CUSTOM,
     backgroundBorderRadius: LengthMetrics.vp(22),
     itemBorderRadius: LengthMetrics.vp(19),
@@ -203,12 +212,6 @@ export struct ExplorePage {
     .width('100%')
     .height(60)
     .padding({ left: 18, right: 18, bottom: 8 })
-    // The design guide recommends ULTRA_THIN for elements floating at the top.
-    // systemMaterial must come after the other style attributes or the
-    // material priority is not what the caller expects.
-    .systemMaterial(new uiMaterial.ImmersiveMaterial({
-      style: uiMaterial.ImmersiveStyle.ULTRA_THIN
-    }))
   }
 
   build() {
