@@ -85,6 +85,7 @@ export struct PracticePage {
           Text(scenario.setting)
             .fontSize(12)
             .fontColor($r('app.color.ink_muted'))
+            .copyOption(CopyOptions.LocalDevice)
         }
         Text(scenario.title)
           .width('100%')
@@ -92,15 +93,18 @@ export struct PracticePage {
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .lineHeight(52)
+          .copyOption(CopyOptions.LocalDevice)
         Text(`${scenario.learnerRole}  ×  ${scenario.aiRole}`)
           .fontSize(14)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.accent'))
+          .copyOption(CopyOptions.LocalDevice)
         Text(scenario.goal)
           .width('100%')
           .fontSize(16)
           .lineHeight(27)
           .fontColor($r('app.color.ink_muted'))
+          .copyOption(CopyOptions.LocalDevice)
         if (journeyLinked) {
           Text('前面的假名、词汇、句型和会话会在这里汇合。')
             .width('100%')
@@ -120,6 +124,7 @@ export struct PracticePage {
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.ink'))
               .lineHeight(29)
+              .copyOption(CopyOptions.LocalDevice)
           }
           .width('100%')
           .alignItems(HorizontalAlign.Start)
@@ -141,7 +146,6 @@ export struct PracticePage {
             actionAccessibilityText: `${this.revealedIndex === index ? '隐藏' : '查看'}${scenario.title}开场提示`,
             icon: $r('sys.symbol.arrow_right'),
             actionSize: 48,
-            emphasized: true,
             onAction: () => this.revealedIndex = this.revealedIndex === index ? -1 : index
           })
           ImmersiveAction({

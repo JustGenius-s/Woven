@@ -23,6 +23,7 @@ const EMPTY_CONTEXT: AiInquiryContext = {
 export struct ContextAiPanel {
   context: AiInquiryContext = EMPTY_CONTEXT;
   apiKey: string = '';
+  onClose: () => void = () => {};
 
   @State private messages: PracticeMessage[] = [];
   @State private draft: string = '';
@@ -161,33 +162,44 @@ export struct ContextAiPanel {
 
   build() {
     Column() {
-      Column({ space: 7 }) {
-        Text(this.context.kind)
-          .fontSize(10)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.accent'))
-          .letterSpacing(1)
-        Text(this.context.title)
-          .width('100%')
-          .fontSize(21)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.ink'))
-          .lineHeight(29)
-          .maxLines(2)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-        if (this.context.subtitle.length > 0) {
-          Text(this.context.subtitle)
+      Stack({ alignContent: Alignment.TopEnd }) {
+        Column({ space: 7 }) {
+          Text(this.context.kind)
+            .fontSize(10)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.accent'))
+            .letterSpacing(1)
+          Text(this.context.title)
             .width('100%')
-            .fontSize(12)
-            .fontColor($r('app.color.ink_muted'))
-            .lineHeight(19)
+            .fontSize(21)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+            .lineHeight(29)
             .maxLines(2)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
+          if (this.context.subtitle.length > 0) {
+            Text(this.context.subtitle)
+              .width('100%')
+              .fontSize(12)
+              .fontColor($r('app.color.ink_muted'))
+              .lineHeight(19)
+              .maxLines(2)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
         }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+        .padding({ left: 22, right: 62, top: 14, bottom: 18 })
+
+        ImmersiveAction({
+          actionAccessibilityText: '关闭 AI 对话',
+          icon: $r('sys.symbol.xmark'),
+          actionSize: 38,
+          onAction: this.onClose
+        })
+        .margin({ top: 8, right: 8 })
       }
       .width('100%')
-      .alignItems(HorizontalAlign.Start)
-      .padding({ left: 22, right: 22, top: 14, bottom: 18 })
       .border({ width: { bottom: 0.5 }, color: $r('app.color.line') })
 
       List({ space: 0, scroller: this.scroller }) {
@@ -200,13 +212,13 @@ export struct ContextAiPanel {
                 .fontColor($r('app.color.ink_muted'))
               Flex({ direction: FlexDirection.Row, wrap: FlexWrap.Wrap }) {
                 ForEach(this.context.suggestions, (suggestion: string) => {
-                  Text(suggestion)
-                    .fontSize(13)
-                    .fontColor($r('app.color.accent'))
-                    .padding({ left: 13, right: 13, top: 9, bottom: 9 })
+                  Button(suggestion, {
+                    type: ButtonType.ROUNDED_RECTANGLE,
+                    stateEffect: true
+                  })
+                    .buttonStyle(ButtonStyleMode.NORMAL)
+                    .controlSize(ControlSize.SMALL)
                     .margin({ right: 8, bottom: 8 })
-                    .borderRadius(18)
-                    .backgroundColor($r('app.color.accent_soft'))
                     .onClick(() => this.askSuggestion(suggestion))
                 }, (suggestion: string) => suggestion)
               }
@@ -236,6 +248,7 @@ export struct ContextAiPanel {
                     .fontColor($r('app.color.ink'))
                     .lineHeight(message.role === 'user' ? 23 : 26)
                     .textAlign(message.role === 'user' ? TextAlign.End : TextAlign.Start)
+                    .copyOption(CopyOptions.LocalDevice)
                 } else {
                   LoadingProgress()
                     .width(20)

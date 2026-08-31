@@ -11,7 +11,7 @@ import {
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { AiInquiryFactory } from '../../services/AiInquiryFactory';
 import { ContentRepository } from '../../services/ContentRepository';
-import { AiAskAction } from '../components/AiAskAction';
+import { aiTextSelectionMenu } from '../components/AiTextSelection';
 import { ImmersiveAction } from '../components/ImmersiveAction';
 import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
 import { contentLightEffect, ImmersivePlane, planeLightEffect } from '../components/ImmersiveCanvas';
@@ -35,7 +35,6 @@ export struct LearnPage {
   @State private grammarIndex: GrammarIndexEntry[] = [];
   @State private catalog: LearningCatalog | undefined = undefined;
   @State private dialogueIndex: number = 0;
-  @State private selectedDialogueLineKey: string = '';
   @State private loadError: string = '';
 
   aboutToAppear(): void {
@@ -52,17 +51,26 @@ export struct LearnPage {
   private changeMode(mode: number): void {
     this.getUIContext().animateTo({ curve: curves.springMotion(0.4, 0.86, 0.16) }, () => {
       this.mode = mode;
-      this.selectedDialogueLineKey = '';
     });
   }
 
-  private dialogueLineKey(dialogue: Dialogue, index: number): string {
-    return `${dialogue.id}-${index}`;
+  private dialogueContext(dialogue: Dialogue, line?: DialogueLine): string {
+    if (line === undefined) {
+      return `场景：${dialogue.setting}\n主题：${dialogue.title}\n学习目标：${dialogue.goal}`;
+    }
+    return `场景：${dialogue.setting}\n主题：${dialogue.title}\n说话人：${line.speaker}\n` +
+      `原句：${line.text}\n读音：${line.reading}\n释义：${line.meaning}`;
   }
 
-  private toggleDialogueLine(dialogue: Dialogue, index: number): void {
-    const key: string = this.dialogueLineKey(dialogue, index);
-    this.selectedDialogueLineKey = this.selectedDialogueLineKey === key ? '' : key;
+  private askDialogueSelection(selection: string, dialogue: Dialogue, line?: DialogueLine): void {
+    const source: string = line === undefined ? dialogue.title : `${dialogue.title} · ${line.speaker}`;
+    this.onAsk(AiInquiryFactory.selection(selection, source, this.dialogueContext(dialogue, line)));
+  }
+
+  private askJourneySelection(selection: string, journey: LearningJourney): void {
+    const context: string = `场景：${journey.setting}\n旅程：${journey.title}\n` +
+      `日语标题：${journey.japaneseTitle}\n目标：${journey.goal}`;
+    this.onAsk(AiInquiryFactory.selection(selection, journey.title, context));
   }
 
   private startFromGuide(): void {
@@ -244,11 +252,17 @@ export struct LearnPage {
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
             .lineHeight(37)
+            .copyOption(CopyOptions.LocalDevice)
+            .editMenuOptions(aiTextSelectionMenu(journey.title,
+              (selection: string) => this.askJourneySelection(selection, journey)))
           Text(journey.japaneseTitle)
             .width('100%')
             .fontSize(17)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.ink_muted'))
+            .copyOption(CopyOptions.LocalDevice)
+            .editMenuOptions(aiTextSelectionMenu(journey.japaneseTitle,
+              (selection: string) => this.askJourneySelection(selection, journey)))
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)
@@ -259,6 +273,9 @@ export struct LearnPage {
           .lineHeight(22)
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .copyOption(CopyOptions.LocalDevice)
+          .editMenuOptions(aiTextSelectionMenu(journey.goal,
+            (selection: string) => this.askJourneySelection(selection, journey)))
         Row({ space: 6 }) {
           ForEach([0, 1, 2, 3, 4, 5], (index: number) => {
             Column()
@@ -382,12 +399,9 @@ export struct LearnPage {
       Text(meta)
         .fontSize(11)
         .fontColor($r('app.color.ink_muted'))
-      ImmersiveAction({
-        actionAccessibilityText: `打开${category}`,
-        icon: $r('sys.symbol.arrow_right'),
-        actionSize: 40,
-        onAction: onSelect
-      })
+      SymbolGlyph($r('sys.symbol.chevron_right'))
+        .fontSize(18)
+        .fontColor([$r('app.color.ink_muted')])
     }
     .width('100%')
     .height(76)
@@ -415,7 +429,6 @@ export struct LearnPage {
         .layoutWeight(1)
         .onChange((index: number) => {
           this.dialogueIndex = index;
-          this.selectedDialogueLineKey = '';
         })
       }
     }
@@ -437,14 +450,23 @@ export struct LearnPage {
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.accent'))
             .letterSpacing(1.3)
+            .copyOption(CopyOptions.LocalDevice)
+            .editMenuOptions(aiTextSelectionMenu(dialogue.setting,
+              (selection: string) => this.askDialogueSelection(selection, dialogue)))
           Text(dialogue.title)
             .fontSize(36)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
+            .copyOption(CopyOptions.LocalDevice)
+            .editMenuOptions(aiTextSelectionMenu(dialogue.title,
+              (selection: string) => this.askDialogueSelection(selection, dialogue)))
           Text(dialogue.goal)
             .fontSize(14)
             .lineHeight(23)
             .fontColor($r('app.color.ink_muted'))
+            .copyOption(CopyOptions.LocalDevice)
+            .editMenuOptions(aiTextSelectionMenu(dialogue.goal,
+              (selection: string) => this.askDialogueSelection(selection, dialogue)))
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)
@@ -480,22 +502,25 @@ export struct LearnPage {
                 .fontColor($r('app.color.ink'))
                 .lineHeight(line.learner === true ? 33 : 38)
                 .textAlign(line.learner === true ? TextAlign.End : TextAlign.Start)
+                .copyOption(CopyOptions.LocalDevice)
+                .editMenuOptions(aiTextSelectionMenu(line.text,
+                  (selection: string) => this.askDialogueSelection(selection, dialogue, line)))
               Text(line.reading)
                 .width('100%')
                 .fontSize(13)
                 .fontColor($r('app.color.ink_muted'))
                 .textAlign(line.learner === true ? TextAlign.End : TextAlign.Start)
+                .copyOption(CopyOptions.LocalDevice)
+                .editMenuOptions(aiTextSelectionMenu(line.reading,
+                  (selection: string) => this.askDialogueSelection(selection, dialogue, line)))
               Text(line.meaning)
                 .width('100%')
                 .fontSize(13)
                 .fontColor($r('app.color.ink_muted'))
                 .textAlign(line.learner === true ? TextAlign.End : TextAlign.Start)
-              if (this.selectedDialogueLineKey === this.dialogueLineKey(dialogue, index)) {
-                AiAskAction({
-                  label: '问这句',
-                  onAsk: () => this.onAsk(AiInquiryFactory.dialogue(dialogue, line))
-                })
-              }
+                .copyOption(CopyOptions.LocalDevice)
+                .editMenuOptions(aiTextSelectionMenu(line.meaning,
+                  (selection: string) => this.askDialogueSelection(selection, dialogue, line)))
             }
             .width(line.learner === true ? '78%' : '90%')
             .alignItems(line.learner === true ? HorizontalAlign.End : HorizontalAlign.Start)
@@ -506,10 +531,7 @@ export struct LearnPage {
           .width('100%')
           .padding({ left: 12, right: 12, top: 24, bottom: 24 })
           .borderRadius(18)
-          .backgroundColor(this.selectedDialogueLineKey === this.dialogueLineKey(dialogue, index) ?
-            $r('app.color.accent_soft') : Color.Transparent)
           .visualEffect(contentLightEffect())
-          .onClick(() => this.toggleDialogueLine(dialogue, index))
         }
       }, (line: DialogueLine, index: number) => `${dialogue.id}-${index}`)
       ListItem() {

@@ -4,7 +4,7 @@ import { JourneyKanaFocus, KanaCell, KanaRow, LearningCatalog, LearningJourney }
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { AiInquiryFactory } from '../../services/AiInquiryFactory';
 import { ContentRepository } from '../../services/ContentRepository';
-import { AiAskAction } from '../components/AiAskAction';
+import { aiTextSelectionMenu } from '../components/AiTextSelection';
 import { contentLightEffect, planeLightEffect } from '../components/ImmersiveCanvas';
 import { PageChrome } from '../components/PageChrome';
 
@@ -15,7 +15,6 @@ export struct KanaPage {
 
   @State private catalog: LearningCatalog | undefined = undefined;
   @State private selected: KanaCell | undefined = undefined;
-  @State private selectionActive: boolean = false;
   @State private loadError: string = '';
 
   aboutToAppear(): void {
@@ -31,7 +30,6 @@ export struct KanaPage {
           this.selected = journeyCell;
         }
       }
-      this.selectionActive = false;
       this.loadError = '';
     } catch (error) {
       this.loadError = '假名资源没有正确载入';
@@ -69,24 +67,27 @@ export struct KanaPage {
                 .fontSize(64)
                 .fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.ink'))
+                .copyOption(CopyOptions.LocalDevice)
+                .editMenuOptions(aiTextSelectionMenu(this.selected?.hira ?? 'あ',
+                  (selection: string) => this.askKanaSelection(selection, this.selected)))
               Column({ space: 7 }) {
                 Text(this.selected?.kata ?? 'ア')
                   .fontSize(31)
                   .fontWeight(FontWeight.Medium)
                   .fontColor($r('app.color.ink'))
+                  .copyOption(CopyOptions.LocalDevice)
+                  .editMenuOptions(aiTextSelectionMenu(this.selected?.kata ?? 'ア',
+                    (selection: string) => this.askKanaSelection(selection, this.selected)))
                 Text(this.selected?.romaji ?? 'a')
                   .fontSize(14)
                   .fontColor($r('app.color.accent'))
                   .letterSpacing(1)
+                  .copyOption(CopyOptions.LocalDevice)
+                  .editMenuOptions(aiTextSelectionMenu(this.selected?.romaji ?? 'a',
+                    (selection: string) => this.askKanaSelection(selection, this.selected)))
               }
               .alignItems(HorizontalAlign.Start)
               Blank()
-              if (this.selected !== undefined && this.selectionActive) {
-                AiAskAction({
-                  label: '问这个音',
-                  onAsk: () => this.askSelectedKana()
-                })
-              }
             }
             .width('100%')
             .padding({ top: 40, bottom: 38, left: 12 })
@@ -139,28 +140,30 @@ export struct KanaPage {
     return undefined;
   }
 
-  private askSelectedKana(): void {
-    if (this.selected === undefined) {
-      return;
-    }
+  private cueForCell(cell: KanaCell): string {
     let cue: string = '';
     const focuses: JourneyKanaFocus[] = this.journey?.kana ?? [];
     for (let index: number = 0; index < focuses.length; index++) {
-      if (focuses[index].key === this.selected.key) {
+      if (focuses[index].key === cell.key) {
         cue = focuses[index].cue;
         break;
       }
     }
-    this.onAsk(AiInquiryFactory.kana(this.selected, cue));
+    return cue;
+  }
+
+  private askKanaSelection(selection: string, cell: KanaCell | undefined): void {
+    if (cell === undefined) {
+      return;
+    }
+    const cue: string = this.cueForCell(cell);
+    const cueLine: string = cue.length > 0 ? `\n学习提示：${cue}` : '';
+    const context: string = `平假名：${cell.hira}\n片假名：${cell.kata}\n罗马音：${cell.romaji}${cueLine}`;
+    this.onAsk(AiInquiryFactory.selection(selection, `五十音 · ${cell.hira}`, context));
   }
 
   private selectKana(cell: KanaCell): void {
-    if (this.selected?.key === cell.key && this.selectionActive) {
-      this.selectionActive = false;
-      return;
-    }
     this.selected = cell;
-    this.selectionActive = true;
   }
 
   @Builder
@@ -183,11 +186,17 @@ export struct KanaPage {
             .fontSize(20)
             .fontWeight(this.selected?.key === focus.key ? FontWeight.Bold : FontWeight.Medium)
             .fontColor(this.selected?.key === focus.key ? $r('app.color.accent') : $r('app.color.ink'))
+            .copyOption(CopyOptions.LocalDevice)
+            .editMenuOptions(aiTextSelectionMenu(focus.key,
+              (selection: string) => this.askKanaSelection(selection, this.findKana(focus.key))))
           Text(focus.cue)
             .fontSize(8)
             .fontColor($r('app.color.ink_muted'))
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .copyOption(CopyOptions.LocalDevice)
+            .editMenuOptions(aiTextSelectionMenu(focus.cue,
+              (selection: string) => this.askKanaSelection(selection, this.findKana(focus.key))))
         }
         .layoutWeight(1)
         .height(48)
@@ -235,12 +244,18 @@ export struct KanaPage {
                   .fontColor($r('app.color.ink'))
                   .maxLines(1)
                   .textAlign(TextAlign.Center)
+                  .copyOption(CopyOptions.LocalDevice)
+                  .editMenuOptions(aiTextSelectionMenu(cell.hira,
+                    (selection: string) => this.askKanaSelection(selection, cell)))
                 Text(cell.kata)
                   .width('100%')
                   .fontSize(cell.kata.length > 1 ? 14 : 16)
                   .fontColor($r('app.color.ink_muted'))
                   .maxLines(1)
                   .textAlign(TextAlign.Center)
+                  .copyOption(CopyOptions.LocalDevice)
+                  .editMenuOptions(aiTextSelectionMenu(cell.kata,
+                    (selection: string) => this.askKanaSelection(selection, cell)))
                 Text(cell.romaji)
                   .width('100%')
                   .fontSize(cell.romaji.length > 4 ? 8 : 9)
@@ -248,6 +263,9 @@ export struct KanaPage {
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
                   .textAlign(TextAlign.Center)
+                  .copyOption(CopyOptions.LocalDevice)
+                  .editMenuOptions(aiTextSelectionMenu(cell.romaji,
+                    (selection: string) => this.askKanaSelection(selection, cell)))
               }
               .layoutWeight(1)
               .height(86)
@@ -295,10 +313,16 @@ export struct KanaPage {
           .fontSize(19)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
+          .copyOption(CopyOptions.LocalDevice)
+          .editMenuOptions(aiTextSelectionMenu(title, (selection: string) =>
+            this.onAsk(AiInquiryFactory.selection(selection, `五十音 · ${title}`, body))))
         Text(body)
           .fontSize(15)
           .lineHeight(25)
           .fontColor($r('app.color.ink_muted'))
+          .copyOption(CopyOptions.LocalDevice)
+          .editMenuOptions(aiTextSelectionMenu(body, (selection: string) =>
+            this.onAsk(AiInquiryFactory.selection(selection, `五十音 · ${title}`, body))))
       }
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)

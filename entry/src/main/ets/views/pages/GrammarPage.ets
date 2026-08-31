@@ -13,7 +13,7 @@ import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { AiInquiryFactory } from '../../services/AiInquiryFactory';
 import { ContentRepository } from '../../services/ContentRepository';
 import { GrammarParser } from '../../services/GrammarParser';
-import { AiAskAction } from '../components/AiAskAction';
+import { aiTextSelectionMenu } from '../components/AiTextSelection';
 import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
 import { contentLightEffect, planeLightEffect } from '../components/ImmersiveCanvas';
 
@@ -65,19 +65,23 @@ export struct GrammarPage {
   build() {
     Column() {
       ImmersiveBackChrome({ title: '语法', onBack: this.onBack })
-      Row({ space: 22 }) {
+      Row({ space: 4 }) {
         ForEach(['N5', 'N4', 'N3', 'N2'], (level: string) => {
-          Text(level)
-            .fontSize(13)
-            .fontWeight(this.entries[this.lessonIndex]?.level === level ? FontWeight.Bold : FontWeight.Regular)
-            .fontColor(this.entries[this.lessonIndex]?.level === level ?
-              $r('app.color.accent') : $r('app.color.ink_muted'))
+          Button(level, {
+            type: ButtonType.ROUNDED_RECTANGLE,
+            stateEffect: true
+          })
+            .layoutWeight(1)
+            .buttonStyle(this.entries[this.lessonIndex]?.level === level ?
+              ButtonStyleMode.NORMAL : ButtonStyleMode.TEXTUAL)
+            .controlSize(ControlSize.SMALL)
+            .accessibilityText(`${level} 语法`)
             .onClick(() => this.jumpLevel(level))
         })
       }
       .width('100%')
       .justifyContent(FlexAlign.Center)
-      .padding({ top: 8, bottom: 12 })
+      .padding({ left: 16, right: 16, top: 8, bottom: 12 })
       .visualEffect(contentLightEffect())
 
       Swiper() {
@@ -120,7 +124,6 @@ struct GrammarLessonPage {
   @State private document: GrammarDocument | undefined = undefined;
   @State private loadError: string = '';
   @State private reachedEnd: boolean = false;
-  @State private selectedBlockIndex: number = -1;
 
   aboutToAppear(): void {
     if (this.lesson !== undefined) {
@@ -134,6 +137,11 @@ struct GrammarLessonPage {
     } catch (error) {
       this.loadError = '这一课没有正确载入';
     }
+  }
+
+  private askLessonSelection(selection: string): void {
+    this.onAsk(AiInquiryFactory.selection(selection, this.entry.title,
+      `${this.entry.title}\n${this.entry.summary}`));
   }
 
   build() {
@@ -151,60 +159,62 @@ struct GrammarLessonPage {
     } else if (this.lesson !== undefined && this.document !== undefined) {
       List({ space: 0 }) {
         ListItem() {
-          Row({ space: 18 }) {
-            Text(this.entry.order.toString().padStart(2, '0'))
-              .fontSize(48)
-              .fontWeight(FontWeight.Lighter)
-              .fontColor($r('app.color.accent'))
-              .opacity(0.64)
-              .alignSelf(ItemAlign.Start)
-            Column({ space: 12 }) {
+          Column({ space: 10 }) {
+            Row({ space: 8 }) {
               Text(this.entry.level)
                 .fontSize(11)
                 .fontWeight(FontWeight.Medium)
                 .fontColor($r('app.color.accent'))
                 .letterSpacing(1.4)
-              Text(this.entry.title)
-                .fontSize(34)
-                .fontWeight(FontWeight.Bold)
-                .fontColor($r('app.color.ink'))
-                .lineHeight(45)
-              Text(this.entry.summary)
-                .fontSize(15)
+              Text(`第 ${this.entry.order} 课`)
+                .fontSize(11)
                 .fontColor($r('app.color.ink_muted'))
-                .lineHeight(25)
             }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Start)
+            .width('100%')
+
+            Text(this.entry.title)
+              .width('100%')
+              .fontSize(30)
+              .fontWeight(FontWeight.Bold)
+              .fontColor($r('app.color.ink'))
+              .lineHeight(40)
+              .copyOption(CopyOptions.LocalDevice)
+              .editMenuOptions(aiTextSelectionMenu(this.entry.title,
+                (selection: string) => this.askLessonSelection(selection)))
+            Text(this.entry.summary)
+              .width('100%')
+              .fontSize(15)
+              .fontColor($r('app.color.ink_muted'))
+              .lineHeight(24)
+              .copyOption(CopyOptions.LocalDevice)
+              .editMenuOptions(aiTextSelectionMenu(this.entry.summary,
+                (selection: string) => this.askLessonSelection(selection)))
           }
           .width('100%')
-          .alignItems(VerticalAlign.Top)
-          .padding({ left: 22, right: 22, top: 24, bottom: 28 })
-          .margin({ top: 16, bottom: 26 })
-          .borderRadius(30)
+          .alignItems(HorizontalAlign.Start)
+          .padding({ left: 20, right: 20, top: 20, bottom: 22 })
+          .margin({ top: 12, bottom: 16 })
+          .borderRadius(24)
           .clip(true)
-          .backgroundEffect({ radius: 34, color: $r('app.color.immersive_plane_strong'), saturation: 1.08 })
+          .backgroundEffect({ radius: 28, color: $r('app.color.immersive_plane_strong'), saturation: 1.06 })
           .border({ width: 0.5, color: $r('app.color.immersive_edge') })
           .visualEffect(planeLightEffect())
         }
+        .width('100%')
 
         ForEach(this.document?.blocks ?? [], (block: GrammarBlock, index: number) => {
           ListItem() {
-            GrammarBlockView({
-              block: block,
-              vocabulary: this.document?.vocabulary ?? [],
-              source: this.entry.title,
-              onAsk: this.onAsk,
-              selectionActive: this.selectedBlockIndex === index,
-              onSelectionChange: (selected: boolean) => {
-                if (selected) {
-                  this.selectedBlockIndex = index;
-                } else if (this.selectedBlockIndex === index) {
-                  this.selectedBlockIndex = -1;
-                }
-              }
-            })
+            Column() {
+              GrammarBlockView({
+                block: block,
+                vocabulary: this.document?.vocabulary ?? [],
+                source: this.entry.title,
+                onAsk: this.onAsk
+              })
+            }
+            .width('100%')
           }
+          .width('100%')
         }, (block: GrammarBlock, index: number) => `${this.entry.id}-${index}`)
 
         ListItem() {
@@ -215,7 +225,7 @@ struct GrammarLessonPage {
       }
       .width('100%')
       .height('100%')
-      .padding({ left: 26, right: 26 })
+      .padding({ left: 16, right: 16 })
       .scrollBar(BarState.Off)
       .edgeEffect(EdgeEffect.Spring)
       .onReachEnd(() => this.reachedEnd = true)
@@ -251,81 +261,69 @@ struct GrammarBlockView {
   vocabulary: GrammarVocabularyEntry[] = [];
   source: string = '';
   onAsk: (context: AiInquiryContext) => void = (context: AiInquiryContext) => {};
-  selectionActive: boolean = false;
-  onSelectionChange: (selected: boolean) => void = (selected: boolean) => {};
   @State private selectedWord: string = '';
   @State private selectedReading: string = '';
   @State private selectedMeaning: string = '';
-  @State private selectedListIndex: number = -1;
-  @State private blockSelected: boolean = false;
 
   private select(segment: InlineSegment): void {
     if (!segment.annotated) {
-      if (this.selectionActive && this.blockSelected) {
-        this.blockSelected = false;
-        this.onSelectionChange(false);
-      } else {
-        this.selectedWord = '';
-        this.blockSelected = true;
-        this.onSelectionChange(true);
-      }
       return;
     }
-    if (this.selectionActive && this.selectedWord === segment.word) {
+    if (this.selectedWord === segment.word) {
       this.selectedWord = '';
-      this.onSelectionChange(false);
       return;
     }
-    this.blockSelected = false;
     this.selectedWord = segment.word;
     this.selectedReading = segment.reading;
     this.selectedMeaning = segment.meaning;
-    this.onSelectionChange(true);
   }
 
-  private selectListItem(index: number): void {
-    if (this.selectionActive && this.selectedListIndex === index) {
-      this.selectedListIndex = -1;
-      this.onSelectionChange(false);
-      return;
+  private contextText(): string {
+    if (this.block.kind !== 'table') {
+      return this.block.text;
     }
-    this.selectedWord = '';
-    this.blockSelected = false;
-    this.selectedListIndex = index;
-    this.onSelectionChange(true);
+    const rows: string[] = [];
+    for (let index: number = 0; index < this.block.cells.length; index++) {
+      rows.push(this.block.cells[index].join(' | '));
+    }
+    return rows.join('\n');
+  }
+
+  private askSelection(selection: string): void {
+    this.onAsk(AiInquiryFactory.selection(selection, this.source, this.contextText()));
   }
 
   build() {
     if (this.block.kind === 'heading') {
-      Row({ space: 13 }) {
-        Text('文法')
-          .fontSize(9)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.accent'))
-          .letterSpacing(1)
-          .rotate({ angle: -90 })
-          .width(28)
+      Column({ space: 8 }) {
         Text(this.block.text)
-          .layoutWeight(1)
-          .fontSize(28)
+          .width('100%')
+          .fontSize(26)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
-          .lineHeight(38)
+          .lineHeight(36)
+          .copyOption(CopyOptions.LocalDevice)
+          .editMenuOptions(aiTextSelectionMenu(this.block.text,
+            (selection: string) => this.askSelection(selection)))
+        Divider()
+          .width(36)
+          .strokeWidth(2)
+          .color($r('app.color.accent'))
       }
       .width('100%')
-      .alignItems(VerticalAlign.Center)
-      .padding({ top: 38, bottom: 17 })
-      .visualEffect(contentLightEffect())
+      .alignItems(HorizontalAlign.Start)
+      .padding({ left: 20, right: 20, top: 28, bottom: 12 })
     } else if (this.block.kind === 'subheading') {
       Text(this.block.text)
-        .width('94%')
+        .width('100%')
         .fontSize(19)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
-        .lineHeight(29)
-        .padding({ left: 18, top: 22, bottom: 10 })
-        .alignSelf(ItemAlign.End)
-        .visualEffect(contentLightEffect())
+        .lineHeight(28)
+        .padding({ left: 20, right: 20, top: 18, bottom: 8 })
+        .copyOption(CopyOptions.LocalDevice)
+        .editMenuOptions(aiTextSelectionMenu(this.block.text,
+          (selection: string) => this.askSelection(selection)))
     } else if (this.block.kind === 'table') {
       Column() {
         ForEach(this.block.cells, (row: string[], rowIndex: number) => {
@@ -338,133 +336,125 @@ struct GrammarBlockView {
                 .fontColor(rowIndex === 0 ? $r('app.color.ink_muted') : $r('app.color.ink'))
                 .lineHeight(21)
                 .padding({ left: 7, right: 7, top: 10, bottom: 10 })
+                .copyOption(CopyOptions.LocalDevice)
+                .editMenuOptions(aiTextSelectionMenu(cell,
+                  (selection: string) => this.askSelection(selection)))
             })
           }
           .width('100%')
+          .alignItems(VerticalAlign.Top)
+          .backgroundColor(rowIndex === 0 ? $r('app.color.accent_soft') : Color.Transparent)
           .border({ width: { bottom: 0.5 }, color: $r('app.color.line') })
         })
       }
       .width('100%')
-      .padding({ left: 10, right: 10, top: 10, bottom: 12 })
-      .margin({ top: 8, bottom: 18 })
-      .borderRadius(22)
+      .padding({ left: 8, right: 8, top: 8, bottom: 10 })
+      .margin({ top: 6, bottom: 16 })
+      .borderRadius(18)
       .clip(true)
-      .backgroundEffect({ radius: 24, color: $r('app.color.immersive_plane'), saturation: 1.04 })
+      .backgroundEffect({ radius: 22, color: $r('app.color.immersive_plane'), saturation: 1.04 })
       .border({ width: 0.5, color: $r('app.color.immersive_edge') })
       .visualEffect(planeLightEffect())
     } else if (this.block.kind === 'list') {
-      Column({ space: 10 }) {
+      Column({ space: 4 }) {
         ForEach(this.block.text.split('\n'), (item: string, index: number) => {
-          Row({ space: 13 }) {
-            Text((index + 1).toString().padStart(2, '0'))
-              .fontSize(11)
+          Row({ space: 8 }) {
+            Text(this.block.ordered === true ? `${index + 1}.` : '•')
+              .width(24)
+              .fontSize(this.block.ordered === true ? 12 : 17)
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.accent'))
+              .textAlign(TextAlign.Center)
             Text(item)
               .layoutWeight(1)
               .fontSize(16)
               .fontColor($r('app.color.ink'))
               .lineHeight(27)
-            if (this.selectionActive && this.selectedListIndex === index) {
-              AiAskAction({
-                label: '问 AI',
-                onAsk: () => this.onAsk(AiInquiryFactory.grammar(item, this.source))
-              })
-            }
+              .copyOption(CopyOptions.LocalDevice)
+              .editMenuOptions(aiTextSelectionMenu(item,
+                (selection: string) => this.askSelection(selection)))
           }
           .width('100%')
           .alignItems(VerticalAlign.Top)
-          .padding({ left: 10, right: 10, top: 8, bottom: 8 })
-          .borderRadius(14)
-          .backgroundColor(this.selectionActive && this.selectedListIndex === index ?
-            $r('app.color.accent_soft') : Color.Transparent)
-          .onClick(() => this.selectListItem(index))
+          .padding({ left: 4, right: 4, top: 8, bottom: 8 })
+          .borderRadius(12)
         })
       }
       .width('100%')
-      .padding({ top: 5, bottom: 13 })
+      .padding({ left: 2, right: 2, top: 4, bottom: 12 })
       .alignItems(HorizontalAlign.Start)
-      .visualEffect(contentLightEffect())
     } else if (this.block.kind === 'note') {
-      Row({ space: 14 }) {
-        Divider()
-          .vertical(true)
-          .width(3)
-          .height('100%')
-          .color($r('app.color.accent'))
-        Text(this.block.text)
-          .layoutWeight(1)
-          .fontSize(15)
-          .fontColor($r('app.color.ink_muted'))
-          .lineHeight(25)
-      }
-      .width('100%')
-      .padding({ left: 16, right: 15, top: 15, bottom: 15 })
+      Text(this.block.text)
+        .width('100%')
+        .fontSize(15)
+        .fontColor($r('app.color.ink_muted'))
+        .lineHeight(25)
+        .padding({ left: 16, right: 15, top: 15, bottom: 15 })
+        .copyOption(CopyOptions.LocalDevice)
+        .editMenuOptions(aiTextSelectionMenu(this.block.text,
+          (selection: string) => this.askSelection(selection)))
       .margin({ top: 8, bottom: 8 })
-      .alignItems(VerticalAlign.Center)
-      .borderRadius(20)
+      .borderRadius(16)
+      .border({ width: { left: 3 }, color: $r('app.color.accent') })
       .backgroundEffect({ radius: 22, color: $r('app.color.immersive_plane'), saturation: 1.04 })
       .visualEffect(planeLightEffect())
     } else {
       Column({ space: 9 }) {
-        Flex({ direction: FlexDirection.Row, wrap: FlexWrap.Wrap, alignItems: ItemAlign.Center }) {
+        Text() {
           ForEach(GrammarParser.annotate(this.block.text, this.vocabulary), (segment: InlineSegment,
             index: number) => {
-            Text(segment.text)
-              .fontSize(17)
+            Span(segment.text)
               .fontColor(segment.annotated ? $r('app.color.accent') : $r('app.color.ink'))
               .fontWeight(segment.annotated ? FontWeight.Medium : FontWeight.Regular)
-              .lineHeight(29)
-              .backgroundColor(this.selectionActive &&
-                ((segment.annotated && this.selectedWord === segment.word) ||
-                  (!segment.annotated && this.blockSelected)) ?
+              .backgroundColor(segment.annotated && this.selectedWord === segment.word ?
                 $r('app.color.accent_soft') : Color.Transparent)
-              .borderRadius(4)
               .onClick(() => this.select(segment))
           }, (segment: InlineSegment, index: number) => `${index}-${segment.text}`)
         }
         .width('100%')
+        .fontSize(17)
+        .fontColor($r('app.color.ink'))
+        .lineHeight(29)
+        .copyOption(CopyOptions.LocalDevice)
+        .editMenuOptions(aiTextSelectionMenu(this.block.text,
+          (selection: string) => this.askSelection(selection)))
 
-        if (this.selectionActive && this.selectedWord.length > 0) {
-          Row({ space: 8 }) {
-            Text(this.selectedWord)
-              .fontSize(14)
-              .fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.accent'))
-            Text(this.selectedReading)
-              .fontSize(13)
-              .fontColor($r('app.color.ink_muted'))
+        if (this.selectedWord.length > 0) {
+          Column({ space: 6 }) {
+            Row({ space: 8 }) {
+              Text(this.selectedWord)
+                .fontSize(14)
+                .fontWeight(FontWeight.Bold)
+                .fontColor($r('app.color.accent'))
+                .copyOption(CopyOptions.LocalDevice)
+                .editMenuOptions(aiTextSelectionMenu(this.selectedWord,
+                  (selection: string) => this.askSelection(selection)))
+              Text(this.selectedReading)
+                .fontSize(13)
+                .fontColor($r('app.color.ink_muted'))
+                .copyOption(CopyOptions.LocalDevice)
+                .editMenuOptions(aiTextSelectionMenu(this.selectedReading,
+                  (selection: string) => this.askSelection(selection)))
+            }
+            .width('100%')
             Text(this.selectedMeaning)
-              .layoutWeight(1)
+              .width('100%')
               .fontSize(13)
               .fontColor($r('app.color.ink'))
-            AiAskAction({
-              label: '问这个词',
-              onAsk: () => this.onAsk(AiInquiryFactory.grammar(
-                `${this.selectedWord}（${this.selectedReading}）：${this.selectedMeaning}\n${this.block.text}`,
-                this.source))
-            })
+              .copyOption(CopyOptions.LocalDevice)
+              .editMenuOptions(aiTextSelectionMenu(this.selectedMeaning,
+                (selection: string) => this.askSelection(selection)))
           }
           .width('100%')
-          .padding({ left: 14, top: 8, bottom: 8 })
+          .alignItems(HorizontalAlign.Start)
+          .padding({ left: 14, right: 4, top: 8, bottom: 8 })
           .border({ width: { left: 2 }, color: $r('app.color.accent') })
-          .visualEffect(contentLightEffect())
-        }
-        if (this.selectionActive && this.blockSelected) {
-          Row() {
-            Blank()
-            AiAskAction({
-              label: '问这段',
-              onAsk: () => this.onAsk(AiInquiryFactory.grammar(this.block.text, this.source))
-            })
-          }
-          .width('100%')
         }
       }
       .width('100%')
       .alignItems(HorizontalAlign.Start)
-      .padding({ top: 5, bottom: 8 })
-      .visualEffect(contentLightEffect())
+      .padding({ left: 20, right: 20, top: 6, bottom: 10 })
+      .borderRadius(12)
     }
   }
 }

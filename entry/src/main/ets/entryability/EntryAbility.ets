@@ -61,17 +61,17 @@ export default class EntryAbility extends UIAbility {
       this.mainWindow.setWindowBackgroundColor(surfaceColor);
       this.mainWindow.setWindowSystemBarProperties({
         statusBarColor: '#00000000',
-        navigationBarColor: '#00000000',
         statusBarContentColor: contentColor,
-        navigationBarContentColor: contentColor,
-        isStatusBarLightIcon: darkMode,
-        isNavigationBarLightIcon: darkMode,
-        enableStatusBarAnimation: true,
-        enableNavigationBarAnimation: true
+        enableStatusBarAnimation: true
       }).catch((error: Object) => {
         hilog.warn(DOMAIN, 'Kotoba', 'Unable to update system bar appearance: %{public}s',
           JSON.stringify(error));
       });
+      this.mainWindow.setSpecificSystemBarEnabled('navigationIndicator', true, false)
+        .catch((error: Object) => {
+          hilog.warn(DOMAIN, 'Kotoba', 'Unable to restore the system navigation indicator: %{public}s',
+            JSON.stringify(error));
+        });
     } catch (error) {
       hilog.warn(DOMAIN, 'Kotoba', 'Unable to apply window colors: %{public}s', JSON.stringify(error));
     }

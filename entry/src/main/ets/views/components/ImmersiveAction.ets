@@ -1,10 +1,7 @@
-import { ActionBarButton, ActionBarStyle, BlurStrategy, HdsActionBar } from '@kit.UIDesignKit';
-import { ColorMetrics, LengthMetrics } from '@ohos.arkui.node';
-import { SymbolGlyphModifier } from '@ohos.arkui.modifier';
-
 /**
- * A restrained HDS action: the label stays in the reading flow while the
- * actionable core is rendered by the system HdsActionBar material.
+ * A single app action rendered with the native ArkUI button states and metrics.
+ * Labeled actions use the system rounded-rectangle button; icon-only actions
+ * use the system circular button while preserving a 40 vp or larger hot area.
  */
 @Component
 export struct ImmersiveAction {
@@ -17,59 +14,36 @@ export struct ImmersiveAction {
   onAction: () => void = () => {};
 
   build() {
-    Row({ space: this.label.length > 0 ? 9 : 0 }) {
-      if (this.label.length > 0) {
-        Text(this.label)
-          .fontSize(13)
-          .fontWeight(this.emphasized ? FontWeight.Medium : FontWeight.Regular)
-          .fontColor(this.actionEnabled ? $r('app.color.ink') : $r('app.color.ink_muted'))
-          .onClick(() => {
-            if (this.actionEnabled) {
-              this.onAction();
-            }
-          })
-      }
-      HdsActionBar({
-        primaryButton: this.actionButton(),
-        actionBarStyle: this.actionStyle(),
-        blurStrategy: BlurStrategy.ADAPTIVE
+    if (this.label.length > 0) {
+      Button(this.label, {
+        type: ButtonType.ROUNDED_RECTANGLE,
+        stateEffect: true
       })
-        .width(this.actionSize)
-        .height(this.actionSize)
+        .buttonStyle(this.emphasized ? ButtonStyleMode.EMPHASIZED : ButtonStyleMode.NORMAL)
+        .controlSize(this.actionSize <= 40 ? ControlSize.SMALL : ControlSize.NORMAL)
+        .enabled(this.actionEnabled)
+        .accessibilityText(this.accessibilityLabel())
+        .onClick(this.onAction)
+    } else {
+      Button({
+        type: ButtonType.Circle,
+        stateEffect: true
+      }) {
+        SymbolGlyph(this.icon)
+          .fontSize(this.actionSize <= 40 ? 18 : 20)
+          .fontColor([this.emphasized ? Color.White : $r('app.color.ink')])
+      }
+      .width(Math.max(40, this.actionSize))
+      .height(Math.max(40, this.actionSize))
+      .buttonStyle(this.emphasized ? ButtonStyleMode.EMPHASIZED : ButtonStyleMode.NORMAL)
+      .controlSize(this.actionSize <= 40 ? ControlSize.SMALL : ControlSize.NORMAL)
+      .enabled(this.actionEnabled)
+      .accessibilityText(this.accessibilityLabel())
+      .onClick(this.onAction)
     }
-    .height(this.actionSize)
-    .opacity(this.actionEnabled ? 1 : 0.56)
   }
 
-  private actionButton(): ActionBarButton {
-    return new ActionBarButton({
-      width: LengthMetrics.vp(this.actionSize),
-      backgroundColor: ColorMetrics.rgba(46, 91, 244, this.emphasized ? 0.2 : 0.07),
-      enabled: this.actionEnabled,
-      iconSize: LengthMetrics.vp(Math.max(17, this.actionSize - 27)),
-      baseIconSymbolGlyphModifier: this.symbolModifier(),
-      accessibilityText: this.actionAccessibilityText.length > 0 ? this.actionAccessibilityText : this.label,
-      onClick: this.onAction
-    });
-  }
-
-  private actionStyle(): ActionBarStyle {
-    return new ActionBarStyle({
-      height: LengthMetrics.vp(this.actionSize),
-      backgroundBlurStyle: BlurStyle.COMPONENT_REGULAR,
-      innerSpace: LengthMetrics.vp(0),
-      startSpace: LengthMetrics.vp(0),
-      endSpace: LengthMetrics.vp(0),
-      margin: LengthMetrics.vp(0),
-      isHorizontal: true,
-      enabled: this.actionEnabled
-    });
-  }
-
-  private symbolModifier(): SymbolGlyphModifier {
-    const modifier: SymbolGlyphModifier = new SymbolGlyphModifier(this.icon);
-    modifier.fontSize(Math.max(17, this.actionSize - 27));
-    modifier.fontColor([this.emphasized ? $r('app.color.accent') : $r('app.color.ink')]);
-    return modifier;
+  private accessibilityLabel(): string {
+    return this.actionAccessibilityText.length > 0 ? this.actionAccessibilityText : this.label;
   }
 }

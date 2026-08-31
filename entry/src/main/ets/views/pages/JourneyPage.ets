@@ -15,7 +15,7 @@ import {
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { AiInquiryFactory } from '../../services/AiInquiryFactory';
 import { ContentRepository } from '../../services/ContentRepository';
-import { AiAskAction } from '../components/AiAskAction';
+import { aiTextSelectionMenu } from '../components/AiTextSelection';
 import { ImmersiveAction } from '../components/ImmersiveAction';
 import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
 import { contentLightEffect, ImmersivePlane, planeLightEffect } from '../components/ImmersiveCanvas';
@@ -80,7 +80,6 @@ export struct JourneyPage {
   @State private grammarEntries: GrammarIndexEntry[] = [];
   @State private selectedKanaIndex: number = 0;
   @State private selectedWordIndex: number = 0;
-  @State private selectedInquiryKey: string = '';
   @State private showDialogueNotes: boolean = false;
   @State private selectedAnswerIndex: number = -1;
   @State private showFullGrammar: boolean = false;
@@ -153,49 +152,57 @@ export struct JourneyPage {
     return 0;
   }
 
-  private askSelectedKana(): void {
-    if (this.kanaCells.length === 0) {
+  private askSelection(selection: string, source: string, context: string): void {
+    this.onAsk(AiInquiryFactory.selection(selection, source, context));
+  }
+
+  private askKanaSelection(selection: string, index: number): void {
+    if (this.kanaCells.length === 0 || index < 0 || index >= this.kanaCells.length) {
       return;
     }
-    const index: number = Math.min(this.selectedKanaIndex, this.kanaCells.length - 1);
-    const cueIndex: number = Math.min(index, this.journey.kana.length - 1);
-    const cue: string = cueIndex >= 0 ? this.journey.kana[cueIndex].cue : '';
-    this.onAsk(AiInquiryFactory.kana(this.kanaCells[index], cue));
+    const cell: KanaCell = this.kanaCells[index];
+    const cue: string = index < this.journey.kana.length ? this.journey.kana[index].cue : '';
+    const cueLine: string = cue.length > 0 ? `\n学习提示：${cue}` : '';
+    this.askSelection(selection, `${this.journey.title} · 假名`,
+      `平假名：${cell.hira}\n片假名：${cell.kata}\n罗马音：${cell.romaji}${cueLine}`);
   }
 
-  private askSelectedWord(): void {
-    if (this.words.length === 0) {
+  private wordContext(index: number): string {
+    if (index < 0 || index >= this.words.length) {
+      return '';
+    }
+    const item: VocabularyEntry = this.words[index];
+    const example: string = item.example === undefined ? '' :
+      `\n例句：${item.example.japanese}\n例句释义：${item.example.english}`;
+    return `单词：${item.word}\n读音：${item.reading}\n释义：${item.meanings.join('；')}${example}`;
+  }
+
+  private askWordSelection(selection: string, index: number): void {
+    if (index < 0 || index >= this.words.length) {
       return;
     }
-    const index: number = Math.min(this.selectedWordIndex, this.words.length - 1);
-    this.onAsk(AiInquiryFactory.word(this.words[index]));
+    this.askSelection(selection, `${this.journey.title} · ${this.words[index].word}`, this.wordContext(index));
   }
 
-  private askDialogueLine(line: DialogueLine): void {
-    if (this.dialogue !== undefined) {
-      this.onAsk(AiInquiryFactory.dialogue(this.dialogue, line));
+  private askDialogueSelection(selection: string, line: DialogueLine): void {
+    if (this.dialogue === undefined) {
+      return;
     }
-  }
-
-  private toggleInquirySelection(key: string): void {
-    this.selectedInquiryKey = this.selectedInquiryKey === key ? '' : key;
+    const context: string = `场景：${this.dialogue.setting}\n主题：${this.dialogue.title}\n说话人：${line.speaker}\n` +
+      `原句：${line.text}\n读音：${line.reading}\n释义：${line.meaning}`;
+    this.askSelection(selection, `${this.dialogue.title} · ${line.speaker}`, context);
   }
 
   private selectKanaForInquiry(index: number): void {
     this.selectedKanaIndex = index;
-    this.toggleInquirySelection(`kana-${index}`);
   }
 
   private selectWordForInquiry(index: number): void {
     this.selectedWordIndex = index;
-    this.toggleInquirySelection(`word-${index}`);
   }
 
   private selectStage(index: number): void {
     const next: number = Math.max(0, Math.min(index, JOURNEY_STAGE_LABELS.length - 1));
-    if (next !== this.stageIndex) {
-      this.selectedInquiryKey = '';
-    }
     this.stageIndex = next;
     this.onProgress(this.journey.id, next, this.completedMask);
   }
@@ -206,7 +213,6 @@ export struct JourneyPage {
     this.getUIContext().animateTo({ curve: curves.springMotion(0.38, 0.8, 0.2) }, () => {
       this.completedMask = nextMask;
       this.stageIndex = next;
-      this.selectedInquiryKey = '';
     });
     this.onProgress(this.journey.id, next, nextMask);
   }
@@ -314,6 +320,10 @@ export struct JourneyPage {
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .maxLines(1)
+          .copyOption(CopyOptions.LocalDevice)
+          .editMenuOptions(aiTextSelectionMenu(this.journey.japaneseTitle,
+            (selection: string) => this.askSelection(selection, this.journey.title,
+              `${this.journey.japaneseTitle}\n${this.journey.goal}`)))
         Text(`${this.journey.level}  ${this.journey.duration}  ·  ${this.completedCount()}/6 已贯通`)
           .fontSize(11)
           .fontColor($r('app.color.ink_muted'))
@@ -414,6 +424,9 @@ export struct JourneyPage {
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.ink'))
               .lineHeight(28)
+              .copyOption(CopyOptions.LocalDevice)
+              .editMenuOptions(aiTextSelectionMenu(line.text,
+                (selection: string) => this.askDialogueSelection(selection, line)))
           }
           .width('100%')
           .alignItems(VerticalAlign.Top)
@@ -450,21 +463,20 @@ export struct JourneyPage {
         .lineHeight(46)
         .padding({ left: 8, right: 8, top: 4, bottom: 4 })
         .borderRadius(12)
-        .backgroundColor(this.selectedInquiryKey === 'scene' ?
-          $r('app.color.accent_soft') : Color.Transparent)
-        .onClick(() => this.toggleInquirySelection('scene'))
+        .copyOption(CopyOptions.LocalDevice)
+        .editMenuOptions(aiTextSelectionMenu(this.journey.opening,
+          (selection: string) => this.askSelection(selection, this.journey.title,
+            `${this.journey.opening}\n${this.journey.goal}`)))
       Text(this.journey.goal)
         .width('100%')
         .fontSize(15)
         .fontColor($r('app.color.ink_muted'))
         .lineHeight(25)
+        .copyOption(CopyOptions.LocalDevice)
+        .editMenuOptions(aiTextSelectionMenu(this.journey.goal,
+          (selection: string) => this.askSelection(selection, this.journey.title,
+            `${this.journey.opening}\n${this.journey.goal}`)))
       Row() {
-        if (this.selectedInquiryKey === 'scene') {
-          AiAskAction({
-            label: '问这句话',
-            onAsk: () => this.onAsk(AiInquiryFactory.grammar(this.journey.opening, this.journey.title))
-          })
-        }
         Blank()
         ImmersiveAction({
           label: '拆开这句话',
@@ -513,9 +525,15 @@ export struct JourneyPage {
               .fontSize(25)
               .fontWeight(FontWeight.Medium)
               .fontColor(this.selectedKanaIndex === index ? $r('app.color.accent') : $r('app.color.ink'))
+              .copyOption(CopyOptions.LocalDevice)
+              .editMenuOptions(aiTextSelectionMenu(cell.hira,
+                (selection: string) => this.askKanaSelection(selection, index)))
             Text(cell.romaji)
               .fontSize(9)
               .fontColor($r('app.color.ink_muted'))
+              .copyOption(CopyOptions.LocalDevice)
+              .editMenuOptions(aiTextSelectionMenu(cell.romaji,
+                (selection: string) => this.askKanaSelection(selection, index)))
           }
           .layoutWeight(1)
           .height(66)
@@ -554,26 +572,40 @@ export struct JourneyPage {
         .fontSize(76)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
+        .copyOption(CopyOptions.LocalDevice)
+        .editMenuOptions(aiTextSelectionMenu(
+          this.kanaCells[Math.min(this.selectedKanaIndex, this.kanaCells.length - 1)].hira,
+          (selection: string) => this.askKanaSelection(selection,
+            Math.min(this.selectedKanaIndex, this.kanaCells.length - 1))))
       Column({ space: 6 }) {
         Text(this.kanaCells[Math.min(this.selectedKanaIndex, this.kanaCells.length - 1)].kata)
           .fontSize(32)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.ink'))
+          .copyOption(CopyOptions.LocalDevice)
+          .editMenuOptions(aiTextSelectionMenu(
+            this.kanaCells[Math.min(this.selectedKanaIndex, this.kanaCells.length - 1)].kata,
+            (selection: string) => this.askKanaSelection(selection,
+              Math.min(this.selectedKanaIndex, this.kanaCells.length - 1))))
         Text(this.kanaCells[Math.min(this.selectedKanaIndex, this.kanaCells.length - 1)].romaji)
           .fontSize(13)
           .fontColor($r('app.color.accent'))
+          .copyOption(CopyOptions.LocalDevice)
+          .editMenuOptions(aiTextSelectionMenu(
+            this.kanaCells[Math.min(this.selectedKanaIndex, this.kanaCells.length - 1)].romaji,
+            (selection: string) => this.askKanaSelection(selection,
+              Math.min(this.selectedKanaIndex, this.kanaCells.length - 1))))
         Text(this.journey.kana[Math.min(this.selectedKanaIndex, this.journey.kana.length - 1)].cue)
           .fontSize(15)
           .fontColor($r('app.color.ink_muted'))
+          .copyOption(CopyOptions.LocalDevice)
+          .editMenuOptions(aiTextSelectionMenu(
+            this.journey.kana[Math.min(this.selectedKanaIndex, this.journey.kana.length - 1)].cue,
+            (selection: string) => this.askKanaSelection(selection,
+              Math.min(this.selectedKanaIndex, this.kanaCells.length - 1))))
       }
       .alignItems(HorizontalAlign.Start)
       Blank()
-      if (this.selectedInquiryKey === `kana-${this.selectedKanaIndex}`) {
-        AiAskAction({
-          label: '问这个音',
-          onAsk: () => this.askSelectedKana()
-        })
-      }
     }
     .width('100%')
     .padding(24)
@@ -613,6 +645,9 @@ export struct JourneyPage {
           .shadow({ radius: this.selectedWordIndex === index ? 10 : 0,
             color: $r('app.color.gravity_glow'), offsetY: 3 })
           .animation({ curve: curves.responsiveSpringMotion(0.18, 0.84, 0.12) })
+          .copyOption(CopyOptions.LocalDevice)
+          .editMenuOptions(aiTextSelectionMenu(word.word,
+            (selection: string) => this.askWordSelection(selection, index)))
           .onClick(() => this.selectWordForInquiry(index))
       })
     }
@@ -648,10 +683,20 @@ export struct JourneyPage {
           .fontSize(44)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
+          .copyOption(CopyOptions.LocalDevice)
+          .editMenuOptions(aiTextSelectionMenu(
+            this.words[Math.min(this.selectedWordIndex, this.words.length - 1)].word,
+            (selection: string) => this.askWordSelection(selection,
+              Math.min(this.selectedWordIndex, this.words.length - 1))))
         Blank()
         Text(this.words[Math.min(this.selectedWordIndex, this.words.length - 1)].reading)
           .fontSize(15)
           .fontColor($r('app.color.accent'))
+          .copyOption(CopyOptions.LocalDevice)
+          .editMenuOptions(aiTextSelectionMenu(
+            this.words[Math.min(this.selectedWordIndex, this.words.length - 1)].reading,
+            (selection: string) => this.askWordSelection(selection,
+              Math.min(this.selectedWordIndex, this.words.length - 1))))
       }
       .width('100%')
       Text(this.words[Math.min(this.selectedWordIndex, this.words.length - 1)].meanings.slice(0, 2).join('；'))
@@ -659,6 +704,11 @@ export struct JourneyPage {
         .fontSize(17)
         .fontColor($r('app.color.ink'))
         .lineHeight(27)
+        .copyOption(CopyOptions.LocalDevice)
+        .editMenuOptions(aiTextSelectionMenu(
+          this.words[Math.min(this.selectedWordIndex, this.words.length - 1)].meanings.slice(0, 2).join('；'),
+          (selection: string) => this.askWordSelection(selection,
+            Math.min(this.selectedWordIndex, this.words.length - 1))))
       if (this.words[Math.min(this.selectedWordIndex, this.words.length - 1)].example !== undefined) {
         Text(this.words[Math.min(this.selectedWordIndex, this.words.length - 1)].example?.japanese ?? '')
           .width('100%')
@@ -666,16 +716,11 @@ export struct JourneyPage {
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.ink_muted'))
           .lineHeight(28)
-      }
-      if (this.selectedInquiryKey === `word-${this.selectedWordIndex}`) {
-        Row() {
-          Blank()
-          AiAskAction({
-            label: '问这个词',
-            onAsk: () => this.askSelectedWord()
-          })
-        }
-        .width('100%')
+          .copyOption(CopyOptions.LocalDevice)
+          .editMenuOptions(aiTextSelectionMenu(
+            this.words[Math.min(this.selectedWordIndex, this.words.length - 1)].example?.japanese ?? '',
+            (selection: string) => this.askWordSelection(selection,
+              Math.min(this.selectedWordIndex, this.words.length - 1))))
       }
     }
     .width('100%')
@@ -704,21 +749,16 @@ export struct JourneyPage {
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.ink'))
             .lineHeight(28)
-          if (this.selectedInquiryKey === `grammar-example-${index}`) {
-            AiAskAction({
-              label: '问 AI',
-              onAsk: () => this.onAsk(AiInquiryFactory.grammar(example, this.journey.grammarPattern))
-            })
-          }
+            .copyOption(CopyOptions.LocalDevice)
+            .editMenuOptions(aiTextSelectionMenu(example,
+              (selection: string) => this.askSelection(selection, this.journey.title,
+                `${this.journey.grammarPattern}\n${this.journey.grammarMeaning}\n${example}`)))
         }
         .width('100%')
         .padding({ left: 10, right: 10, top: 15, bottom: 15 })
         .borderRadius(14)
-        .backgroundColor(this.selectedInquiryKey === `grammar-example-${index}` ?
-          $r('app.color.accent_soft') : Color.Transparent)
         .border({ width: { bottom: index + 1 < this.journey.grammarExamples.length ? 0.5 : 0 },
           color: $r('app.color.line') })
-        .onClick(() => this.toggleInquirySelection(`grammar-example-${index}`))
       })
     }
     .width('100%')
@@ -759,25 +799,19 @@ export struct JourneyPage {
         .lineHeight(48)
         .padding({ left: 8, right: 8, top: 4, bottom: 4 })
         .borderRadius(12)
-        .backgroundColor(this.selectedInquiryKey === 'grammar-pattern' ?
-          $r('app.color.accent_soft') : Color.Transparent)
-        .onClick(() => this.toggleInquirySelection('grammar-pattern'))
+        .copyOption(CopyOptions.LocalDevice)
+        .editMenuOptions(aiTextSelectionMenu(this.journey.grammarPattern,
+          (selection: string) => this.askSelection(selection, this.journey.title,
+            `${this.journey.grammarPattern}\n${this.journey.grammarMeaning}`)))
       Text(this.journey.grammarMeaning)
         .width('100%')
         .fontSize(15)
         .fontColor($r('app.color.ink_muted'))
         .lineHeight(25)
-      if (this.selectedInquiryKey === 'grammar-pattern') {
-        Row() {
-          Blank()
-          AiAskAction({
-            label: '问这个句型',
-            onAsk: () => this.onAsk(AiInquiryFactory.grammar(
-              `${this.journey.grammarPattern}\n${this.journey.grammarMeaning}`, this.journey.title))
-          })
-        }
-        .width('100%')
-      }
+        .copyOption(CopyOptions.LocalDevice)
+        .editMenuOptions(aiTextSelectionMenu(this.journey.grammarMeaning,
+          (selection: string) => this.askSelection(selection, this.journey.title,
+            `${this.journey.grammarPattern}\n${this.journey.grammarMeaning}`)))
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
@@ -795,12 +829,19 @@ export struct JourneyPage {
         Text(this.dialogue?.goal ?? this.journey.goal)
           .fontSize(13)
           .fontColor($r('app.color.ink_muted'))
+          .copyOption(CopyOptions.LocalDevice)
+          .editMenuOptions(aiTextSelectionMenu(this.dialogue?.goal ?? this.journey.goal,
+            (selection: string) => this.askSelection(selection, this.journey.title,
+              this.dialogue?.goal ?? this.journey.goal)))
       }
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
-      Text(this.showDialogueNotes ? '收起提示' : '显示读音')
-        .fontSize(12)
-        .fontColor($r('app.color.accent'))
+      Button(this.showDialogueNotes ? '收起提示' : '显示读音', {
+        type: ButtonType.ROUNDED_RECTANGLE,
+        stateEffect: true
+      })
+        .buttonStyle(ButtonStyleMode.TEXTUAL)
+        .controlSize(ControlSize.SMALL)
         .onClick(() => this.showDialogueNotes = !this.showDialogueNotes)
     }
     .width('100%')
@@ -824,23 +865,26 @@ export struct JourneyPage {
               .fontColor($r('app.color.ink'))
               .lineHeight(line.learner === true ? 29 : 33)
               .textAlign(line.learner === true ? TextAlign.End : TextAlign.Start)
+              .copyOption(CopyOptions.LocalDevice)
+              .editMenuOptions(aiTextSelectionMenu(line.text,
+                (selection: string) => this.askDialogueSelection(selection, line)))
             if (this.showDialogueNotes) {
               Text(line.reading)
                 .width('100%')
                 .fontSize(12)
                 .fontColor($r('app.color.ink_muted'))
                 .textAlign(line.learner === true ? TextAlign.End : TextAlign.Start)
+                .copyOption(CopyOptions.LocalDevice)
+                .editMenuOptions(aiTextSelectionMenu(line.reading,
+                  (selection: string) => this.askDialogueSelection(selection, line)))
               Text(line.meaning)
                 .width('100%')
                 .fontSize(12)
                 .fontColor($r('app.color.ink_muted'))
                 .textAlign(line.learner === true ? TextAlign.End : TextAlign.Start)
-            }
-            if (this.selectedInquiryKey === `dialogue-${index}`) {
-              AiAskAction({
-                label: '问这句',
-                onAsk: () => this.askDialogueLine(line)
-              })
+                .copyOption(CopyOptions.LocalDevice)
+                .editMenuOptions(aiTextSelectionMenu(line.meaning,
+                  (selection: string) => this.askDialogueSelection(selection, line)))
             }
           }
           .width(line.learner === true ? '82%' : '90%')
@@ -852,11 +896,8 @@ export struct JourneyPage {
         .width('100%')
         .padding({ left: 10, right: 10, top: 16, bottom: 16 })
         .borderRadius(14)
-        .backgroundColor(this.selectedInquiryKey === `dialogue-${index}` ?
-          $r('app.color.accent_soft') : Color.Transparent)
         .border({ width: { bottom: index + 1 < (this.dialogue?.lines.length ?? 0) ? 0.5 : 0 },
           color: $r('app.color.line') })
-        .onClick(() => this.toggleInquirySelection(`dialogue-${index}`))
       })
     }
     .width('100%')
@@ -891,6 +932,10 @@ export struct JourneyPage {
         .fontSize(16)
         .fontColor($r('app.color.ink_muted'))
         .lineHeight(26)
+        .copyOption(CopyOptions.LocalDevice)
+        .editMenuOptions(aiTextSelectionMenu(this.journey.challenge.prompt,
+          (selection: string) => this.askSelection(selection, `${this.journey.title} · 情境判断`,
+            `${this.journey.challenge.prompt}\n${this.journey.challenge.explanation}`)))
     }
     .alignItems(HorizontalAlign.Start)
     .padding({ left: 4, right: 4 })
@@ -913,6 +958,10 @@ export struct JourneyPage {
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.ink'))
             .lineHeight(25)
+            .copyOption(CopyOptions.LocalDevice)
+            .editMenuOptions(aiTextSelectionMenu(option,
+              (selection: string) => this.askSelection(selection, `${this.journey.title} · 情境判断`,
+                `${this.journey.challenge.prompt}\n${option}\n${this.journey.challenge.explanation}`)))
         }
         .width('100%')
         .padding({ left: 14, right: 14, top: 15, bottom: 15 })
@@ -946,6 +995,10 @@ export struct JourneyPage {
           .fontSize(14)
           .fontColor($r('app.color.ink_muted'))
           .lineHeight(23)
+          .copyOption(CopyOptions.LocalDevice)
+          .editMenuOptions(aiTextSelectionMenu(this.journey.challenge.explanation,
+            (selection: string) => this.askSelection(selection, `${this.journey.title} · 情境判断`,
+              `${this.journey.challenge.prompt}\n${this.journey.challenge.explanation}`)))
       }
       .width('100%')
       .alignItems(HorizontalAlign.Start)
@@ -994,6 +1047,11 @@ export struct JourneyPage {
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.ink'))
         .lineHeight(28)
+        .copyOption(CopyOptions.LocalDevice)
+        .editMenuOptions(aiTextSelectionMenu(this.journey.practice.openingHint,
+          (selection: string) => this.askSelection(selection, this.journey.practice.title,
+            `${this.journey.practice.setting}\n${this.journey.practice.goal}\n` +
+              this.journey.practice.openingHint)))
       Text('不依赖网络：先遮住提示说一遍，再打开核对表达。')
         .width('100%')
         .fontSize(12)

@@ -136,6 +136,7 @@ export interface GrammarBlock {
   kind: string;
   text: string;
   cells: string[][];
+  ordered?: boolean;
 }
 
 export interface GrammarDocument {

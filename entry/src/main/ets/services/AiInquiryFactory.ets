@@ -7,6 +7,20 @@ import {
 import { AiInquiryContext } from '../model/DeepSeekModels';
 
 export class AiInquiryFactory {
+  static selection(text: string, source: string, surroundingContext: string = ''): AiInquiryContext {
+    const selection: string = text.trim();
+    const contextLine: string = surroundingContext.trim().length === 0 ? '' :
+      `\n相关上下文：\n${surroundingContext.trim()}`;
+    return {
+      id: `selection-${Date.now()}`,
+      kind: '选中内容',
+      title: AiInquiryFactory.compact(selection),
+      subtitle: source,
+      content: `来源：${source}\n用户选中的内容：${selection}${contextLine}`,
+      suggestions: ['解释这段内容', '分析读音和语法', '给我两个相似例句']
+    };
+  }
+
   static kana(cell: KanaCell, cue: string = ''): AiInquiryContext {
     const cueLine: string = cue.length > 0 ? `\n学习提示：${cue}` : '';
     return {

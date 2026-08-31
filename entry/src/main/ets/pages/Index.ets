@@ -1,5 +1,5 @@
 import { common } from '@kit.AbilityKit';
-import { curves, LengthUnit, window } from '@kit.ArkUI';
+import { curves, window } from '@kit.ArkUI';
 import { BlurStrategy, DividerMode, HdsTabs } from '@kit.UIDesignKit';
 import { SymbolGlyphModifier } from '@ohos.arkui.modifier';
 import {
@@ -40,7 +40,7 @@ struct Index {
   @State private journeyCompletedMask: number = 0;
   @State private showHomeGuide: boolean = false;
   @State private activeInquiry: AiInquiryContext | undefined = undefined;
-  @State private inquirySheetOpen: boolean = false;
+  @State private inquiryPopupOpen: boolean = false;
 
   aboutToAppear(): void {
     const context: common.Context = this.getUIContext().getHostContext() as common.Context;
@@ -102,15 +102,15 @@ struct Index {
       return;
     }
     this.activeInquiry = context;
-    this.inquirySheetOpen = true;
+    this.inquiryPopupOpen = true;
   }
 
   private closeInquiry(): void {
-    this.inquirySheetOpen = false;
+    this.inquiryPopupOpen = false;
   }
 
   private finishInquiryDismissal(): void {
-    this.inquirySheetOpen = false;
+    this.inquiryPopupOpen = false;
     this.activeInquiry = undefined;
   }
 
@@ -160,6 +160,12 @@ struct Index {
       this.avoidAreas.statusBar.bottomRect.height);
   }
 
+  private shellBottomInset(): number {
+    const tabsVisible: boolean = this.activeScenario === undefined && !this.settingsOpen &&
+      (!this.journeyOpen || this.currentJourney === undefined);
+    return tabsVisible ? 0 : this.bottomSafeInset();
+  }
+
   private leftSafeInset(): number {
     return Math.max(this.avoidAreas.cutout.leftRect.width, this.avoidAreas.navigationIndicator.leftRect.width,
       this.avoidAreas.statusBar.leftRect.width);
@@ -187,12 +193,14 @@ struct Index {
     }
     .width('100%')
     .height('100%')
+    .background($r('app.color.surface'))
   }
 
   @Builder
   private appShell() {
-    Stack({ alignContent: Alignment.Center }) {
-      if (this.activeScenario !== undefined) {
+    Stack({ alignContent: Alignment.Bottom }) {
+      Stack({ alignContent: Alignment.Center }) {
+        if (this.activeScenario !== undefined) {
         PracticeSessionPage({
           scenario: this.activeScenario,
           apiKey: this.deepSeekApiKey,
@@ -316,26 +324,40 @@ struct Index {
         .transition(TransitionEffect.OPACITY
           .combine(TransitionEffect.scale({ x: 0.985, y: 0.985 }))
           .animation({ curve: curves.springMotion(0.4, 0.88, 0.14) }))
+        }
       }
+      .width('100%')
+      .height('100%')
+
+      Column()
+        .width(1)
+        .height(1)
+        .margin({ bottom: 88 })
+        .bindPopup(this.inquiryPopupOpen, {
+          builder: this.aiInquiryPopup,
+          placement: Placement.Top,
+          width: 336,
+          popupColor: $r('app.color.surface_raised'),
+          enableArrow: true,
+          autoCancel: true,
+          mask: false,
+          focusable: true,
+          radius: 24,
+          shadow: ShadowStyle.OUTER_DEFAULT_MD,
+          backgroundBlurStyle: BlurStyle.COMPONENT_REGULAR,
+          keyboardAvoidMode: KeyboardAvoidMode.DEFAULT,
+          onStateChange: (event) => {
+            if (!event.isVisible) {
+              this.finishInquiryDismissal();
+            }
+          }
+        })
     }
     .width('100%')
     .height('100%')
-    .bindSheet($$this.inquirySheetOpen, this.aiInquirySheet(), {
-      height: SheetSize.LARGE,
-      preferType: SheetType.BOTTOM,
-      radius: { value: 32, unit: LengthUnit.VP },
-      dragBar: true,
-      showClose: true,
-      title: { title: '问 AI', subtitle: '围绕当前内容连续追问' },
-      backgroundColor: $r('app.color.surface_raised'),
-      maskColor: '#33202124',
-      blurStyle: BlurStyle.COMPONENT_REGULAR,
-      keyboardAvoidMode: SheetKeyboardAvoidMode.TRANSLATE_AND_SCROLL,
-      onDisappear: () => this.finishInquiryDismissal()
-    })
     .padding({
       top: this.topSafeInset(),
-      bottom: this.bottomSafeInset(),
+      bottom: this.shellBottomInset(),
       left: this.leftSafeInset(),
       right: this.rightSafeInset()
     })
@@ -343,17 +365,24 @@ struct Index {
   }
 
   @Builder
-  private aiInquirySheet() {
+  private aiInquiryPopup() {
     if (this.activeInquiry !== undefined) {
-      ContextAiPanel({
-        context: this.activeInquiry,
-        apiKey: this.deepSeekApiKey
-      })
+      Column() {
+        ContextAiPanel({
+          context: this.activeInquiry,
+          apiKey: this.deepSeekApiKey,
+          onClose: () => this.closeInquiry()
+        })
+      }
+      .width('100%')
+      .height(460)
+      .borderRadius(24)
+      .clip(true)
     }
   }
 
   onBackPress(): boolean {
-    if (this.inquirySheetOpen) {
+    if (this.inquiryPopupOpen) {
       this.closeInquiry();
       return true;
     }

@@ -216,6 +216,7 @@ export struct PracticeSessionPage {
                       .fontColor($r('app.color.ink'))
                       .lineHeight(message.role === 'user' ? 33 : 39)
                       .textAlign(message.role === 'user' ? TextAlign.End : TextAlign.Start)
+                      .copyOption(CopyOptions.LocalDevice)
                   } else {
                     Column({ space: 8 }) {
                       LoadingProgress()

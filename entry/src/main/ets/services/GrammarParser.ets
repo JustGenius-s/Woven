@@ -27,8 +27,9 @@ export class GrammarParser {
         cursor += 1;
         continue;
       }
-      if (line.startsWith('### ')) {
-        blocks.push(GrammarParser.block(BLOCK_SUBHEADING, GrammarParser.cleanInline(line.slice(4))));
+      if (/^#{3,6}\s+/.test(line)) {
+        blocks.push(GrammarParser.block(BLOCK_SUBHEADING,
+          GrammarParser.cleanInline(line.replace(/^#{3,6}\s+/, ''))));
         cursor += 1;
         continue;
       }
@@ -60,12 +61,14 @@ export class GrammarParser {
       }
       if (GrammarParser.isListLine(line)) {
         const items: string[] = [];
+        const ordered: boolean = /^\d+[.)]\s+/.test(line);
         while (cursor < lines.length && GrammarParser.isListLine(lines[cursor].trim())) {
           items.push(GrammarParser.cleanInline(lines[cursor].trim().replace(/^[-*]\s+/, '')
-            .replace(/^\d+[.)]\s+/, '')));
+            .replace(/^\d+[.)]\s+/, '')
+            .replace(/^\[[ xX]\]\s*/, '')));
           cursor += 1;
         }
-        blocks.push(GrammarParser.block(BLOCK_LIST, items.join('\n')));
+        blocks.push({ kind: BLOCK_LIST, text: items.join('\n'), cells: [], ordered: ordered });
         continue;
       }
 
@@ -219,4 +222,3 @@ export class GrammarParser {
       .trim();
   }
 }
-
