@@ -4,6 +4,7 @@ import { curves } from '@kit.ArkUI';
 @Component
 export struct ImmersiveBackdrop {
   @BuilderParam canvasContent: () => void = this.emptyContent;
+  @Prop sceneToneIndex: number = -1;
 
   @State private settled: boolean = false;
 
@@ -15,14 +16,45 @@ export struct ImmersiveBackdrop {
   private emptyContent() {
   }
 
+  private sceneTone(): ResourceColor {
+    switch (this.sceneToneIndex) {
+      case 0:
+        return $r('app.color.word_card_blue');
+      case 1:
+        return $r('app.color.word_card_cyan');
+      case 2:
+        return $r('app.color.word_card_green');
+      case 3:
+        return $r('app.color.word_card_amber');
+      case 4:
+        return $r('app.color.word_card_rose');
+      case 5:
+        return $r('app.color.word_card_violet');
+      default:
+        return $r('app.color.surface');
+    }
+  }
+
   build() {
     Stack() {
+      if (this.sceneToneIndex >= 0) {
+        Column()
+          .width('100%')
+          .height('100%')
+          .linearGradient({
+            angle: 180,
+            colors: [[this.sceneTone(), 0], [this.sceneTone(), 0.38], [$r('app.color.surface'), 1]]
+          })
+          .animation({ duration: 320, curve: curves.springMotion(0.42, 0.88, 0.14) })
+          .hitTestBehavior(HitTestMode.None)
+      }
+
       Column()
         .width(500)
         .height(500)
         .borderRadius(250)
         .border({ width: 1.5, color: $r('app.color.accent') })
-        .opacity(this.settled ? 0.08 : 0)
+        .opacity(this.settled ? (this.sceneToneIndex >= 0 ? 0.035 : 0.08) : 0)
         .scale({ x: this.settled ? 1 : 0.68, y: this.settled ? 1 : 0.68 })
         .position({ x: -258, y: -210 })
         .animation({ curve: curves.springMotion(0.62, 0.9, 0.12) })
@@ -37,36 +69,10 @@ export struct ImmersiveBackdrop {
           radius: '50%',
           colors: [[$r('app.color.gravity_glow'), 0], [Color.Transparent, 1]]
         })
-        .opacity(this.settled ? 1 : 0)
+        .opacity(this.settled ? (this.sceneToneIndex >= 0 ? 0.34 : 1) : 0)
         .translate({ x: this.settled ? -18 : 28, y: this.settled ? 14 : 48 })
         .position({ x: '56%', y: 360 })
         .animation({ curve: curves.springMotion(0.72, 0.92, 0.1) })
-        .hitTestBehavior(HitTestMode.None)
-
-      Column()
-        .width(78)
-        .height(78)
-        .borderRadius(39)
-        .linearGradient({
-          angle: 145,
-          colors: [[$r('app.color.immersive_edge'), 0], [$r('app.color.accent_soft'), 1]]
-        })
-        .border({ width: 0.8, color: $r('app.color.immersive_edge') })
-        .shadow({ radius: 18, color: $r('app.color.gravity_glow'), offsetY: 6 })
-        .translate({ x: this.settled ? 0 : 42, y: this.settled ? 0 : 26 })
-        .position({ x: '72%', y: 126 })
-        .animation({ curve: curves.springMotion(0.48, 0.8, 0.2) })
-        .hitTestBehavior(HitTestMode.None)
-
-      Column()
-        .width(18)
-        .height(18)
-        .borderRadius(9)
-        .backgroundColor($r('app.color.accent'))
-        .shadow({ radius: 14, color: $r('app.color.gravity_glow') })
-        .position({ x: '88%', y: 188 })
-        .translate({ x: this.settled ? 0 : -32, y: this.settled ? 0 : -34 })
-        .animation({ curve: curves.springMotion(0.42, 0.78, 0.22) })
         .hitTestBehavior(HitTestMode.None)
 
       this.canvasContent()
@@ -74,7 +80,7 @@ export struct ImmersiveBackdrop {
     .width('100%')
     .height('100%')
     .clip(true)
-    .backgroundColor($r('app.color.surface'))
+    .backgroundColor(this.sceneToneIndex >= 0 ? this.sceneTone() : $r('app.color.surface'))
   }
 }
 

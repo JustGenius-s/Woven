@@ -119,7 +119,7 @@ export struct PracticeSessionPage {
       this.status = error.message;
       this.removeIfEmpty(assistantId);
       hilog.error(LOG_DOMAIN, LOG_TAG, 'Request surfaced to UI scenario=%{public}s', this.scenario.id);
-      showImmersiveNotice(this.getUIContext(), '对练暂时中断', error.message);
+      showImmersiveNotice(this.getUIContext(), '场景互动暂时中断', error.message);
     });
   }
 
@@ -252,7 +252,7 @@ export struct PracticeSessionPage {
                 if (this.status !== '已停止生成，可以继续输入。') {
                   ImmersiveAction({
                     label: '重试',
-                    actionAccessibilityText: '重试 DeepSeek 对练请求',
+                    actionAccessibilityText: '重试 DeepSeek 场景请求',
                     icon: $r('sys.symbol.arrow_right'),
                     actionSize: 42,
                     onAction: () => this.retry()

@@ -31,5 +31,16 @@ export class VocabularyDataSource implements IDataSource {
       this.listeners[index].onDataReloaded();
     }
   }
-}
 
+  refresh(id: string): void {
+    for (let index: number = 0; index < this.items.length; index++) {
+      if (this.items[index].id !== id) {
+        continue;
+      }
+      for (let listenerIndex: number = 0; listenerIndex < this.listeners.length; listenerIndex++) {
+        this.listeners[listenerIndex].onDataReloaded();
+      }
+      return;
+    }
+  }
+}

@@ -11,7 +11,9 @@ import { PageChrome } from '../components/PageChrome';
 @Component
 export struct KanaPage {
   journey: LearningJourney | undefined = undefined;
+  initialKanaKey: string = 'あ';
   onAsk: (context: AiInquiryContext) => void = (context: AiInquiryContext) => {};
+  onKanaChange: (key: string) => void = (key: string) => {};
 
   @State private catalog: LearningCatalog | undefined = undefined;
   @State private selected: KanaCell | undefined = undefined;
@@ -24,7 +26,10 @@ export struct KanaPage {
       if (this.catalog.kanaGroups.basic.length > 0 && this.catalog.kanaGroups.basic[0].cells.length > 0) {
         this.selected = this.catalog.kanaGroups.basic[0].cells[0];
       }
-      if (this.journey !== undefined && this.journey.kana.length > 0) {
+      const savedCell: KanaCell | undefined = this.findKana(this.initialKanaKey);
+      if (savedCell !== undefined) {
+        this.selected = savedCell;
+      } else if (this.journey !== undefined && this.journey.kana.length > 0) {
         const journeyCell: KanaCell | undefined = this.findKana(this.journey.kana[0].key);
         if (journeyCell !== undefined) {
           this.selected = journeyCell;
@@ -164,6 +169,7 @@ export struct KanaPage {
 
   private selectKana(cell: KanaCell): void {
     this.selected = cell;
+    this.onKanaChange(cell.key);
   }
 
   @Builder

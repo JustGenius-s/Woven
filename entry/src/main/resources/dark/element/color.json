@@ -25,6 +25,10 @@
       "value": "#4DFFFFFF"
     },
     {
+      "name": "journey_card_shadow",
+      "value": "#300D1016"
+    },
+    {
       "name": "gravity_glow",
       "value": "#3D6F8CFF"
     },
@@ -55,6 +59,30 @@
     {
       "name": "accent_soft",
       "value": "#286F8CFF"
+    },
+    {
+      "name": "word_card_blue",
+      "value": "#2C3955"
+    },
+    {
+      "name": "word_card_cyan",
+      "value": "#294245"
+    },
+    {
+      "name": "word_card_green",
+      "value": "#304431"
+    },
+    {
+      "name": "word_card_amber",
+      "value": "#4A402D"
+    },
+    {
+      "name": "word_card_rose",
+      "value": "#4A333A"
+    },
+    {
+      "name": "word_card_violet",
+      "value": "#3E3552"
     },
     {
       "name": "success",

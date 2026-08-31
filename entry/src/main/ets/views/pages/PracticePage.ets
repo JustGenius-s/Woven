@@ -24,13 +24,13 @@ export struct PracticePage {
         this.getUIContext().getHostContext() as common.Context);
       this.error = '';
     } catch (error) {
-      this.error = '对练场景没有正确载入';
+      this.error = '探索场景没有正确载入';
     }
   }
 
   build() {
     Column() {
-      PageChrome({ title: 'AI 对练' })
+      PageChrome({ title: '场景探索' })
       if (this.error.length > 0) {
         Text(this.error)
           .layoutWeight(1)
@@ -132,7 +132,7 @@ export struct PracticePage {
           .border({ width: { left: 3 }, color: $r('app.color.accent') })
         } else {
           Text(this.apiKeyConfigured ?
-            '先自己说一句，也可以直接进入角色对练。' :
+            '先自己说一句，也可以直接进入角色场景。' :
             '请先在「我的 > 设置」中配置 DeepSeek。')
             .width('100%')
             .fontSize(13)
@@ -149,9 +149,9 @@ export struct PracticePage {
             onAction: () => this.revealedIndex = this.revealedIndex === index ? -1 : index
           })
           ImmersiveAction({
-            label: '开始对练',
+            label: '开始探索',
             actionAccessibilityText: this.apiKeyConfigured ?
-              `开始${scenario.title}AI 对练` : '请先在我的设置中配置 DeepSeek',
+              `开始${scenario.title}AI 场景` : '请先在我的设置中配置 DeepSeek',
             icon: $r('sys.symbol.paperplane_fill'),
             actionSize: 48,
             emphasized: true,

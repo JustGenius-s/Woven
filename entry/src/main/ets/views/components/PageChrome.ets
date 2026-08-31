@@ -11,6 +11,25 @@ import { preferredImmersiveMaterial } from '../../common/ImmersiveMaterial';
 export struct PageChrome {
   eyebrow: string = '';
   title: string = '';
+  largeTitle: boolean = true;
+  customTitle: boolean = false;
+  showSearchAction: boolean = false;
+  bottomHeight: number = 0;
+  onSearch: () => void = () => {};
+  @BuilderParam bottomContent: () => void = this.emptyBottomContent;
+  @BuilderParam customTitleContent: () => void = this.emptyCustomTitleContent;
+
+  @Builder
+  private emptyBottomContent() {
+  }
+
+  @Builder
+  private emptyCustomTitleContent() {
+  }
+
+  private titleHeight(): number {
+    return this.largeTitle ? 112 : 56;
+  }
 
   build() {
     HdsNavigation() {
@@ -28,6 +47,9 @@ export struct PageChrome {
             titleStyle: {
               mainTitleColor: $r('app.color.ink'),
               subTitleColor: $r('app.color.accent')
+            },
+            menuStyle: {
+              iconColor: $r('app.color.ink')
             }
           }
         },
@@ -35,21 +57,36 @@ export struct PageChrome {
         systemMaterialEffect: preferredImmersiveMaterial()
       },
       content: {
-        title: {
+        title: this.customTitle ? undefined : {
           mainTitle: this.title,
           subTitle: this.eyebrow.length > 0 ? this.eyebrow : undefined,
           mainTitleAccessibilityText: this.title,
-          mainTitleSize: TitleSize.TITLE_S
+          mainTitleSize: this.largeTitle ? TitleSize.TITLE_ML : TitleSize.TITLE_S
         },
+        menu: !this.customTitle && this.showSearchAction ? {
+          value: [{
+            content: {
+              icon: $r('sys.symbol.magnifyingglass'),
+              label: '搜索',
+              action: () => this.onSearch()
+            }
+          }],
+          maxCount: 1
+        } : undefined,
+        stackBuilder: this.customTitle ? this.customTitleContent : undefined,
+        bottomBuilder: this.bottomHeight > 0 ? {
+          builder: this.bottomContent,
+          height: this.bottomHeight
+        } : undefined,
         divider: {
           showType: DividerShowType.OFF
         }
       }
     })
-    .titleMode(HdsNavigationTitleMode.MINI)
+    .titleMode(this.largeTitle ? HdsNavigationTitleMode.FULL : HdsNavigationTitleMode.MINI)
     .hideBackButton(true)
     .width('100%')
-    .height(64)
+    .height(this.titleHeight() + this.bottomHeight)
     .backgroundColor(Color.Transparent)
   }
 }

@@ -58,7 +58,7 @@ export struct ImmersiveBackChrome {
     })
     .titleMode(HdsNavigationTitleMode.MINI)
     .width('100%')
-    .height(64)
+    .height(56)
     .backgroundColor(Color.Transparent)
   }
 }

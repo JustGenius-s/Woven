@@ -1,5 +1,5 @@
 import { common } from '@kit.AbilityKit';
-import { curves } from '@kit.ArkUI';
+import { ChipGroup, ChipGroupItemOptions, ChipSize, curves } from '@kit.ArkUI';
 import { FLOATING_TAB_CONTENT_INSET, MOTION_DURATION } from '../../common/AppTheme';
 import {
   GrammarBlock,
@@ -15,7 +15,9 @@ import { ContentRepository } from '../../services/ContentRepository';
 import { GrammarParser } from '../../services/GrammarParser';
 import { aiTextSelectionMenu } from '../components/AiTextSelection';
 import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
-import { contentLightEffect, planeLightEffect } from '../components/ImmersiveCanvas';
+import { planeLightEffect } from '../components/ImmersiveCanvas';
+
+const GRAMMAR_LEVELS: string[] = ['N5', 'N4', 'N3', 'N2'];
 
 const EMPTY_GRAMMAR_ENTRY: GrammarIndexEntry = {
   id: '',
@@ -62,27 +64,57 @@ export struct GrammarPage {
     }
   }
 
+  private levelChipItems(): ChipGroupItemOptions[] {
+    const items: ChipGroupItemOptions[] = [];
+    for (let index: number = 0; index < GRAMMAR_LEVELS.length; index++) {
+      const level: string = GRAMMAR_LEVELS[index];
+      items.push({
+        label: { text: level },
+        accessibilityDescription: `切换到 ${level} 语法`
+      });
+    }
+    return items;
+  }
+
+  private selectedLevelIndexes(): number[] {
+    const currentLevel: string = this.entries[this.lessonIndex]?.level ?? GRAMMAR_LEVELS[0];
+    const index: number = GRAMMAR_LEVELS.indexOf(currentLevel);
+    return [index >= 0 ? index : 0];
+  }
+
+  private selectLevelIndexes(indexes: number[]): void {
+    if (indexes.length === 0) {
+      return;
+    }
+    const index: number = indexes[indexes.length - 1];
+    if (index >= 0 && index < GRAMMAR_LEVELS.length) {
+      this.jumpLevel(GRAMMAR_LEVELS[index]);
+    }
+  }
+
   build() {
     Column() {
       ImmersiveBackChrome({ title: '语法', onBack: this.onBack })
-      Row({ space: 4 }) {
-        ForEach(['N5', 'N4', 'N3', 'N2'], (level: string) => {
-          Button(level, {
-            type: ButtonType.ROUNDED_RECTANGLE,
-            stateEffect: true
-          })
-            .layoutWeight(1)
-            .buttonStyle(this.entries[this.lessonIndex]?.level === level ?
-              ButtonStyleMode.NORMAL : ButtonStyleMode.TEXTUAL)
-            .controlSize(ControlSize.SMALL)
-            .accessibilityText(`${level} 语法`)
-            .onClick(() => this.jumpLevel(level))
-        })
-      }
+      ChipGroup({
+        items: this.levelChipItems(),
+        selectedIndexes: this.selectedLevelIndexes(),
+        multiple: false,
+        itemStyle: {
+          size: ChipSize.NORMAL
+        },
+        chipGroupSpace: {
+          itemSpace: 8,
+          startSpace: 20,
+          endSpace: 20
+        },
+        chipGroupPadding: {
+          top: 2,
+          bottom: 2
+        },
+        onChange: (indexes: number[]) => this.selectLevelIndexes(indexes)
+      })
       .width('100%')
-      .justifyContent(FlexAlign.Center)
-      .padding({ left: 16, right: 16, top: 8, bottom: 12 })
-      .visualEffect(contentLightEffect())
+      .padding({ top: 8, bottom: 12 })
 
       Swiper() {
         ForEach(this.entries, (entry: GrammarIndexEntry, index: number) => {

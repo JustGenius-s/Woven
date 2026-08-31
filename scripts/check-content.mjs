@@ -28,6 +28,11 @@ if (!catalog.kanaGroups?.basic?.length || !catalog.dialogues?.length || !catalog
   throw new Error('Bundled learning catalog is incomplete.')
 }
 
+const musicTracks = JSON.parse(await readFile(resolve(contentRoot, 'music.json'), 'utf8'))
+if (musicTracks.length < 3 || musicTracks.some((track) => !track.id || !track.title || track.lines?.length < 3)) {
+  throw new Error('Bundled music learning content is incomplete.')
+}
+
 const journeys = JSON.parse(await readFile(resolve(contentRoot, 'journeys.json'), 'utf8'))
 const grammarIds = new Set(grammarIndex.map((entry) => entry.id))
 const dialogueIds = new Set(catalog.dialogues.map((dialogue) => dialogue.id))
@@ -59,4 +64,4 @@ for (const journey of journeys) {
   }
 }
 
-console.log(`Content OK: ${lessonFiles.length} lessons, ${vocabularyCount} words, ${catalog.dialogues.length} dialogues, ${journeys.length} journeys.`)
+console.log(`Content OK: ${lessonFiles.length} lessons, ${vocabularyCount} words, ${musicTracks.length} music tracks, ${catalog.dialogues.length} readings, ${catalog.practiceScenarios.length} scenarios.`)

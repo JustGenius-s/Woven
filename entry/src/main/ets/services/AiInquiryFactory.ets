@@ -33,16 +33,20 @@ export class AiInquiryFactory {
     };
   }
 
-  static word(item: VocabularyEntry): AiInquiryContext {
+  static word(item: VocabularyEntry, learningContext: string = '', initialPrompt: string = ''): AiInquiryContext {
     const example: string = item.example === undefined ? '' :
       `\n例句：${item.example.japanese}\n例句释义：${item.example.english}`;
+    const progress: string = learningContext.trim().length === 0 ? '' :
+      `\n用户的学习进度：\n${learningContext.trim()}`;
     return {
       id: `word-${item.id}-${Date.now()}`,
-      kind: '单词',
+      kind: '单词对话',
       title: item.word,
       subtitle: `${item.reading} · ${item.meanings.slice(0, 2).join('；')}`,
-      content: `单词：${item.word}\n读音：${item.reading}\n释义：${item.meanings.join('；')}${example}`,
-      suggestions: ['怎么记这个词？', '给我两个自然例句', '和近义词有什么区别？']
+      content: `单词：${item.word}\n读音：${item.reading}\n释义：${item.meanings.join('；')}${example}${progress}`,
+      suggestions: ['用我学过的内容再造一句', '说明常见搭配', '和相近词比较'],
+      conversationKey: `word-${item.id}`,
+      initialPrompt: initialPrompt.trim()
     };
   }
 

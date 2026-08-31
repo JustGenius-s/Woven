@@ -176,7 +176,7 @@ export struct SettingsPage {
         SymbolGlyph($r('sys.symbol.lock_fill'))
           .fontSize(14)
           .fontColor([$r('app.color.ink_muted')])
-        Text('仅保存在此设备，并在 AI 对练或询问学习内容时用于请求 DeepSeek。')
+        Text('仅保存在此设备，并在 AI 场景或询问学习内容时用于请求 DeepSeek。')
           .layoutWeight(1)
           .fontSize(13)
           .lineHeight(19)

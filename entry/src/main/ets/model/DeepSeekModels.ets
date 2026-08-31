@@ -41,6 +41,8 @@ export interface AiInquiryContext {
   subtitle: string;
   content: string;
   suggestions: string[];
+  conversationKey?: string;
+  initialPrompt?: string;
 }
 
 export interface PracticeMessage {

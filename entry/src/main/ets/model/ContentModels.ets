@@ -2,7 +2,7 @@ export enum AppSection {
   LEARN = 0,
   KANA = 1,
   VOCABULARY = 2,
-  PRACTICE = 3,
+  EXPLORE = 3,
   ME = 4
 }
 
@@ -50,6 +50,23 @@ export interface PracticeScenario {
   level: string;
   goal: string;
   openingHint: string;
+}
+
+export interface MusicLine {
+  text: string;
+  reading: string;
+  meaning: string;
+}
+
+export interface MusicTrack {
+  id: string;
+  title: string;
+  chineseTitle: string;
+  artist: string;
+  level: string;
+  duration: string;
+  focus: string;
+  lines: MusicLine[];
 }
 
 export interface JourneyKanaFocus {

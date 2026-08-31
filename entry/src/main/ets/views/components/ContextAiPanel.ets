@@ -1,3 +1,4 @@
+import { common } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import {
   AiInquiryContext,
@@ -5,6 +6,7 @@ import {
   PracticeMessage
 } from '../../model/DeepSeekModels';
 import { DeepSeekClient } from '../../services/DeepSeekClient';
+import { VocabularyLearningStore } from '../../services/VocabularyLearningStore';
 import { ImmersiveAction } from './ImmersiveAction';
 
 const LOG_DOMAIN: number = 0x4b4f;
@@ -33,15 +35,29 @@ export struct ContextAiPanel {
   private client?: DeepSeekClient;
   private activeAssistantId: string = '';
   private scroller: Scroller = new Scroller();
+  private initialPromptTimer: number = 0;
 
   aboutToAppear(): void {
-    this.messages = [];
-    this.history = [];
+    this.restoreConversation();
     this.status = '';
     hilog.info(LOG_DOMAIN, LOG_TAG, 'Inquiry opened kind=%{public}s', this.context.kind);
+    const initialPrompt: string = this.context.initialPrompt === undefined ? '' :
+      this.context.initialPrompt.trim();
+    if (initialPrompt.length > 0) {
+      this.initialPromptTimer = setTimeout(() => {
+        this.initialPromptTimer = 0;
+        this.submit(initialPrompt);
+      }, 120);
+    } else {
+      this.scrollToLatest();
+    }
   }
 
   aboutToDisappear(): void {
+    if (this.initialPromptTimer > 0) {
+      clearTimeout(this.initialPromptTimer);
+      this.initialPromptTimer = 0;
+    }
     this.client?.cancel();
   }
 
@@ -115,15 +131,46 @@ export struct ContextAiPanel {
   }
 
   private instructions(): string {
-    return `你是 Woven 日语学习助手。用户正在学习一段已经选中的内容。内容类型：${this.context.kind}。` +
-      `\n选中内容：\n${this.context.content}\n` +
-      '只围绕这段内容回答，并根据问题解释读音、词义、语法、语气、使用场景或给出例句。' +
+    return `你是 Woven 日语学习助手。用户正在围绕一项学习内容对话。内容类型：${this.context.kind}。` +
+      `\n学习内容：\n${this.context.content}\n` +
+      '围绕这项内容回答，并根据问题解释读音、词义、语法、语气、使用场景或给出例句。' +
+      '如果学习内容中带有用户的学习进度，造句时优先复用其中列出的语法和词汇，' +
+      '同时保证日语自然，不需要为了复用而写出生硬句子。' +
       '优先使用简洁中文说明，日语示例附上必要的读音或翻译。不要输出 Markdown 标题，回答控制在容易在手机上阅读的长度。';
+  }
+
+  private restoreConversation(): void {
+    this.messages = [];
+    this.history = [];
+    const conversationKey: string = this.context.conversationKey === undefined ? '' :
+      this.context.conversationKey;
+    if (conversationKey.length === 0) {
+      return;
+    }
+    const context: common.Context = this.getUIContext().getHostContext() as common.Context;
+    this.messages = VocabularyLearningStore.loadConversation(context, conversationKey);
+    for (let index: number = 0; index < this.messages.length; index++) {
+      this.history.push({
+        role: this.messages[index].role,
+        content: this.messages[index].text
+      });
+    }
+  }
+
+  private persistConversation(): void {
+    const conversationKey: string = this.context.conversationKey === undefined ? '' :
+      this.context.conversationKey;
+    if (conversationKey.length === 0) {
+      return;
+    }
+    VocabularyLearningStore.saveConversation(
+      this.getUIContext().getHostContext() as common.Context, conversationKey, this.messages);
   }
 
   private appendMessage(role: string, text: string): string {
     const id: string = `${role}-${Date.now()}-${this.messages.length}`;
     this.messages = this.messages.concat([{ id: id, role: role, text: text, revision: 0 }]);
+    this.persistConversation();
     this.scrollToLatest();
     return id;
   }
@@ -142,6 +189,7 @@ export struct ContextAiPanel {
       }
     }
     this.messages = next;
+    this.persistConversation();
   }
 
   private removeIfEmpty(id: string): void {
@@ -152,6 +200,7 @@ export struct ContextAiPanel {
       }
     }
     this.messages = next;
+    this.persistConversation();
   }
 
   private scrollToLatest(): void {

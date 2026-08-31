@@ -9,6 +9,11 @@ const KEY_JOURNEY_ID: string = 'journey_id';
 const KEY_JOURNEY_STAGE: string = 'journey_stage';
 const KEY_JOURNEY_COMPLETED_MASK: string = 'journey_completed_mask';
 const KEY_HOME_GUIDE_SEEN: string = 'home_guide_seen';
+const KEY_KANA_KEY: string = 'kana_key';
+const KEY_EXPLORE_TAB: string = 'explore_tab';
+const KEY_MUSIC_INDEX: string = 'music_index';
+const KEY_READING_INDEX: string = 'reading_index';
+const KEY_SCENARIO_INDEX: string = 'scenario_index';
 
 export class LearningPreferences {
   private static store(context: common.Context): preferences.Preferences {
@@ -57,6 +62,26 @@ export class LearningPreferences {
 
   static journeyCompletedMask(context: common.Context): number {
     return LearningPreferences.readNumber(context, KEY_JOURNEY_COMPLETED_MASK, 0);
+  }
+
+  static kanaKey(context: common.Context): string {
+    return LearningPreferences.readString(context, KEY_KANA_KEY, 'あ');
+  }
+
+  static exploreTab(context: common.Context): number {
+    return LearningPreferences.readNumber(context, KEY_EXPLORE_TAB, 0);
+  }
+
+  static musicIndex(context: common.Context): number {
+    return LearningPreferences.readNumber(context, KEY_MUSIC_INDEX, -1);
+  }
+
+  static readingIndex(context: common.Context): number {
+    return LearningPreferences.readNumber(context, KEY_READING_INDEX, -1);
+  }
+
+  static scenarioIndex(context: common.Context): number {
+    return LearningPreferences.readNumber(context, KEY_SCENARIO_INDEX, -1);
   }
 
   static shouldShowHomeGuide(context: common.Context): boolean {
@@ -113,6 +138,26 @@ export class LearningPreferences {
     }
   }
 
+  static saveKanaKey(context: common.Context, key: string): void {
+    LearningPreferences.saveString(context, KEY_KANA_KEY, key);
+  }
+
+  static saveExploreTab(context: common.Context, index: number): void {
+    LearningPreferences.saveNumber(context, KEY_EXPLORE_TAB, index);
+  }
+
+  static saveMusicIndex(context: common.Context, index: number): void {
+    LearningPreferences.saveNumber(context, KEY_MUSIC_INDEX, index);
+  }
+
+  static saveReadingIndex(context: common.Context, index: number): void {
+    LearningPreferences.saveNumber(context, KEY_READING_INDEX, index);
+  }
+
+  static saveScenarioIndex(context: common.Context, index: number): void {
+    LearningPreferences.saveNumber(context, KEY_SCENARIO_INDEX, index);
+  }
+
   static saveJourneyProgress(context: common.Context, journeyId: string, stage: number,
     completedMask: number): void {
     try {
@@ -130,6 +175,26 @@ export class LearningPreferences {
     try {
       const store: preferences.Preferences = LearningPreferences.store(context);
       store.putSync(KEY_HOME_GUIDE_SEEN, 1);
+      store.flush();
+    } catch (error) {
+      return;
+    }
+  }
+
+  private static saveString(context: common.Context, key: string, value: string): void {
+    try {
+      const store: preferences.Preferences = LearningPreferences.store(context);
+      store.putSync(key, value);
+      store.flush();
+    } catch (error) {
+      return;
+    }
+  }
+
+  private static saveNumber(context: common.Context, key: string, value: number): void {
+    try {
+      const store: preferences.Preferences = LearningPreferences.store(context);
+      store.putSync(key, value);
       store.flush();
     } catch (error) {
       return;

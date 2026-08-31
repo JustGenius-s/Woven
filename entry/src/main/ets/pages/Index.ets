@@ -13,14 +13,15 @@ import { AppSection, LearningJourney, PracticeScenario } from '../model/ContentM
 import { AiInquiryContext } from '../model/DeepSeekModels';
 import { ContentRepository } from '../services/ContentRepository';
 import { LearningPreferences } from '../services/LearningPreferences';
+import { VocabularyLearningStore } from '../services/VocabularyLearningStore';
+import { ExplorePage } from '../views/pages/ExplorePage';
 import { KanaPage } from '../views/pages/KanaPage';
 import { LearnPage } from '../views/pages/LearnPage';
-import { JourneyPage } from '../views/pages/JourneyPage';
 import { MePage } from '../views/pages/MePage';
-import { PracticePage } from '../views/pages/PracticePage';
 import { PracticeSessionPage } from '../views/pages/PracticeSessionPage';
 import { SettingsPage } from '../views/pages/SettingsPage';
 import { VocabularyPage } from '../views/pages/VocabularyPage';
+import { VocabularyStudyPage } from '../views/pages/VocabularyStudyPage';
 import { ImmersiveBackdrop } from '../views/components/ImmersiveCanvas';
 import { ContextAiPanel } from '../views/components/ContextAiPanel';
 
@@ -35,12 +36,22 @@ struct Index {
   @State private activeScenario: PracticeScenario | undefined = undefined;
   @State private journeys: LearningJourney[] = [];
   @State private currentJourney: LearningJourney | undefined = undefined;
-  @State private journeyOpen: boolean = false;
   @State private journeyStage: number = 0;
   @State private journeyCompletedMask: number = 0;
-  @State private showHomeGuide: boolean = false;
   @State private activeInquiry: AiInquiryContext | undefined = undefined;
   @State private inquiryPopupOpen: boolean = false;
+  @State private vocabularyStudyOpen: boolean = false;
+  @State private vocabularyStudyLevel: string = 'N5';
+  @State private vocabularyStudyWordId: string = '';
+  @State private vocabularyStudyWordIds: string[] = [];
+  @State private vocabularySceneTone: number = -1;
+  @State private vocabularySearchOpen: boolean = false;
+  @State private kanaKey: string = 'あ';
+  @State private exploreTab: number = 0;
+  @State private musicIndex: number = -1;
+  @State private readingIndex: number = -1;
+  @State private scenarioIndex: number = -1;
+  @State private learnedWordCount: number = 0;
 
   aboutToAppear(): void {
     const context: common.Context = this.getUIContext().getHostContext() as common.Context;
@@ -51,7 +62,12 @@ struct Index {
     this.deepSeekApiKey = LearningPreferences.deepSeekApiKey(context);
     this.journeyStage = LearningPreferences.journeyStage(context);
     this.journeyCompletedMask = LearningPreferences.journeyCompletedMask(context);
-    this.showHomeGuide = LearningPreferences.shouldShowHomeGuide(context);
+    this.kanaKey = LearningPreferences.kanaKey(context);
+    this.exploreTab = LearningPreferences.exploreTab(context);
+    this.musicIndex = LearningPreferences.musicIndex(context);
+    this.readingIndex = LearningPreferences.readingIndex(context);
+    this.scenarioIndex = LearningPreferences.scenarioIndex(context);
+    this.learnedWordCount = VocabularyLearningStore.loadLearnedWords(context).length;
     try {
       this.journeys = ContentRepository.loadJourneys(context);
       const savedJourneyId: string = LearningPreferences.journeyId(context);
@@ -69,6 +85,9 @@ struct Index {
   }
 
   private selectSection(section: number): void {
+    if (section !== AppSection.VOCABULARY) {
+      this.vocabularySearchOpen = false;
+    }
     this.section = section;
     LearningPreferences.saveSection(this.getUIContext().getHostContext() as common.Context, section);
   }
@@ -76,6 +95,37 @@ struct Index {
   private saveGrammarIndex(index: number): void {
     this.grammarIndex = index;
     LearningPreferences.saveGrammarIndex(this.getUIContext().getHostContext() as common.Context, index);
+  }
+
+  private saveKanaKey(key: string): void {
+    this.kanaKey = key;
+    LearningPreferences.saveKanaKey(this.getUIContext().getHostContext() as common.Context, key);
+  }
+
+  private saveExploreTab(index: number): void {
+    this.exploreTab = Math.max(0, Math.min(index, 2));
+    LearningPreferences.saveExploreTab(
+      this.getUIContext().getHostContext() as common.Context, this.exploreTab);
+  }
+
+  private openExplore(tab: number): void {
+    this.saveExploreTab(tab);
+    this.selectSection(AppSection.EXPLORE);
+  }
+
+  private saveMusicIndex(index: number): void {
+    this.musicIndex = index;
+    LearningPreferences.saveMusicIndex(this.getUIContext().getHostContext() as common.Context, index);
+  }
+
+  private saveReadingIndex(index: number): void {
+    this.readingIndex = index;
+    LearningPreferences.saveReadingIndex(this.getUIContext().getHostContext() as common.Context, index);
+  }
+
+  private saveScenarioIndex(index: number): void {
+    this.scenarioIndex = index;
+    LearningPreferences.saveScenarioIndex(this.getUIContext().getHostContext() as common.Context, index);
   }
 
   private saveDeepSeekApiKey(apiKey: string): void {
@@ -109,45 +159,27 @@ struct Index {
     this.inquiryPopupOpen = false;
   }
 
+  private openVocabularyStudy(level: string, wordId: string, wordIds: string[]): void {
+    this.getUIContext().animateTo({ curve: curves.springMotion(0.42, 0.84, 0.18) }, () => {
+      this.vocabularyStudyLevel = level;
+      this.vocabularyStudyWordId = wordId;
+      this.vocabularyStudyWordIds = wordIds.slice();
+      this.vocabularyStudyOpen = true;
+    });
+  }
+
+  private closeVocabularyStudy(): void {
+    this.learnedWordCount = VocabularyLearningStore.loadLearnedWords(
+      this.getUIContext().getHostContext() as common.Context).length;
+    this.getUIContext().animateTo({ curve: curves.springMotion(0.38, 0.88, 0.16) }, () => {
+      this.vocabularyStudyOpen = false;
+      this.vocabularySceneTone = -1;
+    });
+  }
+
   private finishInquiryDismissal(): void {
     this.inquiryPopupOpen = false;
     this.activeInquiry = undefined;
-  }
-
-  private openJourney(journey: LearningJourney): void {
-    const changed: boolean = this.currentJourney?.id !== journey.id;
-    this.getUIContext().animateTo({ curve: curves.springMotion(0.42, 0.84, 0.18) }, () => {
-      if (changed) {
-        this.currentJourney = journey;
-        this.journeyStage = 0;
-        this.journeyCompletedMask = 0;
-      }
-      this.journeyOpen = true;
-    });
-    if (changed) {
-      LearningPreferences.saveJourneyProgress(this.getUIContext().getHostContext() as common.Context,
-        journey.id, 0, 0);
-    }
-  }
-
-  private closeJourney(): void {
-    this.getUIContext().animateTo({ curve: curves.springMotion(0.38, 0.88, 0.16) }, () => {
-      this.journeyOpen = false;
-    });
-  }
-
-  private saveJourneyProgress(journeyId: string, stage: number, completedMask: number): void {
-    this.journeyStage = stage;
-    this.journeyCompletedMask = completedMask;
-    LearningPreferences.saveJourneyProgress(this.getUIContext().getHostContext() as common.Context,
-      journeyId, stage, completedMask);
-  }
-
-  private dismissHomeGuide(): void {
-    this.getUIContext().animateTo({ curve: curves.springMotion(0.38, 0.88, 0.16) }, () => {
-      this.showHomeGuide = false;
-    });
-    LearningPreferences.saveHomeGuideSeen(this.getUIContext().getHostContext() as common.Context);
   }
 
   private topSafeInset(): number {
@@ -162,7 +194,7 @@ struct Index {
 
   private shellBottomInset(): number {
     const tabsVisible: boolean = this.activeScenario === undefined && !this.settingsOpen &&
-      (!this.journeyOpen || this.currentJourney === undefined);
+      !this.vocabularyStudyOpen;
     return tabsVisible ? 0 : this.bottomSafeInset();
   }
 
@@ -186,6 +218,7 @@ struct Index {
   build() {
     Stack() {
       ImmersiveBackdrop({
+        sceneToneIndex: this.vocabularyStudyOpen && !this.settingsOpen ? this.vocabularySceneTone : -1,
         canvasContent: () => {
           this.appShell()
         }
@@ -222,36 +255,39 @@ struct Index {
         .transition(TransitionEffect.OPACITY
           .combine(TransitionEffect.scale({ x: 0.97, y: 0.97 }))
           .animation({ curve: curves.springMotion(0.4, 0.86, 0.16) }))
-      } else if (this.journeyOpen && this.currentJourney !== undefined) {
-        JourneyPage({
+      } else if (this.vocabularyStudyOpen) {
+        VocabularyStudyPage({
+          level: this.vocabularyStudyLevel,
+          wordIds: this.vocabularyStudyWordIds,
+          initialWordId: this.vocabularyStudyWordId,
           journey: this.currentJourney,
-          initialStage: this.journeyStage,
-          initialCompletedMask: this.journeyCompletedMask,
+          learnedGrammarIndex: this.grammarIndex,
+          journeyCompletedMask: this.journeyCompletedMask,
           onAsk: (context: AiInquiryContext) => this.openInquiry(context),
-          onBack: () => this.closeJourney(),
-          onProgress: (journeyId: string, stage: number, completedMask: number) =>
-            this.saveJourneyProgress(journeyId, stage, completedMask)
+          onBack: () => this.closeVocabularyStudy(),
+          onToneChange: (toneIndex: number) => this.vocabularySceneTone = toneIndex
         })
         .width('100%')
         .constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
         .transition(TransitionEffect.OPACITY
-          .combine(TransitionEffect.translate({ y: 22 }))
-          .combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))
-          .animation({ curve: curves.springMotion(0.46, 0.84, 0.18) }))
+          .combine(TransitionEffect.translate({ y: 20 }))
+          .combine(TransitionEffect.scale({ x: 0.97, y: 0.97 }))
+          .animation({ curve: curves.springMotion(0.44, 0.84, 0.18) }))
       } else {
         HdsTabs({ barPosition: BarPosition.End, index: this.section }) {
           TabContent() {
             LearnPage({
               savedLessonIndex: this.grammarIndex,
-              journeys: this.journeys,
-              currentJourney: this.currentJourney,
-              journeyStage: this.journeyStage,
-              journeyCompletedMask: this.journeyCompletedMask,
-              showHomeGuide: this.showHomeGuide,
+              kanaKey: this.kanaKey,
+              learnedWordCount: this.learnedWordCount,
+              musicIndex: this.musicIndex,
+              readingIndex: this.readingIndex,
+              scenarioIndex: this.scenarioIndex,
               onLessonChange: (index: number) => this.saveGrammarIndex(index),
-              onJourney: (journey: LearningJourney) => this.openJourney(journey),
-              onAsk: (context: AiInquiryContext) => this.openInquiry(context),
-              onDismissHomeGuide: () => this.dismissHomeGuide()
+              onOpenKana: () => this.selectSection(AppSection.KANA),
+              onOpenVocabulary: () => this.selectSection(AppSection.VOCABULARY),
+              onOpenExplore: (tab: number) => this.openExplore(tab),
+              onAsk: (context: AiInquiryContext) => this.openInquiry(context)
             })
           }
           .tabBar(BottomTabBarStyle.of(this.tabSymbol(
@@ -259,31 +295,43 @@ struct Index {
 
           TabContent() {
             KanaPage({
-              journey: this.currentJourney,
-              onAsk: (context: AiInquiryContext) => this.openInquiry(context)
+              initialKanaKey: this.kanaKey,
+              onAsk: (context: AiInquiryContext) => this.openInquiry(context),
+              onKanaChange: (key: string) => this.saveKanaKey(key)
             })
           }
           .tabBar(BottomTabBarStyle.of(this.tabSymbol(
-            $r('sys.symbol.character_square'), $r('sys.symbol.character_square_fill')), '假名'))
+            $r('sys.symbol.character_square'), $r('sys.symbol.character_square_fill')), '五十音'))
 
           TabContent() {
             VocabularyPage({
-              journey: this.currentJourney,
-              onAsk: (context: AiInquiryContext) => this.openInquiry(context)
+              searchActive: this.vocabularySearchOpen,
+              onAsk: (context: AiInquiryContext) => this.openInquiry(context),
+              onStudy: (level: string, wordId: string, wordIds: string[]) =>
+                this.openVocabularyStudy(level, wordId, wordIds),
+              onSearchActiveChange: (active: boolean) => this.vocabularySearchOpen = active
             })
           }
           .tabBar(BottomTabBarStyle.of(this.tabSymbol(
             $r('sys.symbol.translate_square'), $r('sys.symbol.translate_square_fill')), '词库'))
 
           TabContent() {
-            PracticePage({
-              journey: this.currentJourney,
+            ExplorePage({
+              selectedTab: this.exploreTab,
+              musicIndex: this.musicIndex,
+              readingIndex: this.readingIndex,
+              scenarioIndex: this.scenarioIndex,
               apiKeyConfigured: this.deepSeekApiKey.length > 0,
-              onStart: (scenario: PracticeScenario) => this.startPractice(scenario)
+              onTabChange: (index: number) => this.saveExploreTab(index),
+              onMusicChange: (index: number) => this.saveMusicIndex(index),
+              onReadingChange: (index: number) => this.saveReadingIndex(index),
+              onScenarioChange: (index: number) => this.saveScenarioIndex(index),
+              onStartScenario: (scenario: PracticeScenario) => this.startPractice(scenario),
+              onAsk: (context: AiInquiryContext) => this.openInquiry(context)
             })
           }
           .tabBar(BottomTabBarStyle.of(this.tabSymbol(
-            $r('sys.symbol.message'), $r('sys.symbol.message_fill')), '对练'))
+            $r('sys.symbol.compass_circle'), $r('sys.symbol.compass_circle_fill')), '探索'))
 
           TabContent() {
             MePage({
@@ -394,8 +442,12 @@ struct Index {
       this.settingsOpen = false;
       return true;
     }
-    if (this.journeyOpen) {
-      this.closeJourney();
+    if (this.vocabularyStudyOpen) {
+      this.closeVocabularyStudy();
+      return true;
+    }
+    if (this.section === AppSection.VOCABULARY && this.vocabularySearchOpen) {
+      this.vocabularySearchOpen = false;
       return true;
     }
     if (this.section !== AppSection.LEARN) {
