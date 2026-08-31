@@ -3,6 +3,7 @@ import {
   BorderRadiusMode,
   ItemRestriction,
   LengthMetrics,
+  Rect,
   SegmentButton,
   SegmentButtonOptions,
   SegmentButtonTextItem,
@@ -207,7 +208,11 @@ export struct ExplorePage {
       })
         .layoutWeight(1)
         .height(44)
-        .clip(true)
+        // clip(true) cuts on the rectangular bounds, which squared off the
+        // material layer now that the background is transparent. SegmentButton
+        // already draws its own rounded plate via backgroundBorderRadius, so a
+        // matching rounded clip keeps the material inside that shape.
+        .clip(new Rect({ width: '100%', height: '100%', radius: 22 }))
     }
     .width('100%')
     .height(60)
