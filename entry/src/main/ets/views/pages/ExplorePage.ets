@@ -7,6 +7,7 @@ import {
   SegmentButtonOptions,
   SegmentButtonTextItem
 } from '@kit.ArkUI';
+import uiMaterial from '@ohos.arkui.uiMaterial';
 import { FLOATING_TAB_CONTENT_INSET } from '../../common/AppTheme';
 import {
   LearningCatalog,
@@ -202,6 +203,12 @@ export struct ExplorePage {
     .width('100%')
     .height(60)
     .padding({ left: 18, right: 18, bottom: 8 })
+    // The design guide recommends ULTRA_THIN for elements floating at the top.
+    // systemMaterial must come after the other style attributes or the
+    // material priority is not what the caller expects.
+    .systemMaterial(new uiMaterial.ImmersiveMaterial({
+      style: uiMaterial.ImmersiveStyle.ULTRA_THIN
+    }))
   }
 
   build() {
