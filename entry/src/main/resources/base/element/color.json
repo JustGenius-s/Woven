@@ -13,6 +13,10 @@
       "value": "#FFFFFF"
     },
     {
+      "name": "tab_gradient_mask",
+      "value": "#CCF2F4F7"
+    },
+    {
       "name": "immersive_plane",
       "value": "#D9FFFFFF"
     },

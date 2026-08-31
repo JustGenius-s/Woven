@@ -615,7 +615,11 @@ struct Index {
           barSideMargin: 16,
           barBottomMargin: FLOATING_TAB_BAR_BOTTOM_MARGIN,
           gradientMask: {
-            maskColor: $r('app.color.surface'),
+            // The mask paints on top of the bar's material layer, so an opaque
+            // color cancels the immersive effect entirely. HdsTabs defaults to
+            // a translucent mask (#CCF1F3F5 light / #99000000 dark) for exactly
+            // this reason; mirror that so the material stays visible.
+            maskColor: $r('app.color.tab_gradient_mask'),
             maskHeight: FLOATING_TAB_CONTENT_INSET
           },
           adaptToHandedness: true,
