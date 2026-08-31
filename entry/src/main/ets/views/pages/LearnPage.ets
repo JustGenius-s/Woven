@@ -12,6 +12,7 @@ import {
 } from '../../model/ContentModels';
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { ContentRepository } from '../../services/ContentRepository';
+import { FloatingBarScrollTracker } from '../components/FloatingBarScrollTracker';
 import { planeLightEffect } from '../components/ImmersiveCanvas';
 import { PageChrome } from '../components/PageChrome';
 import { GrammarPage } from './GrammarPage';
@@ -24,6 +25,8 @@ export struct LearnPage {
   musicIndex: number = -1;
   readingIndex: number = -1;
   scenarioIndex: number = -1;
+  onScrollerReady: (scroller: Scroller) => void = (scroller: Scroller) => {};
+  onFloatingBarCompactChange: (compact: boolean) => void = (compact: boolean) => {};
   onLessonChange: (index: number) => void = (index: number) => {};
   onOpenKana: () => void = () => {};
   onOpenVocabulary: () => void = () => {};
@@ -39,8 +42,10 @@ export struct LearnPage {
   @State private loadError: string = '';
   @State private pressedCard: number = -1;
   private progressScroller: Scroller = new Scroller();
+  private floatingBarTracker: FloatingBarScrollTracker = new FloatingBarScrollTracker('learn');
 
   aboutToAppear(): void {
+    this.onScrollerReady(this.progressScroller);
     try {
       const context: common.Context = this.getUIContext().getHostContext() as common.Context;
       this.grammarIndex = ContentRepository.loadGrammarIndex(context);
@@ -314,6 +319,8 @@ export struct LearnPage {
         .edgeEffect(EdgeEffect.Spring)
         .clip(false)
         .alignListItem(ListItemAlign.Center)
+        .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) =>
+          this.floatingBarTracker.update(this.progressScroller, this.onFloatingBarCompactChange))
     }
   }
 
@@ -339,7 +346,7 @@ export struct LearnPage {
           .width(36)
           .height(36)
           .borderRadius(12)
-          .backgroundColor($r('app.color.immersive_plane'))
+          .backgroundColor($r('app.color.surface_raised'))
 
           Text(title)
             .fontSize(15)
@@ -356,7 +363,7 @@ export struct LearnPage {
           .width(32)
           .height(32)
           .borderRadius(11)
-          .backgroundColor($r('app.color.immersive_plane'))
+          .backgroundColor($r('app.color.surface_raised'))
         }
         .width('100%')
         .alignItems(VerticalAlign.Center)
@@ -398,7 +405,7 @@ export struct LearnPage {
             .width('100%')
             .height(3)
             .borderRadius(2)
-            .backgroundColor($r('app.color.immersive_edge'))
+            .backgroundColor($r('app.color.line'))
           Column()
             .width(this.progressWidth(progress))
             .height(3)
@@ -418,12 +425,11 @@ export struct LearnPage {
     .height(210)
     .borderRadius(28)
     .clip(true)
-    .backgroundEffect({ radius: 34, color: tone, saturation: 1.08 })
+    .backgroundColor(tone)
     .linearGradient({
       angle: 150,
-      colors: [[tone, 0], [tone, 0.58], [$r('app.color.immersive_plane_strong'), 1]]
+      colors: [[tone, 0], [tone, 0.58], [$r('app.color.surface_raised'), 1]]
     })
-    .border({ width: 0.5, color: $r('app.color.immersive_edge') })
     .shadow({ radius: 18, color: $r('app.color.journey_card_shadow'), offsetY: 8 })
     .visualEffect(planeLightEffect())
     .scale({ x: this.pressedCard === index ? 0.985 : 1, y: this.pressedCard === index ? 0.985 : 1 })

@@ -18,7 +18,7 @@ import { ContentRepository } from '../../services/ContentRepository';
 import { aiTextSelectionMenu } from '../components/AiTextSelection';
 import { ImmersiveAction } from '../components/ImmersiveAction';
 import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
-import { contentLightEffect, ImmersivePlane, planeLightEffect } from '../components/ImmersiveCanvas';
+import { contentLightEffect, HdsInteractiveSurface, planeLightEffect } from '../components/ImmersiveCanvas';
 import { GravityMark } from '../components/GravityMark';
 import { GrammarPage } from './GrammarPage';
 
@@ -370,9 +370,9 @@ export struct JourneyPage {
           .textAlign(TextAlign.Center)
           .borderRadius(19)
           .backgroundColor(this.stageIndex === index ?
-            $r('app.color.accent') : $r('app.color.immersive_plane'))
+            $r('app.color.accent') : $r('app.color.surface_raised'))
           .border({ width: 0.5, color: this.stageIndex === index ?
-            $r('app.color.accent') : $r('app.color.immersive_edge') })
+            $r('app.color.accent') : $r('app.color.line') })
           .shadow({ radius: this.stageIndex === index ? 13 : 0,
             color: $r('app.color.gravity_glow'), offsetY: 4 })
           .animation({ curve: curves.springMotion(0.36, 0.8, 0.2) })
@@ -416,7 +416,7 @@ export struct JourneyPage {
 
   @Builder
   private sceneStage() {
-    ImmersivePlane({
+    HdsInteractiveSurface({
       planeStrong: true,
       interactive: true,
       planeContent: () => {
@@ -529,7 +529,7 @@ export struct JourneyPage {
     .padding({ left: 4, right: 4 })
 
     if (this.kanaCells.length > 0) {
-      ImmersivePlane({
+      HdsInteractiveSurface({
         planeStrong: true,
         interactive: true,
         planeContent: () => {
@@ -558,7 +558,7 @@ export struct JourneyPage {
           .justifyContent(FlexAlign.Center)
           .borderRadius(18)
           .backgroundColor(this.selectedKanaIndex === index ?
-            $r('app.color.accent_soft') : $r('app.color.immersive_plane'))
+            $r('app.color.accent_soft') : $r('app.color.surface_raised'))
           .scale({ x: this.selectedKanaIndex === index ? 1 : 0.94,
             y: this.selectedKanaIndex === index ? 1 : 0.94 })
           .shadow({ radius: this.selectedKanaIndex === index ? 10 : 0,
@@ -657,7 +657,7 @@ export struct JourneyPage {
           .textAlign(TextAlign.Center)
           .borderRadius(15)
           .backgroundColor(this.selectedWordIndex === index ?
-            $r('app.color.accent_soft') : $r('app.color.immersive_plane'))
+            $r('app.color.accent_soft') : $r('app.color.surface_raised'))
           .scale({ x: this.selectedWordIndex === index ? 1 : 0.95,
             y: this.selectedWordIndex === index ? 1 : 0.95 })
           .shadow({ radius: this.selectedWordIndex === index ? 10 : 0,
@@ -672,7 +672,7 @@ export struct JourneyPage {
     .width('100%')
 
     if (this.words.length > 0) {
-      ImmersivePlane({
+      HdsInteractiveSurface({
         planeStrong: true,
         interactive: true,
         planeContent: () => {
@@ -748,7 +748,7 @@ export struct JourneyPage {
 
   @Builder
   private grammarStage() {
-    ImmersivePlane({
+    HdsInteractiveSurface({
       planeStrong: true,
       planeContent: () => {
         this.grammarFocusPlane()
@@ -921,8 +921,7 @@ export struct JourneyPage {
     .width('100%')
     .padding({ left: 14, right: 14 })
     .borderRadius(26)
-    .backgroundEffect({ radius: 28, color: $r('app.color.immersive_plane'), saturation: 1.06 })
-    .border({ width: 0.5, color: $r('app.color.immersive_edge') })
+    .backgroundColor($r('app.color.surface_raised'))
     .visualEffect(planeLightEffect())
     Row() {
       Blank()
@@ -985,10 +984,10 @@ export struct JourneyPage {
         .padding({ left: 14, right: 14, top: 15, bottom: 15 })
         .borderRadius(20)
         .backgroundColor(this.selectedAnswerIndex === index ?
-          $r('app.color.immersive_plane_strong') : $r('app.color.immersive_plane'))
+          $r('app.color.accent_soft') : $r('app.color.surface_raised'))
         .border({
           width: this.selectedAnswerIndex === index ? 1 : 0.5,
-          color: this.selectedAnswerIndex === index ? $r('app.color.accent') : $r('app.color.immersive_edge')
+          color: this.selectedAnswerIndex === index ? $r('app.color.accent') : $r('app.color.line')
         })
         .scale({
           x: this.selectedAnswerIndex < 0 || this.selectedAnswerIndex === index ? 1 : 0.98,
@@ -1025,7 +1024,7 @@ export struct JourneyPage {
       .visualEffect(contentLightEffect())
     }
 
-    ImmersivePlane({
+    HdsInteractiveSurface({
       planeStrong: true,
       interactive: true,
       planeContent: () => {

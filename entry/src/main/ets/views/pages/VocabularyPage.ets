@@ -11,6 +11,7 @@ import {
   VocabularyLearningStore
 } from '../../services/VocabularyLearningStore';
 import { aiTextSelectionMenu } from '../components/AiTextSelection';
+import { FloatingBarScrollTracker } from '../components/FloatingBarScrollTracker';
 import { planeLightEffect } from '../components/ImmersiveCanvas';
 import { PageChrome } from '../components/PageChrome';
 
@@ -20,6 +21,8 @@ const VOCABULARY_LEVELS: string[] = ['N5', 'N4', 'N3', 'N2', 'N1'];
 export struct VocabularyPage {
   journey: LearningJourney | undefined = undefined;
   @Prop searchActive: boolean = false;
+  onScrollerReady: (scroller: Scroller) => void = (scroller: Scroller) => {};
+  onFloatingBarCompactChange: (compact: boolean) => void = (compact: boolean) => {};
   onAsk: (context: AiInquiryContext) => void = (context: AiInquiryContext) => {};
   onStudy: (level: string, wordId: string, wordIds: string[]) => void =
     (level: string, wordId: string, wordIds: string[]) => {};
@@ -38,8 +41,12 @@ export struct VocabularyPage {
   private learnedWordIds: Set<string> = new Set<string>();
   private homeScroller: Scroller = new Scroller();
   private searchScroller: Scroller = new Scroller();
+  private homeFloatingBarTracker: FloatingBarScrollTracker = new FloatingBarScrollTracker('vocabulary-home');
+  private searchFloatingBarTracker: FloatingBarScrollTracker = new FloatingBarScrollTracker('vocabulary-search');
 
   aboutToAppear(): void {
+    this.onScrollerReady(this.homeScroller);
+    this.onScrollerReady(this.searchScroller);
     const context: common.Context = this.getUIContext().getHostContext() as common.Context;
     this.learnedWords = VocabularyLearningStore.loadLearnedWords(context);
     this.rebuildLearnedIndex(this.learnedWords);
@@ -410,6 +417,8 @@ export struct VocabularyPage {
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.Spring)
     .clip(false)
+    .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) =>
+      this.homeFloatingBarTracker.update(this.homeScroller, this.onFloatingBarCompactChange))
   }
 
   @Builder
@@ -470,12 +479,11 @@ export struct VocabularyPage {
     .height('100%')
     .borderRadius(28)
     .clip(true)
-    .backgroundEffect({ radius: 34, color: $r('app.color.immersive_plane_strong'), saturation: 1.08 })
+    .backgroundColor(this.levelTone(this.level))
     .linearGradient({
       angle: 180,
-      colors: [[$r('app.color.immersive_edge'), 0], [this.levelTone(this.level), 1]]
+      colors: [[$r('app.color.surface_raised'), 0], [this.levelTone(this.level), 1]]
     })
-    .border({ width: 0.5, color: $r('app.color.immersive_edge') })
     .visualEffect(planeLightEffect())
     .accessibilityText(`${this.level} 基础词库，共 ${this.source.length} 个单词`)
     .onClick(() => this.openLevelDeck())
@@ -537,12 +545,11 @@ export struct VocabularyPage {
     .height('100%')
     .borderRadius(28)
     .clip(true)
-    .backgroundEffect({ radius: 34, color: $r('app.color.immersive_plane_strong'), saturation: 1.08 })
+    .backgroundColor($r('app.color.word_card_violet'))
     .linearGradient({
       angle: 180,
-      colors: [[$r('app.color.immersive_edge'), 0], [$r('app.color.word_card_violet'), 1]]
+      colors: [[$r('app.color.surface_raised'), 0], [$r('app.color.word_card_violet'), 1]]
     })
-    .border({ width: 0.5, color: $r('app.color.immersive_edge') })
     .visualEffect(planeLightEffect())
     .accessibilityText(`当前旅程，${this.journey?.title ?? ''}`)
     .onClick(() => this.openJourneyDeck())
@@ -594,6 +601,8 @@ export struct VocabularyPage {
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring)
         .clip(false)
+        .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) =>
+          this.searchFloatingBarTracker.update(this.searchScroller, this.onFloatingBarCompactChange))
       }
     }
     .layoutWeight(1)
@@ -616,7 +625,7 @@ export struct VocabularyPage {
       .clip(true)
       .linearGradient({
         angle: 180,
-        colors: [[$r('app.color.immersive_edge'), 0], [this.wordTone(item), 1]]
+        colors: [[$r('app.color.surface_raised'), 0], [this.wordTone(item), 1]]
       })
       .visualEffect(planeLightEffect())
 

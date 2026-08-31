@@ -84,8 +84,13 @@ export struct ImmersiveBackdrop {
   }
 }
 
+/**
+ * A regular content surface with official HDS light and press feedback.
+ * It deliberately does not imitate hdsMaterial: on API 23 that material is
+ * exposed only by HdsNavigation and HdsTabs.
+ */
 @Component
-export struct ImmersivePlane {
+export struct HdsInteractiveSurface {
   @BuilderParam planeContent: () => void = this.emptyContent;
   planeWidth: Length = '100%';
   planeRadius: number = 28;
@@ -106,18 +111,8 @@ export struct ImmersivePlane {
     .width(this.planeWidth)
     .borderRadius(this.planeRadius)
     .clip(true)
-    .backgroundEffect({
-      radius: this.planeStrong ? 34 : 26,
-      color: this.planeStrong ? $r('app.color.immersive_plane_strong') : $r('app.color.immersive_plane'),
-      saturation: 1.08
-    })
-    .linearGradient({
-      angle: 155,
-      colors: [[$r('app.color.immersive_edge'), 0], [Color.Transparent, 0.46],
-        [$r('app.color.accent_soft'), 1]]
-    })
-    .border({ width: 0.5, color: $r('app.color.immersive_edge') })
-    .shadow({ radius: 22, color: '#181646A8', offsetY: 8 })
+    .backgroundColor($r('app.color.surface_raised'))
+    .shadow({ radius: this.planeStrong ? 20 : 14, color: '#12000000', offsetY: 6 })
     .scale({ x: this.interactive && this.pressed ? 0.985 : 1,
       y: this.interactive && this.pressed ? 0.985 : 1 })
     .animation({ curve: curves.responsiveSpringMotion(0.18, 0.86, 0.12) })

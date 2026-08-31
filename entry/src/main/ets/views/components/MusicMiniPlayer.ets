@@ -4,7 +4,6 @@ import {
   MusicPlaybackPhase,
   MusicPlaybackSnapshot
 } from '../../model/MusicPlaybackModels';
-import { planeLightEffect } from './ImmersiveCanvas';
 
 @Component
 export struct MusicMiniPlayer {
@@ -93,7 +92,7 @@ export struct MusicMiniPlayer {
           }
           .width(42)
           .height(42)
-          .backgroundColor($r('app.color.immersive_plane_strong'))
+          .backgroundColor($r('app.color.accent_soft'))
           .accessibilityText(this.playing() ? '暂停' : '播放')
           .onClick(() => this.onToggle())
 
@@ -125,18 +124,8 @@ export struct MusicMiniPlayer {
         .width('100%')
         .height(2)
       }
-      .width('calc(100% - 32vp)')
-      .constraintSize({ maxWidth: 560 })
-      .borderRadius(24)
-      .clip(true)
-      .backgroundEffect({
-        radius: 34,
-        color: $r('app.color.immersive_plane_strong'),
-        saturation: 1.12
-      })
-      .border({ width: 0.5, color: $r('app.color.immersive_edge') })
-      .shadow({ radius: 20, color: $r('app.color.journey_card_shadow'), offsetY: 8 })
-      .visualEffect(planeLightEffect())
+      .width('100%')
+      .height(66)
     }
   }
 }

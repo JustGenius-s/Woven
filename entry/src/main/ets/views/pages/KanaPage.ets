@@ -6,12 +6,15 @@ import { AiInquiryFactory } from '../../services/AiInquiryFactory';
 import { ContentRepository } from '../../services/ContentRepository';
 import { aiTextSelectionMenu } from '../components/AiTextSelection';
 import { contentLightEffect, planeLightEffect } from '../components/ImmersiveCanvas';
+import { FloatingBarScrollTracker } from '../components/FloatingBarScrollTracker';
 import { PageChrome } from '../components/PageChrome';
 
 @Component
 export struct KanaPage {
   journey: LearningJourney | undefined = undefined;
   initialKanaKey: string = 'あ';
+  onScrollerReady: (scroller: Scroller) => void = (scroller: Scroller) => {};
+  onFloatingBarCompactChange: (compact: boolean) => void = (compact: boolean) => {};
   onAsk: (context: AiInquiryContext) => void = (context: AiInquiryContext) => {};
   onKanaChange: (key: string) => void = (key: string) => {};
 
@@ -19,8 +22,10 @@ export struct KanaPage {
   @State private selected: KanaCell | undefined = undefined;
   @State private loadError: string = '';
   private pageScroller: Scroller = new Scroller();
+  private floatingBarTracker: FloatingBarScrollTracker = new FloatingBarScrollTracker('kana');
 
   aboutToAppear(): void {
+    this.onScrollerReady(this.pageScroller);
     try {
       const context: common.Context = this.getUIContext().getHostContext() as common.Context;
       this.catalog = ContentRepository.loadCatalog(context);
@@ -110,8 +115,7 @@ export struct KanaPage {
             .alignItems(VerticalAlign.Center)
             .borderRadius(30)
             .clip(true)
-            .backgroundEffect({ radius: 34, color: $r('app.color.immersive_plane_strong'), saturation: 1.08 })
-            .border({ width: 0.5, color: $r('app.color.immersive_edge') })
+            .backgroundColor($r('app.color.surface_raised'))
             .visualEffect(planeLightEffect())
           }
 
@@ -131,6 +135,8 @@ export struct KanaPage {
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring)
         .clip(false)
+        .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) =>
+          this.floatingBarTracker.update(this.pageScroller, this.onFloatingBarCompactChange))
       }
     }
     .width('100%')
@@ -289,7 +295,7 @@ export struct KanaPage {
               .height(86)
               .justifyContent(FlexAlign.Center)
               .backgroundColor(this.selected?.key === cell.key ?
-                $r('app.color.immersive_plane_strong') : Color.Transparent)
+                $r('app.color.accent_soft') : Color.Transparent)
               .borderRadius(14)
               .visualEffect(contentLightEffect())
               .onClick(() => this.selectKana(cell))
@@ -312,8 +318,7 @@ export struct KanaPage {
     .margin({ top: 10, bottom: 8 })
     .borderRadius(28)
     .clip(true)
-    .backgroundEffect({ radius: 28, color: $r('app.color.immersive_plane'), saturation: 1.06 })
-    .border({ width: 0.5, color: $r('app.color.immersive_edge') })
+    .backgroundColor($r('app.color.surface_raised'))
     .visualEffect(planeLightEffect())
   }
 

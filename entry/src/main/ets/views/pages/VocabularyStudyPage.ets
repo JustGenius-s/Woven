@@ -530,12 +530,11 @@ export struct VocabularyStudyPage {
     .height(this.artworkSize())
     .borderRadius(28)
     .clip(true)
-    .backgroundEffect({ radius: 34, color: $r('app.color.immersive_plane_strong'), saturation: 1.08 })
+    .backgroundColor(this.wordTone(item))
     .linearGradient({
       angle: 180,
-      colors: [[$r('app.color.immersive_edge'), 0], [this.wordTone(item), 1]]
+      colors: [[$r('app.color.surface_raised'), 0], [this.wordTone(item), 1]]
     })
-    .border({ width: 0.5, color: $r('app.color.immersive_edge') })
     .visualEffect(planeLightEffect())
     .accessibilityText(`${item.word}，${item.reading}`)
   }

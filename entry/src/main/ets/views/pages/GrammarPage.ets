@@ -246,8 +246,7 @@ struct GrammarLessonPage {
           .margin({ top: 12, bottom: 16 })
           .borderRadius(24)
           .clip(true)
-          .backgroundEffect({ radius: 28, color: $r('app.color.immersive_plane_strong'), saturation: 1.06 })
-          .border({ width: 0.5, color: $r('app.color.immersive_edge') })
+          .backgroundColor($r('app.color.surface_raised'))
           .visualEffect(planeLightEffect())
         }
         .width('100%')
@@ -403,8 +402,7 @@ struct GrammarBlockView {
       .margin({ top: 6, bottom: 16 })
       .borderRadius(18)
       .clip(true)
-      .backgroundEffect({ radius: 22, color: $r('app.color.immersive_plane'), saturation: 1.04 })
-      .border({ width: 0.5, color: $r('app.color.immersive_edge') })
+      .backgroundColor($r('app.color.surface_raised'))
       .visualEffect(planeLightEffect())
     } else if (this.block.kind === 'list') {
       Column({ space: 4 }) {
@@ -447,7 +445,7 @@ struct GrammarBlockView {
       .margin({ top: 8, bottom: 8 })
       .borderRadius(16)
       .border({ width: { left: 3 }, color: $r('app.color.accent') })
-      .backgroundEffect({ radius: 22, color: $r('app.color.immersive_plane'), saturation: 1.04 })
+      .backgroundColor($r('app.color.surface_raised'))
       .visualEffect(planeLightEffect())
     } else {
       Column({ space: 9 }) {

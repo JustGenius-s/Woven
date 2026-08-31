@@ -244,7 +244,7 @@ export struct MusicPlayerPage {
     .constraintSize({ maxWidth: maxSize, maxHeight: maxSize })
     .borderRadius(this.splitLayout() ? 32 : 28)
     .clip(true)
-    .border({ width: 0.5, color: $r('app.color.immersive_edge') })
+    .border({ width: 0.5, color: $r('app.color.line') })
     .shadow({ radius: 28, color: $r('app.color.journey_card_shadow'), offsetY: 14 })
     .visualEffect(planeLightEffect())
   }
@@ -422,10 +422,10 @@ export struct MusicPlayerPage {
     .padding({ left: 18, right: 18, top: 16, bottom: 16 })
     .borderRadius(22)
     .backgroundColor(this.activeLineIndex(track) === index ?
-      $r('app.color.immersive_plane_strong') : Color.Transparent)
+      $r('app.color.accent_soft') : Color.Transparent)
     .border({
       width: this.activeLineIndex(track) === index ? 0.5 : 0,
-      color: $r('app.color.immersive_edge')
+      color: $r('app.color.accent')
     })
     .visualEffect(this.activeLineIndex(track) === index ? planeLightEffect() : undefined)
     .accessibilityText(`${line.text}，${line.meaning}`)

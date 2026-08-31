@@ -32,8 +32,8 @@
       {
         "name": "default",
         "signingConfig": "Release",
-        "compatibleSdkVersion": "6.1.0(23)",
-        "targetSdkVersion": "6.1.0(23)",
+        "compatibleSdkVersion": "6.1.1(24)",
+        "targetSdkVersion": "6.1.1(24)",
         "runtimeOS": "HarmonyOS",
         "buildOption": {
           "strictMode": {
@@ -45,8 +45,8 @@
       {
         "name": "emulator",
         "signingConfig": "default",
-        "compatibleSdkVersion": "6.1.0(23)",
-        "targetSdkVersion": "6.1.0(23)",
+        "compatibleSdkVersion": "6.1.1(24)",
+        "targetSdkVersion": "6.1.1(24)",
         "runtimeOS": "HarmonyOS",
         "buildOption": {
           "strictMode": {

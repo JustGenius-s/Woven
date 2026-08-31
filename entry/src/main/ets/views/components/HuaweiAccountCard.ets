@@ -10,7 +10,7 @@ import {
   HuaweiAccountSnapshot
 } from '../../model/SyncModels';
 import { HuaweiAccountService } from '../../services/HuaweiAccountService';
-import { contentLightEffect, planeLightEffect } from './ImmersiveCanvas';
+import { contentLightEffect } from './ImmersiveCanvas';
 
 const EMPTY_ACCOUNT: HuaweiAccountSnapshot = {
   phase: HuaweiAccountPhase.SIGNED_OUT,
@@ -155,9 +155,8 @@ export struct HuaweiAccountCard {
     .width('100%')
     .padding(18)
     .borderRadius(24)
-    .backgroundEffect({ radius: 28, color: $r('app.color.immersive_plane_strong'), saturation: 1.06 })
-    .border({ width: 0.5, color: $r('app.color.immersive_edge') })
-    .visualEffect(planeLightEffect())
+    .backgroundColor($r('app.color.surface_raised'))
+    .shadow({ radius: 18, color: '#12000000', offsetY: 6 })
   }
 
   @Builder

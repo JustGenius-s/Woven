@@ -1,6 +1,14 @@
 import { common } from '@kit.AbilityKit';
 import { curves, window } from '@kit.ArkUI';
-import { BlurStrategy, DividerMode, HdsTabs } from '@kit.UIDesignKit';
+import {
+  BlurStrategy,
+  DividerMode,
+  HdsBarLayoutMode,
+  HdsBarStyle,
+  HdsTabs,
+  HdsTabsController,
+  HdsTabsMiniBar
+} from '@kit.UIDesignKit';
 import { SymbolGlyphModifier } from '@ohos.arkui.modifier';
 import {
   CONTENT_MAX_WIDTH,
@@ -77,6 +85,7 @@ struct Index {
   @State private readingIndex: number = -1;
   @State private scenarioIndex: number = -1;
   @State private learnedWordCount: number = 0;
+  @State private floatingBarsVertical: boolean = true;
   @State private accountSnapshot: HuaweiAccountSnapshot = {
     phase: HuaweiAccountPhase.SIGNED_OUT,
     unionId: '',
@@ -204,6 +213,7 @@ struct Index {
     if (section !== AppSection.VOCABULARY) {
       this.vocabularySearchOpen = false;
     }
+    this.floatingBarsVertical = true;
     this.section = section;
     LearningPreferences.saveSection(this.getUIContext().getHostContext() as common.Context, section);
   }
@@ -362,6 +372,44 @@ struct Index {
       this.musicPlayback.trackIndex < this.musicTracks.length;
   }
 
+  private tabsController: HdsTabsController = new HdsTabsController();
+
+  private bindTabScroller(section: AppSection, scroller: Scroller): void {
+    this.tabsController.bindScroller(section, scroller);
+  }
+
+  private setFloatingBarsCompact(compact: boolean): void {
+    const vertical: boolean = !compact;
+    if (this.floatingBarsVertical === vertical) {
+      return;
+    }
+    this.getUIContext().animateTo({ curve: curves.springMotion(0.42, 0.86, 0.16) }, () => {
+      this.floatingBarsVertical = vertical;
+    });
+  }
+
+  private musicMiniBarOptions(): HdsTabsMiniBar | undefined {
+    if (!this.miniPlayerVisible()) {
+      return undefined;
+    }
+    return {
+      // HdsTabs invokes CustomBuilder from its native component context. Keep
+      // the owning Index instance captured instead of passing an unbound
+      // member builder, otherwise generated ArkUI code receives `this` as
+      // undefined at runtime.
+      miniBarBuilder: () => {
+        this.musicMiniBar()
+      },
+      // In a vertical stack, letting the tab bar take expansion priority keeps
+      // both rows visible. In a horizontal row, prioritizing the mini bar makes
+      // the tab bar collapse to the selected icon, matching the system player.
+      miniBarStyle: this.floatingBarsVertical ? HdsBarStyle.COLLAPSE : HdsBarStyle.EXPAND,
+      barLayoutMode: this.floatingBarsVertical ? HdsBarLayoutMode.VERTICAL : HdsBarLayoutMode.HORIZONTAL,
+      enableMiniBarBackground: true,
+      enableMiniBarClip: true
+    };
+  }
+
   private leftSafeInset(): number {
     return Math.max(this.avoidAreas.cutout.leftRect.width, this.avoidAreas.navigationIndicator.leftRect.width,
       this.avoidAreas.statusBar.leftRect.width);
@@ -469,7 +517,7 @@ struct Index {
             .combine(TransitionEffect.scale({ x: 0.97, y: 0.97 }))
             .animation({ curve: curves.springMotion(0.44, 0.84, 0.18) }))
         } else {
-        HdsTabs({ barPosition: BarPosition.End, index: this.section }) {
+        HdsTabs({ barPosition: BarPosition.End, index: this.section, controller: this.tabsController }) {
           TabContent() {
             LearnPage({
               savedLessonIndex: this.grammarIndex,
@@ -478,6 +526,8 @@ struct Index {
               musicIndex: this.musicIndex,
               readingIndex: this.readingIndex,
               scenarioIndex: this.scenarioIndex,
+              onScrollerReady: (scroller: Scroller) => this.bindTabScroller(AppSection.LEARN, scroller),
+              onFloatingBarCompactChange: (compact: boolean) => this.setFloatingBarsCompact(compact),
               onLessonChange: (index: number) => this.saveGrammarIndex(index),
               onOpenKana: () => this.selectSection(AppSection.KANA),
               onOpenVocabulary: () => this.selectSection(AppSection.VOCABULARY),
@@ -491,6 +541,8 @@ struct Index {
           TabContent() {
             KanaPage({
               initialKanaKey: this.kanaKey,
+              onScrollerReady: (scroller: Scroller) => this.bindTabScroller(AppSection.KANA, scroller),
+              onFloatingBarCompactChange: (compact: boolean) => this.setFloatingBarsCompact(compact),
               onAsk: (context: AiInquiryContext) => this.openInquiry(context),
               onKanaChange: (key: string) => this.saveKanaKey(key)
             })
@@ -501,6 +553,8 @@ struct Index {
           TabContent() {
             VocabularyPage({
               searchActive: this.vocabularySearchOpen,
+              onScrollerReady: (scroller: Scroller) => this.bindTabScroller(AppSection.VOCABULARY, scroller),
+              onFloatingBarCompactChange: (compact: boolean) => this.setFloatingBarsCompact(compact),
               onAsk: (context: AiInquiryContext) => this.openInquiry(context),
               onStudy: (level: string, wordId: string, wordIds: string[]) =>
                 this.openVocabularyStudy(level, wordId, wordIds),
@@ -517,6 +571,8 @@ struct Index {
               readingIndex: this.readingIndex,
               scenarioIndex: this.scenarioIndex,
               apiKeyConfigured: this.deepSeekApiKey.length > 0,
+              onScrollerReady: (scroller: Scroller) => this.bindTabScroller(AppSection.EXPLORE, scroller),
+              onFloatingBarCompactChange: (compact: boolean) => this.setFloatingBarsCompact(compact),
               onTabChange: (index: number) => this.saveExploreTab(index),
               onOpenMusic: (track: MusicTrack, index: number) => this.openMusic(index, true),
               onOpenReading: (reading: ReadingWork, index: number) => this.openReading(reading, index),
@@ -532,6 +588,8 @@ struct Index {
             MePage({
               journey: this.currentJourney,
               account: this.accountSnapshot,
+              onScrollerReady: (scroller: Scroller) => this.bindTabScroller(AppSection.ME, scroller),
+              onFloatingBarCompactChange: (compact: boolean) => this.setFloatingBarsCompact(compact),
               onSettings: () => this.settingsOpen = true,
               onAccountChange: (snapshot: HuaweiAccountSnapshot) => this.handleAccountChange(snapshot)
             })
@@ -558,6 +616,7 @@ struct Index {
           },
           adaptToHandedness: true,
           lightColor: $r('app.color.accent'),
+          miniBar: this.musicMiniBarOptions(),
           systemMaterialEffect: preferredImmersiveMaterial(),
           thermoCtrl: true
         })
@@ -573,21 +632,6 @@ struct Index {
       }
       .width('100%')
       .height('100%')
-
-      if (this.miniPlayerVisible()) {
-        MusicMiniPlayer({
-          tracks: this.musicTracks,
-          snapshot: this.musicPlayback,
-          onOpen: () => this.openMusic(this.musicPlayback.trackIndex, false),
-          onToggle: () => MusicPlaybackService.toggle(),
-          onNext: () => MusicPlaybackService.next()
-        })
-        .margin({ bottom: 84 })
-        .zIndex(8)
-        .transition(TransitionEffect.OPACITY
-          .combine(TransitionEffect.translate({ y: 18 }))
-          .animation({ curve: curves.springMotion(0.42, 0.84, 0.18) }))
-      }
 
       Column()
         .width(1)
@@ -621,6 +665,17 @@ struct Index {
       right: this.activeReading === undefined && !this.musicPlayerOpen ? this.rightSafeInset() : 0
     })
     .backgroundColor(Color.Transparent)
+  }
+
+  @Builder
+  private musicMiniBar() {
+    MusicMiniPlayer({
+      tracks: this.musicTracks,
+      snapshot: this.musicPlayback,
+      onOpen: () => this.openMusic(this.musicPlayback.trackIndex, false),
+      onToggle: () => MusicPlaybackService.toggle(),
+      onNext: () => MusicPlaybackService.next()
+    })
   }
 
   @Builder

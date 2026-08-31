@@ -383,8 +383,7 @@ export struct PracticeSessionPage {
       .alignItems(VerticalAlign.Center)
       .padding({ left: 20, right: 18, top: 6, bottom: 18 })
       .borderRadius(28)
-      .backgroundEffect({ radius: 30, color: $r('app.color.immersive_plane_strong'), saturation: 1.08 })
-      .border({ width: 0.5, color: $r('app.color.immersive_edge') })
+      .backgroundColor($r('app.color.surface_raised'))
       .visualEffect(planeLightEffect())
     }
     .width('100%')

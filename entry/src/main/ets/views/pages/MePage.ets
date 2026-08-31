@@ -5,6 +5,7 @@ import {
   HuaweiAccountSnapshot
 } from '../../model/SyncModels';
 import { HuaweiAccountCard } from '../components/HuaweiAccountCard';
+import { FloatingBarScrollTracker } from '../components/FloatingBarScrollTracker';
 import { contentLightEffect } from '../components/ImmersiveCanvas';
 import { PageChrome } from '../components/PageChrome';
 
@@ -19,10 +20,17 @@ const EMPTY_ACCOUNT: HuaweiAccountSnapshot = {
 export struct MePage {
   journey: LearningJourney | undefined = undefined;
   @Prop account: HuaweiAccountSnapshot = EMPTY_ACCOUNT;
+  onScrollerReady: (scroller: Scroller) => void = (scroller: Scroller) => {};
+  onFloatingBarCompactChange: (compact: boolean) => void = (compact: boolean) => {};
   onSettings: () => void = () => {};
   onAccountChange: (snapshot: HuaweiAccountSnapshot) => void =
     (snapshot: HuaweiAccountSnapshot) => {};
   private pageScroller: Scroller = new Scroller();
+  private floatingBarTracker: FloatingBarScrollTracker = new FloatingBarScrollTracker('me');
+
+  aboutToAppear(): void {
+    this.onScrollerReady(this.pageScroller);
+  }
 
   build() {
     PageChrome({
@@ -54,6 +62,8 @@ export struct MePage {
       .scrollBar(BarState.Off)
       .edgeEffect(EdgeEffect.Spring)
       .clip(false)
+      .onDidScroll((_xOffset: number, _yOffset: number, _scrollState: ScrollState) =>
+        this.floatingBarTracker.update(this.pageScroller, this.onFloatingBarCompactChange))
   }
 
   @Builder
@@ -94,8 +104,7 @@ export struct MePage {
       .height(64)
       .padding({ left: 18, right: 18 })
       .borderRadius(24)
-      .backgroundEffect({ radius: 28, color: $r('app.color.immersive_plane'), saturation: 1.06 })
-      .border({ width: 0.5, color: $r('app.color.immersive_edge') })
+      .backgroundColor($r('app.color.surface_raised'))
       .visualEffect(contentLightEffect())
       .accessibilityText('设置')
       .onClick(this.onSettings)

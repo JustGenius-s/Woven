@@ -179,8 +179,7 @@ export struct PracticePage {
     .margin({ left: 18, right: 18, top: 10, bottom: 64 })
     .borderRadius(34)
     .clip(true)
-    .backgroundEffect({ radius: 38, color: $r('app.color.immersive_plane_strong'), saturation: 1.1 })
-    .border({ width: 0.5, color: $r('app.color.immersive_edge') })
+    .backgroundColor($r('app.color.surface_raised'))
     .shadow({ radius: 28, color: $r('app.color.gravity_glow'), offsetY: 12 })
     .visualEffect(planeLightEffect())
   }

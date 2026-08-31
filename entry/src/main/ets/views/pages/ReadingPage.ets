@@ -119,9 +119,8 @@ export struct ReadingPage {
     selectedFontSize: 14,
     fontWeight: FontWeight.Regular,
     selectedFontWeight: FontWeight.Medium,
-    backgroundColor: $r('app.color.immersive_plane'),
-    selectedBackgroundColor: $r('app.color.immersive_plane_strong'),
-    backgroundBlurStyle: BlurStyle.COMPONENT_REGULAR,
+    backgroundColor: $r('app.color.surface_raised'),
+    selectedBackgroundColor: $r('app.color.accent_soft'),
     borderRadiusMode: BorderRadiusMode.CUSTOM,
     backgroundBorderRadius: LengthMetrics.vp(20),
     itemBorderRadius: LengthMetrics.vp(17),
@@ -414,8 +413,7 @@ export struct ReadingPage {
             .fontColor($r('app.color.ink'))
             .padding({ left: 18, right: 18, top: 10, bottom: 10 })
             .borderRadius(22)
-            .backgroundColor($r('app.color.immersive_plane_strong'))
-            .backgroundBlurStyle(BlurStyle.COMPONENT_REGULAR)
+            .backgroundColor($r('app.color.surface_raised'))
             .position({ x: '50%', y: '48%' })
             .translate({ x: '-50%', y: '-50%' })
         }
@@ -700,8 +698,7 @@ export struct ReadingPage {
         .fontColor($r('app.color.ink_muted'))
         .padding({ left: 13, right: 13, top: 6, bottom: 6 })
         .borderRadius(16)
-        .backgroundColor($r('app.color.immersive_plane'))
-        .backgroundBlurStyle(BlurStyle.COMPONENT_REGULAR)
+        .backgroundColor($r('app.color.surface_raised'))
       HdsActionBar({
         startButtons: [
           this.readerAction($r('sys.symbol.book_pages_fill'), '目录', () => this.openCatalog())

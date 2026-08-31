@@ -7,7 +7,7 @@ import {
 } from '../../model/SyncModels';
 import { DISTRIBUTED_SYNC_PERMISSION_REQUIRED } from '../../services/DistributedSyncPermission';
 import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
-import { contentLightEffect, planeLightEffect } from '../components/ImmersiveCanvas';
+import { contentLightEffect } from '../components/ImmersiveCanvas';
 
 const EMPTY_ACCOUNT: HuaweiAccountSnapshot = {
   phase: HuaweiAccountPhase.SIGNED_OUT,
@@ -177,7 +177,7 @@ export struct SettingsPage {
           }
         }
         .width('100%')
-        .height(76)
+        .constraintSize({ minHeight: 76 })
         .padding({ left: 18, right: 18, top: 12, bottom: 12 })
         .visualEffect(contentLightEffect())
         .accessibilityText(this.canSync() ? $r('app.string.cloud_sync_now') :
@@ -210,16 +210,14 @@ export struct SettingsPage {
           .alignItems(HorizontalAlign.Start)
         }
         .width('100%')
-        .height(68)
-        .padding({ left: 18, right: 18 })
+        .constraintSize({ minHeight: 68 })
+        .padding({ left: 18, right: 18, top: 10, bottom: 10 })
         .visualEffect(contentLightEffect())
       }
       .width('100%')
       .borderRadius(24)
       .clip(true)
-      .backgroundEffect({ radius: 28, color: $r('app.color.immersive_plane_strong'), saturation: 1.06 })
-      .border({ width: 0.5, color: $r('app.color.immersive_edge') })
-      .visualEffect(planeLightEffect())
+      .backgroundColor($r('app.color.surface_raised'))
 
       Text($r('app.string.cloud_sync_privacy'))
         .width('100%')
@@ -250,12 +248,14 @@ export struct SettingsPage {
       Text($r('app.string.cloud_sync_last_time', this.lastSyncTime()))
         .fontSize(13)
         .fontColor($r('app.color.success'))
+        .maxLines(2)
     } else if (this.syncState.phase === CloudSyncPhase.NEEDS_CONFIGURATION) {
       Text(this.syncState.detail === DISTRIBUTED_SYNC_PERMISSION_REQUIRED ?
         $r('app.string.cloud_sync_permission_required') :
         $r('app.string.cloud_sync_needs_configuration'))
         .fontSize(13)
         .fontColor($r('app.color.ink_muted'))
+        .maxLines(2)
     } else if (this.syncState.phase === CloudSyncPhase.ERROR) {
       Text($r('app.string.cloud_sync_error'))
         .fontSize(13)
@@ -281,45 +281,39 @@ export struct SettingsPage {
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.ink_muted'))
 
-      Column() {
-        Row({ space: 14 }) {
-          SymbolGlyph($r('sys.symbol.key_fill'))
-            .fontSize(22)
-            .fontColor([$r('app.color.accent')])
+      Row({ space: 14 }) {
+        SymbolGlyph($r('sys.symbol.key_fill'))
+          .fontSize(22)
+          .fontColor([$r('app.color.accent')])
 
-          Column({ space: 3 }) {
-            Text('DeepSeek')
-              .fontSize(17)
-              .fontWeight(FontWeight.Medium)
-              .fontColor($r('app.color.ink'))
-            Text('API Key')
-              .fontSize(13)
-              .fontColor($r('app.color.ink_muted'))
-          }
-          .layoutWeight(1)
-          .alignItems(HorizontalAlign.Start)
-
-          Text(this.hasSavedApiKey() ? '已配置' : '未配置')
-            .fontSize(14)
-            .fontColor(this.hasSavedApiKey() ? $r('app.color.success') : $r('app.color.ink_muted'))
-
-          SymbolGlyph($r('sys.symbol.chevron_right'))
-            .fontSize(16)
-            .fontColor([$r('app.color.ink_muted')])
+        Column({ space: 3 }) {
+          Text('DeepSeek')
+            .fontSize(17)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.ink'))
+          Text('API Key')
+            .fontSize(13)
+            .fontColor($r('app.color.ink_muted'))
         }
-        .width('100%')
-        .height(72)
-        .padding({ left: 18, right: 18 })
-        .visualEffect(contentLightEffect())
-        .accessibilityText(this.hasSavedApiKey() ? 'DeepSeek API Key，已配置' : 'DeepSeek API Key，未配置')
-        .onClick(() => this.openDeepSeekSheet())
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+
+        Text(this.hasSavedApiKey() ? '已配置' : '未配置')
+          .fontSize(14)
+          .fontColor(this.hasSavedApiKey() ? $r('app.color.success') : $r('app.color.ink_muted'))
+
+        SymbolGlyph($r('sys.symbol.chevron_right'))
+          .fontSize(16)
+          .fontColor([$r('app.color.ink_muted')])
       }
       .width('100%')
+      .constraintSize({ minHeight: 72 })
+      .padding({ left: 18, right: 18, top: 10, bottom: 10 })
       .borderRadius(24)
-      .clip(true)
-      .backgroundEffect({ radius: 28, color: $r('app.color.immersive_plane_strong'), saturation: 1.06 })
-      .border({ width: 0.5, color: $r('app.color.immersive_edge') })
-      .visualEffect(planeLightEffect())
+      .backgroundColor($r('app.color.surface_raised'))
+      .visualEffect(contentLightEffect())
+      .accessibilityText(this.hasSavedApiKey() ? 'DeepSeek API Key，已配置' : 'DeepSeek API Key，未配置')
+      .onClick(() => this.openDeepSeekSheet())
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)

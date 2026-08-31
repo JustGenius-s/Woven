@@ -16,6 +16,7 @@ import {
 } from '../../model/ContentModels';
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { ContentRepository } from '../../services/ContentRepository';
+import { FloatingBarScrollTracker } from '../components/FloatingBarScrollTracker';
 import { planeLightEffect } from '../components/ImmersiveCanvas';
 import { PageChrome } from '../components/PageChrome';
 
@@ -26,6 +27,8 @@ export struct ExplorePage {
   @Prop readingIndex: number = -1;
   @Prop scenarioIndex: number = -1;
   apiKeyConfigured: boolean = false;
+  onScrollerReady: (scroller: Scroller) => void = (scroller: Scroller) => {};
+  onFloatingBarCompactChange: (compact: boolean) => void = (compact: boolean) => {};
   onTabChange: (index: number) => void = (index: number) => {};
   onOpenMusic: (track: MusicTrack, index: number) => void =
     (track: MusicTrack, index: number) => {};
@@ -53,9 +56,8 @@ export struct ExplorePage {
     selectedFontSize: 15,
     fontWeight: FontWeight.Regular,
     selectedFontWeight: FontWeight.Medium,
-    backgroundColor: $r('app.color.immersive_plane'),
-    selectedBackgroundColor: $r('app.color.immersive_plane_strong'),
-    backgroundBlurStyle: BlurStyle.COMPONENT_REGULAR,
+    backgroundColor: $r('app.color.surface_raised'),
+    selectedBackgroundColor: $r('app.color.accent_soft'),
     borderRadiusMode: BorderRadiusMode.CUSTOM,
     backgroundBorderRadius: LengthMetrics.vp(22),
     itemBorderRadius: LengthMetrics.vp(19),
@@ -65,8 +67,14 @@ export struct ExplorePage {
   private musicScroller: Scroller = new Scroller();
   private readingScroller: Scroller = new Scroller();
   private scenarioScroller: Scroller = new Scroller();
+  private musicFloatingBarTracker: FloatingBarScrollTracker = new FloatingBarScrollTracker('explore-music');
+  private readingFloatingBarTracker: FloatingBarScrollTracker = new FloatingBarScrollTracker('explore-reading');
+  private scenarioFloatingBarTracker: FloatingBarScrollTracker = new FloatingBarScrollTracker('explore-scenario');
 
   aboutToAppear(): void {
+    this.onScrollerReady(this.musicScroller);
+    this.onScrollerReady(this.readingScroller);
+    this.onScrollerReady(this.scenarioScroller);
     this.exploreTabIndexes = [this.selectedTab];
     try {
       const context: common.Context = this.getUIContext().getHostContext() as common.Context;
@@ -190,7 +198,6 @@ export struct ExplorePage {
         .layoutWeight(1)
         .height(44)
         .clip(true)
-        .visualEffect(planeLightEffect())
     }
     .width('100%')
     .height(60)
@@ -256,6 +263,8 @@ export struct ExplorePage {
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.Spring)
     .clip(false)
+    .onDidScroll((_xOffset: number, _yOffset: number, _scrollState: ScrollState) =>
+      this.musicFloatingBarTracker.update(this.musicScroller, this.onFloatingBarCompactChange))
   }
 
   @Builder
@@ -335,7 +344,7 @@ export struct ExplorePage {
     .borderRadius(28)
     .clip(true)
     .border({ width: this.musicIndex === index ? 1.5 : 0.5,
-      color: this.musicIndex === index ? $r('app.color.accent') : $r('app.color.immersive_edge') })
+      color: this.musicIndex === index ? $r('app.color.accent') : $r('app.color.line') })
     .visualEffect(planeLightEffect())
     .accessibilityText(`${track.title}，${track.chineseTitle}，${track.level}`)
     .onClick(() => this.openMusic(index))
@@ -361,6 +370,8 @@ export struct ExplorePage {
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.Spring)
     .clip(false)
+    .onDidScroll((_xOffset: number, _yOffset: number, _scrollState: ScrollState) =>
+      this.readingFloatingBarTracker.update(this.readingScroller, this.onFloatingBarCompactChange))
   }
 
   @Builder
@@ -446,7 +457,7 @@ export struct ExplorePage {
     .borderRadius(28)
     .clip(true)
     .border({ width: this.readingIndex === index ? 1.5 : 0.5,
-      color: this.readingIndex === index ? $r('app.color.accent') : $r('app.color.immersive_edge') })
+      color: this.readingIndex === index ? $r('app.color.accent') : $r('app.color.line') })
     .visualEffect(planeLightEffect())
     .accessibilityText(`${reading.title}，${reading.author}，${reading.level}`)
     .onClick(() => this.openReading(index))
@@ -472,6 +483,8 @@ export struct ExplorePage {
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.Spring)
     .clip(false)
+    .onDidScroll((_xOffset: number, _yOffset: number, _scrollState: ScrollState) =>
+      this.scenarioFloatingBarTracker.update(this.scenarioScroller, this.onFloatingBarCompactChange))
   }
 
   @Builder
@@ -557,7 +570,7 @@ export struct ExplorePage {
     .borderRadius(28)
     .clip(true)
     .border({ width: this.scenarioIndex === index ? 1.5 : 0.5,
-      color: this.scenarioIndex === index ? $r('app.color.accent') : $r('app.color.immersive_edge') })
+      color: this.scenarioIndex === index ? $r('app.color.accent') : $r('app.color.line') })
     .visualEffect(planeLightEffect())
     .accessibilityText(`${scenario.title}，${scenario.setting}，${scenario.level}`)
   }
