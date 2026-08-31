@@ -438,7 +438,11 @@ struct Index {
     }
     .width('100%')
     .height('100%')
-    .background($r('app.color.surface'))
+    // Opaque backgrounds render above the title bar's material layer and hide
+    // the immersive effect (see the "看不到材质效果" FAQ). The window already
+    // paints the surface color in EntryAbility, so keeping the root clear lets
+    // the material show through.
+    .backgroundColor(Color.Transparent)
   }
 
   @Builder

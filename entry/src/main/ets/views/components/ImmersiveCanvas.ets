@@ -80,7 +80,10 @@ export struct ImmersiveBackdrop {
     .width('100%')
     .height('100%')
     .clip(true)
-    .backgroundColor(this.sceneToneIndex >= 0 ? this.sceneTone() : $r('app.color.surface'))
+    // An opaque backdrop sits above the HdsNavigation material layer and
+    // cancels the immersive effect. Keep it transparent for the neutral tone;
+    // the EntryAbility window background supplies the surface color.
+    .backgroundColor(this.sceneToneIndex >= 0 ? this.sceneTone() : Color.Transparent)
   }
 }
 
