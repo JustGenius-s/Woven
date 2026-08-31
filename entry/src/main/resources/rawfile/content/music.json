@@ -5,7 +5,6 @@
     "chineseTitle": "清晨电车",
     "artist": "言葉 Original",
     "level": "N5",
-    "duration": "1:42",
     "focus": "时间、车站与移动",
     "lines": [
       { "text": "朝の電車に 風が乗る", "reading": "あさの でんしゃに かぜが のる", "meaning": "清晨的风乘上电车。" },
@@ -20,7 +19,6 @@
     "chineseTitle": "雨天咖啡店",
     "artist": "言葉 Original",
     "level": "N5",
-    "duration": "2:08",
     "focus": "天气、饮品与等待",
     "lines": [
       { "text": "窓に雨の音がする", "reading": "まどに あめの おとが する", "meaning": "窗边传来雨声。" },
@@ -35,7 +33,6 @@
     "chineseTitle": "小小旅行",
     "artist": "言葉 Original",
     "level": "N4",
-    "duration": "2:24",
     "focus": "计划、方向与发现",
     "lines": [
       { "text": "地図を閉じて 歩いてみよう", "reading": "ちずを とじて あるいてみよう", "meaning": "合上地图，试着走走吧。" },
@@ -50,7 +47,6 @@
     "chineseTitle": "海边的信",
     "artist": "言葉 Original",
     "level": "N4",
-    "duration": "2:51",
     "focus": "回忆、书信与过去时",
     "lines": [
       { "text": "青い便箋に 夏を書く", "reading": "あおい びんせんに なつを かく", "meaning": "在蓝色信纸上写下夏天。" },
@@ -65,7 +61,6 @@
     "chineseTitle": "仰望星空",
     "artist": "言葉 Original",
     "level": "N3",
-    "duration": "3:16",
     "focus": "愿望、假设与未来",
     "lines": [
       { "text": "もしも明日が見えなくても", "reading": "もしも あしたが みえなくても", "meaning": "即使看不见明天。" },

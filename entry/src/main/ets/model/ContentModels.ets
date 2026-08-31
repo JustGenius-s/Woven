@@ -64,9 +64,27 @@ export interface MusicTrack {
   chineseTitle: string;
   artist: string;
   level: string;
-  duration: string;
   focus: string;
   lines: MusicLine[];
+}
+
+export interface ReadingPassage {
+  text: string;
+  note: string;
+}
+
+export interface ReadingWork {
+  id: string;
+  title: string;
+  titleReading: string;
+  author: string;
+  level: string;
+  genre: string;
+  summary: string;
+  sourceName: string;
+  sourceUrl: string;
+  rights: string;
+  passages: ReadingPassage[];
 }
 
 export interface JourneyKanaFocus {

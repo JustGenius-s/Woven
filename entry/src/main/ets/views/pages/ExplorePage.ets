@@ -4,12 +4,12 @@ import { BlurStrategy, DividerMode, HdsTabs } from '@kit.UIDesignKit';
 import { FLOATING_TAB_CONTENT_INSET, MOTION_DURATION } from '../../common/AppTheme';
 import { preferredImmersiveMaterial } from '../../common/ImmersiveMaterial';
 import {
-  Dialogue,
-  DialogueLine,
   LearningCatalog,
   MusicLine,
   MusicTrack,
-  PracticeScenario
+  PracticeScenario,
+  ReadingPassage,
+  ReadingWork
 } from '../../model/ContentModels';
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { AiInquiryFactory } from '../../services/AiInquiryFactory';
@@ -34,6 +34,7 @@ export struct ExplorePage {
 
   @State private catalog: LearningCatalog | undefined = undefined;
   @State private musicTracks: MusicTrack[] = [];
+  @State private readingWorks: ReadingWork[] = [];
   @State private loadError: string = '';
   @State private pageWidth: number = 360;
   @State private detailOpen: boolean = false;
@@ -45,10 +46,12 @@ export struct ExplorePage {
       const context: common.Context = this.getUIContext().getHostContext() as common.Context;
       this.catalog = ContentRepository.loadCatalog(context);
       this.musicTracks = ContentRepository.loadMusicTracks(context);
+      this.readingWorks = ContentRepository.loadReadingWorks(context);
       this.loadError = '';
     } catch (error) {
       this.catalog = undefined;
       this.musicTracks = [];
+      this.readingWorks = [];
       this.loadError = '探索内容没有正确载入';
     }
   }
@@ -64,16 +67,49 @@ export struct ExplorePage {
     }
   }
 
-  private tone(index: number): ResourceColor {
-    const tones: ResourceColor[] = [
-      $r('app.color.word_card_blue'),
-      $r('app.color.word_card_rose'),
-      $r('app.color.word_card_green'),
-      $r('app.color.word_card_cyan'),
-      $r('app.color.word_card_violet'),
-      $r('app.color.word_card_amber')
-    ];
-    return tones[index % tones.length];
+  private musicArtwork(trackId: string): Resource {
+    switch (trackId) {
+      case 'morning-train':
+        return $r('app.media.music_morning_train');
+      case 'rain-cafe':
+        return $r('app.media.music_rain_cafe');
+      case 'small-trip':
+        return $r('app.media.music_small_trip');
+      case 'seaside-letter':
+        return $r('app.media.music_seaside_letter');
+      default:
+        return $r('app.media.music_look_at_stars');
+    }
+  }
+
+  private readingArtwork(readingId: string): Resource {
+    switch (readingId) {
+      case 'spiders-thread':
+        return $r('app.media.reading_spiders_thread');
+      case 'i-am-a-cat':
+        return $r('app.media.reading_i_am_a_cat');
+      case 'many-orders':
+        return $r('app.media.reading_many_orders');
+      case 'gon-fox':
+        return $r('app.media.reading_gon_fox');
+      default:
+        return $r('app.media.reading_run_melos');
+    }
+  }
+
+  private scenarioArtwork(scenarioId: string): Resource {
+    switch (scenarioId) {
+      case 'cafe':
+        return $r('app.media.scenario_cafe');
+      case 'directions':
+        return $r('app.media.scenario_directions');
+      case 'restaurant':
+        return $r('app.media.scenario_restaurant');
+      case 'small-talk':
+        return $r('app.media.scenario_small_talk');
+      default:
+        return $r('app.media.scenario_opinion');
+    }
   }
 
   private openMusic(index: number): void {
@@ -105,12 +141,11 @@ export struct ExplorePage {
     return this.musicTracks[this.detailIndex];
   }
 
-  private selectedReading(): Dialogue | undefined {
-    const readings: Dialogue[] = this.catalog?.dialogues ?? [];
-    if (this.detailKind !== 1 || this.detailIndex < 0 || this.detailIndex >= readings.length) {
+  private selectedReading(): ReadingWork | undefined {
+    if (this.detailKind !== 1 || this.detailIndex < 0 || this.detailIndex >= this.readingWorks.length) {
       return undefined;
     }
-    return readings[this.detailIndex];
+    return this.readingWorks[this.detailIndex];
   }
 
   private askMusicSelection(selection: string, track: MusicTrack, line?: MusicLine): void {
@@ -120,10 +155,10 @@ export struct ExplorePage {
     this.onAsk(AiInquiryFactory.selection(selection, `音乐 · ${track.title}`, detail));
   }
 
-  private askReadingSelection(selection: string, reading: Dialogue, line?: DialogueLine): void {
-    const detail: string = line === undefined ?
-      `阅读：${reading.title}\n场景：${reading.setting}\n目标：${reading.goal}` :
-      `阅读：${reading.title}\n原句：${line.text}\n读音：${line.reading}\n释义：${line.meaning}`;
+  private askReadingSelection(selection: string, reading: ReadingWork, passage?: ReadingPassage): void {
+    const detail: string = passage === undefined ?
+      `作品：${reading.title}\n作者：${reading.author}\n简介：${reading.summary}` :
+      `作品：${reading.title}\n作者：${reading.author}\n原文：${passage.text}\n学习提示：${passage.note}`;
     this.onAsk(AiInquiryFactory.selection(selection, `阅读 · ${reading.title}`, detail));
   }
 
@@ -206,12 +241,19 @@ export struct ExplorePage {
   @Builder
   private musicCard(track: MusicTrack, index: number) {
     Stack({ alignContent: Alignment.BottomStart }) {
-      Text(track.title.slice(0, 1))
-        .fontSize(132)
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.ink'))
-        .opacity(0.055)
-        .position({ x: 142, y: -26 })
+      Image(this.musicArtwork(track.id))
+        .width('100%')
+        .height('100%')
+        .objectFit(ImageFit.Cover)
+        .hitTestBehavior(HitTestMode.None)
+
+      Column()
+        .width('100%')
+        .height('100%')
+        .linearGradient({
+          angle: 180,
+          colors: [[Color.Transparent, 0.24], ['#4D17181A', 0.56], ['#E617181A', 1]]
+        })
         .hitTestBehavior(HitTestMode.None)
 
       Column() {
@@ -219,23 +261,26 @@ export struct ExplorePage {
           Text(track.level)
             .fontSize(11)
             .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.accent'))
+            .fontColor($r('app.color.immersive_light'))
+            .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+            .borderRadius(13)
+            .backgroundColor('#6617181A')
           Blank()
-          Text(track.duration)
+          Text(`${track.lines.length} 句`)
             .fontSize(12)
-            .fontColor($r('app.color.ink_muted'))
+            .fontColor($r('app.color.immersive_light'))
         }
         Blank()
         Text(track.title)
           .width('100%')
-          .fontSize(28)
+          .fontSize(30)
           .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.ink'))
+          .fontColor($r('app.color.immersive_light'))
           .maxLines(1)
         Text(`${track.chineseTitle} · ${track.artist}`)
           .width('100%')
           .fontSize(13)
-          .fontColor($r('app.color.ink_muted'))
+          .fontColor('#D9F7F8FA')
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .margin({ top: 5 })
@@ -243,30 +288,32 @@ export struct ExplorePage {
           Text(track.focus)
             .layoutWeight(1)
             .fontSize(12)
-            .fontColor($r('app.color.ink_muted'))
+            .fontColor('#D9F7F8FA')
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
-          SymbolGlyph($r('sys.symbol.music_note_circle_fill'))
-            .fontSize(34)
-            .fontColor([$r('app.color.accent')])
+          Stack({ alignContent: Alignment.Center }) {
+            SymbolGlyph($r('sys.symbol.music_note_circle_fill'))
+              .fontSize(27)
+              .fontColor([$r('app.color.ink')])
+          }
+          .width(40)
+          .height(40)
+          .borderRadius(20)
+          .backgroundColor($r('app.color.immersive_light'))
         }
         .width('100%')
         .alignItems(VerticalAlign.Center)
-        .margin({ top: 16 })
+        .margin({ top: 14 })
       }
       .width('100%')
       .height('100%')
       .alignItems(HorizontalAlign.Start)
-      .padding(22)
+      .padding(20)
     }
     .width('100%')
-    .height(210)
+    .height(304)
     .borderRadius(28)
     .clip(true)
-    .linearGradient({
-      angle: 155,
-      colors: [[$r('app.color.immersive_plane_strong'), 0], [this.tone(index), 1]]
-    })
     .border({ width: this.musicIndex === index ? 1.5 : 0.5,
       color: this.musicIndex === index ? $r('app.color.accent') : $r('app.color.immersive_edge') })
     .visualEffect(planeLightEffect())
@@ -277,11 +324,11 @@ export struct ExplorePage {
   @Builder
   private readingPage() {
     Grid() {
-      ForEach(this.catalog?.dialogues ?? [], (reading: Dialogue, index: number) => {
+      ForEach(this.readingWorks, (reading: ReadingWork, index: number) => {
         GridItem() {
           this.readingCard(reading, index)
         }
-      }, (reading: Dialogue) => reading.id)
+      }, (reading: ReadingWork) => reading.id)
     }
     .columnsTemplate(this.columns())
     .columnsGap(14)
@@ -294,56 +341,91 @@ export struct ExplorePage {
   }
 
   @Builder
-  private readingCard(reading: Dialogue, index: number) {
-    Column() {
-      Row() {
-        Text(reading.setting)
-          .fontSize(11)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.accent'))
-        Blank()
-        Text(reading.level)
-          .fontSize(11)
-          .fontColor($r('app.color.ink_muted'))
-      }
-      Blank()
-      Text(reading.title)
+  private readingCard(reading: ReadingWork, index: number) {
+    Stack({ alignContent: Alignment.BottomStart }) {
+      Image(this.readingArtwork(reading.id))
         .width('100%')
-        .fontSize(25)
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.ink'))
-        .maxLines(1)
-      Text(reading.goal)
+        .height('100%')
+        .objectFit(ImageFit.Cover)
+        .hitTestBehavior(HitTestMode.None)
+
+      Column()
         .width('100%')
-        .fontSize(13)
-        .lineHeight(20)
-        .fontColor($r('app.color.ink_muted'))
-        .maxLines(2)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .margin({ top: 7 })
-      Row() {
-        Text(`${reading.lines.length} 段`)
-          .fontSize(11)
-          .fontColor($r('app.color.ink_muted'))
+        .height('100%')
+        .linearGradient({
+          angle: 180,
+          colors: [[Color.Transparent, 0.28], ['#4217181A', 0.58], ['#E617181A', 1]]
+        })
+        .hitTestBehavior(HitTestMode.None)
+
+      Column() {
+        Row() {
+          Text(reading.genre)
+            .fontSize(11)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.immersive_light'))
+            .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+            .borderRadius(13)
+            .backgroundColor('#6617181A')
+          Blank()
+          Text(reading.level)
+            .fontSize(12)
+            .fontColor('#D9F7F8FA')
+        }
         Blank()
-        SymbolGlyph($r('sys.symbol.book_pages_fill'))
-          .fontSize(24)
-          .fontColor([$r('app.color.accent')])
+        Text(reading.title)
+          .width('100%')
+          .fontSize(28)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.immersive_light'))
+          .maxLines(1)
+        Text(`${reading.author} · ${reading.titleReading}`)
+          .width('100%')
+          .fontSize(13)
+          .fontColor('#D9F7F8FA')
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .margin({ top: 5 })
+        Text(reading.summary)
+          .width('100%')
+          .fontSize(12)
+          .lineHeight(18)
+          .fontColor('#CCF7F8FA')
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .margin({ top: 5 })
+        Row() {
+          Text(`${reading.passages.length} 段节选`)
+            .fontSize(12)
+            .fontColor('#D9F7F8FA')
+          Blank()
+          Stack({ alignContent: Alignment.Center }) {
+            SymbolGlyph($r('sys.symbol.book_pages_fill'))
+              .fontSize(24)
+              .fontColor([$r('app.color.ink')])
+          }
+          .width(40)
+          .height(40)
+          .borderRadius(20)
+          .backgroundColor($r('app.color.immersive_light'))
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Center)
+        .margin({ top: 12 })
       }
       .width('100%')
-      .alignItems(VerticalAlign.Center)
-      .margin({ top: 15 })
+      .height('100%')
+      .alignItems(HorizontalAlign.Start)
+      .padding(20)
     }
     .width('100%')
-    .height(184)
-    .alignItems(HorizontalAlign.Start)
-    .padding(20)
-    .borderRadius(26)
+    .height(284)
+    .borderRadius(28)
     .clip(true)
-    .backgroundEffect({ radius: 30, color: $r('app.color.immersive_plane_strong'), saturation: 1.06 })
     .border({ width: this.readingIndex === index ? 1.5 : 0.5,
       color: this.readingIndex === index ? $r('app.color.accent') : $r('app.color.immersive_edge') })
     .visualEffect(planeLightEffect())
+    .accessibilityText(`${reading.title}，${reading.author}，${reading.level}`)
     .onClick(() => this.openReading(index))
   }
 
@@ -368,70 +450,90 @@ export struct ExplorePage {
 
   @Builder
   private scenarioCard(scenario: PracticeScenario, index: number) {
-    Column() {
-      Row() {
-        Text(scenario.level)
-          .fontSize(11)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.accent'))
-        Blank()
-        Text(scenario.setting)
-          .fontSize(11)
-          .fontColor($r('app.color.ink_muted'))
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-      }
-      Text(scenario.title)
+    Stack({ alignContent: Alignment.BottomStart }) {
+      Image(this.scenarioArtwork(scenario.id))
         .width('100%')
-        .fontSize(26)
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.ink'))
-        .maxLines(1)
-        .margin({ top: 18 })
-      Text(`${scenario.learnerRole} × ${scenario.aiRole}`)
+        .height('100%')
+        .objectFit(ImageFit.Cover)
+        .hitTestBehavior(HitTestMode.None)
+
+      Column()
         .width('100%')
-        .fontSize(13)
-        .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.accent'))
-        .margin({ top: 6 })
-      Text(scenario.goal)
-        .width('100%')
-        .fontSize(13)
-        .lineHeight(21)
-        .fontColor($r('app.color.ink_muted'))
-        .maxLines(2)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .margin({ top: 10 })
-      Blank()
-      Row() {
-        if (this.scenarioIndex === index) {
-          Text('上次进行')
+        .height('100%')
+        .linearGradient({
+          angle: 180,
+          colors: [[Color.Transparent, 0.22], ['#4D17181A', 0.52], ['#ED17181A', 1]]
+        })
+        .hitTestBehavior(HitTestMode.None)
+
+      Column() {
+        Row() {
+          Text(scenario.level)
             .fontSize(11)
-            .fontColor($r('app.color.success'))
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.immersive_light'))
+            .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+            .borderRadius(13)
+            .backgroundColor('#6617181A')
+          Blank()
+          Text(scenario.setting)
+            .fontSize(11)
+            .fontColor('#D9F7F8FA')
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
         Blank()
-        Button('开始', { type: ButtonType.ROUNDED_RECTANGLE, stateEffect: true })
-          .buttonStyle(ButtonStyleMode.EMPHASIZED)
-          .controlSize(ControlSize.NORMAL)
-          .enabled(this.apiKeyConfigured)
-          .onClick(() => this.startScenario(scenario, index))
+        Text(scenario.title)
+          .width('100%')
+          .fontSize(28)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.immersive_light'))
+          .maxLines(1)
+        Text(`${scenario.learnerRole} × ${scenario.aiRole}`)
+          .width('100%')
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
+          .fontColor('#D9F7F8FA')
+          .margin({ top: 5 })
+        Text(scenario.goal)
+          .width('100%')
+          .fontSize(13)
+          .lineHeight(20)
+          .fontColor('#D9F7F8FA')
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .margin({ top: 7 })
+        Row() {
+          if (this.scenarioIndex === index) {
+            Text('上次进行')
+              .fontSize(11)
+              .fontColor($r('app.color.immersive_light'))
+          }
+          Blank()
+          Button('开始', { type: ButtonType.ROUNDED_RECTANGLE, stateEffect: true })
+            .controlSize(ControlSize.NORMAL)
+            .fontColor($r('app.color.ink'))
+            .backgroundColor($r('app.color.immersive_light'))
+            .enabled(this.apiKeyConfigured)
+            .onClick(() => this.startScenario(scenario, index))
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Center)
+        .margin({ top: 13 })
       }
       .width('100%')
-      .alignItems(VerticalAlign.Center)
+      .height('100%')
+      .alignItems(HorizontalAlign.Start)
+      .padding(20)
     }
     .width('100%')
-    .height(228)
-    .alignItems(HorizontalAlign.Start)
-    .padding(21)
-    .borderRadius(26)
+    .height(304)
+    .borderRadius(28)
     .clip(true)
-    .linearGradient({
-      angle: 160,
-      colors: [[$r('app.color.immersive_plane_strong'), 0], [this.tone(index + 2), 1]]
-    })
     .border({ width: this.scenarioIndex === index ? 1.5 : 0.5,
       color: this.scenarioIndex === index ? $r('app.color.accent') : $r('app.color.immersive_edge') })
     .visualEffect(planeLightEffect())
+    .accessibilityText(`${scenario.title}，${scenario.setting}，${scenario.level}`)
   }
 
   @Builder
@@ -449,6 +551,12 @@ export struct ExplorePage {
       List({ space: 0 }) {
         ListItem() {
           Column({ space: 7 }) {
+            Image(this.musicArtwork(this.selectedMusic()?.id ?? ''))
+              .width('100%')
+              .height(246)
+              .borderRadius(26)
+              .objectFit(ImageFit.Cover)
+              .margin({ bottom: 15 })
             Text(this.selectedMusic()?.title ?? '')
               .width('100%')
               .fontSize(34)
@@ -516,7 +624,13 @@ export struct ExplorePage {
       List({ space: 0 }) {
         ListItem() {
           Column({ space: 7 }) {
-            Text(this.selectedReading()?.setting ?? '')
+            Image(this.readingArtwork(this.selectedReading()?.id ?? ''))
+              .width('100%')
+              .height(232)
+              .borderRadius(26)
+              .objectFit(ImageFit.Cover)
+              .margin({ bottom: 15 })
+            Text(`${this.selectedReading()?.genre ?? ''} · ${this.selectedReading()?.level ?? ''}`)
               .width('100%')
               .fontSize(12)
               .fontWeight(FontWeight.Medium)
@@ -529,8 +643,13 @@ export struct ExplorePage {
               .copyOption(CopyOptions.LocalDevice)
               .editMenuOptions(aiTextSelectionMenu(this.selectedReading()?.title ?? '',
                 (selection: string) => this.askReadingSelection(
-                  selection, this.selectedReading() as Dialogue)))
-            Text(this.selectedReading()?.goal ?? '')
+                  selection, this.selectedReading() as ReadingWork)))
+            Text(`${this.selectedReading()?.author ?? ''} · ${this.selectedReading()?.titleReading ?? ''}`)
+              .width('100%')
+              .fontSize(14)
+              .fontColor($r('app.color.accent'))
+              .copyOption(CopyOptions.LocalDevice)
+            Text(this.selectedReading()?.summary ?? '')
               .width('100%')
               .fontSize(14)
               .lineHeight(22)
@@ -541,27 +660,23 @@ export struct ExplorePage {
           .padding({ left: 22, right: 22, top: 12, bottom: 22 })
         }
 
-        ForEach(this.selectedReading()?.lines ?? [], (line: DialogueLine) => {
+        ForEach(this.selectedReading()?.passages ?? [], (passage: ReadingPassage) => {
           ListItem() {
             Column({ space: 7 }) {
-              Text(line.text)
+              Text(passage.text)
                 .width('100%')
                 .fontSize(21)
                 .fontWeight(FontWeight.Medium)
                 .fontColor($r('app.color.ink'))
                 .lineHeight(31)
                 .copyOption(CopyOptions.LocalDevice)
-                .editMenuOptions(aiTextSelectionMenu(line.text,
+                .editMenuOptions(aiTextSelectionMenu(passage.text,
                   (selection: string) => this.askReadingSelection(
-                    selection, this.selectedReading() as Dialogue, line)))
-              Text(line.reading)
-                .width('100%')
-                .fontSize(13)
-                .fontColor($r('app.color.accent'))
-                .copyOption(CopyOptions.LocalDevice)
-              Text(line.meaning)
+                    selection, this.selectedReading() as ReadingWork, passage)))
+              Text(passage.note)
                 .width('100%')
                 .fontSize(14)
+                .lineHeight(22)
                 .fontColor($r('app.color.ink_muted'))
                 .copyOption(CopyOptions.LocalDevice)
             }
@@ -570,7 +685,37 @@ export struct ExplorePage {
             .padding({ left: 22, right: 22, top: 18, bottom: 18 })
             .border({ width: { top: 0.5 }, color: $r('app.color.line') })
           }
-        }, (line: DialogueLine) => `${line.speaker}-${line.text}`)
+        }, (passage: ReadingPassage) => passage.text)
+
+        ListItem() {
+          Column({ space: 7 }) {
+            Text('内容来源')
+              .width('100%')
+              .fontSize(12)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.accent'))
+            Text(this.selectedReading()?.sourceName ?? '')
+              .width('100%')
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.ink'))
+              .copyOption(CopyOptions.LocalDevice)
+            Text(this.selectedReading()?.sourceUrl ?? '')
+              .width('100%')
+              .fontSize(12)
+              .fontColor($r('app.color.ink_muted'))
+              .copyOption(CopyOptions.LocalDevice)
+            Text(this.selectedReading()?.rights ?? '')
+              .width('100%')
+              .fontSize(12)
+              .lineHeight(19)
+              .fontColor($r('app.color.ink_muted'))
+          }
+          .width('100%')
+          .alignItems(HorizontalAlign.Start)
+          .padding({ left: 22, right: 22, top: 22, bottom: 36 })
+          .border({ width: { top: 0.5 }, color: $r('app.color.line') })
+        }
       }
       .width('100%')
       .height('100%')

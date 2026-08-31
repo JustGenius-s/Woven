@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-08-31",
+  "sources": [
+    {
+      "id": "aozora-bunko",
+      "kind": "reading",
+      "name": "青空文庫",
+      "homepage": "https://www.aozora.gr.jp/",
+      "rulesUrl": "https://www.aozora.gr.jp/guide/kijyunn.html",
+      "licenseSummary": "仅打包作者著作权已消灭且作品卡明确公开的文本；保留作品卡、底本和输入校正信息。",
+      "integrationStatus": "bundled",
+      "bundledIds": ["spiders-thread", "i-am-a-cat", "many-orders", "gon-fox", "run-melos"]
+    },
+    {
+      "id": "musicbrainz",
+      "kind": "music-metadata",
+      "name": "MusicBrainz",
+      "homepage": "https://musicbrainz.org/",
+      "apiUrl": "https://musicbrainz.org/doc/MusicBrainz_API",
+      "licenseUrl": "https://musicbrainz.org/doc/About/Data_License",
+      "licenseSummary": "核心数据为 CC0；补充数据为 CC BY-NC-SA 3.0。MusicBrainz 提供元数据，不提供歌曲音频。",
+      "integrationStatus": "candidate",
+      "requirements": ["发送可识别的 User-Agent", "请求频率不超过每秒一次", "商业版本不得混入补充数据"]
+    },
+    {
+      "id": "wikimedia-commons-audio",
+      "kind": "music-audio",
+      "name": "Wikimedia Commons",
+      "homepage": "https://commons.wikimedia.org/",
+      "reuseUrl": "https://commons.wikimedia.org/wiki/Commons:Reusing_content_outside_Wikimedia",
+      "licenseSummary": "每个媒体文件单独授权；打包前逐项核对许可、作者、署名方式及衍生作品要求。",
+      "integrationStatus": "candidate",
+      "candidates": [
+        {
+          "title": "Edo Lullaby",
+          "filePage": "https://commons.wikimedia.org/wiki/File:Edo_Lullaby.ogg",
+          "license": "CC BY 3.0 / GFDL",
+          "bundled": false
+        },
+        {
+          "title": "Japanese O pronunciation",
+          "filePage": "https://commons.wikimedia.org/wiki/File:Japanese_O.ogg",
+          "license": "Public domain",
+          "bundled": false
+        }
+      ]
+    },
+    {
+      "id": "tatoeba",
+      "kind": "example-sentences",
+      "name": "Tatoeba",
+      "homepage": "https://tatoeba.org/",
+      "downloadsUrl": "https://tatoeba.org/en/downloads",
+      "licenseSummary": "句子下载集通常为 CC BY 2.0 FR，部分贡献为 CC0；音频许可由贡献者逐项选择。",
+      "integrationStatus": "candidate",
+      "requirements": ["保存句子 ID 与作者归属", "逐条检查音频许可", "提供应用内署名入口"]
+    }
+  ]
+}

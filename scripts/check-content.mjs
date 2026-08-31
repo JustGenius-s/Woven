@@ -33,6 +33,21 @@ if (musicTracks.length < 3 || musicTracks.some((track) => !track.id || !track.ti
   throw new Error('Bundled music learning content is incomplete.')
 }
 
+const readingWorks = JSON.parse(await readFile(resolve(contentRoot, 'reading.json'), 'utf8'))
+const readingIds = new Set(readingWorks.map((work) => work.id))
+if (readingWorks.length < 5 || readingIds.size !== readingWorks.length ||
+  readingWorks.some((work) => !work.title || !work.author || !work.sourceUrl || work.passages?.length < 3)) {
+  throw new Error('Bundled open reading content is incomplete.')
+}
+
+const openSources = JSON.parse(await readFile(resolve(contentRoot, 'open-sources.json'), 'utf8'))
+const aozora = openSources.sources?.find((source) => source.id === 'aozora-bunko')
+const aozoraBundledIds = new Set(aozora?.bundledIds ?? [])
+if (!aozora || aozora.integrationStatus !== 'bundled' || aozoraBundledIds.size !== readingWorks.length ||
+  readingWorks.some((work) => !aozoraBundledIds.has(work.id))) {
+  throw new Error('Open-source manifest does not cover every bundled Aozora reading.')
+}
+
 const journeys = JSON.parse(await readFile(resolve(contentRoot, 'journeys.json'), 'utf8'))
 const grammarIds = new Set(grammarIndex.map((entry) => entry.id))
 const dialogueIds = new Set(catalog.dialogues.map((dialogue) => dialogue.id))
@@ -64,4 +79,4 @@ for (const journey of journeys) {
   }
 }
 
-console.log(`Content OK: ${lessonFiles.length} lessons, ${vocabularyCount} words, ${musicTracks.length} music tracks, ${catalog.dialogues.length} readings, ${catalog.practiceScenarios.length} scenarios.`)
+console.log(`Content OK: ${lessonFiles.length} lessons, ${vocabularyCount} words, ${musicTracks.length} music tracks, ${readingWorks.length} open readings, ${catalog.dialogues.length} journey dialogues, ${catalog.practiceScenarios.length} scenarios.`)

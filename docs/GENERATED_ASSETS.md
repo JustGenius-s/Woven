@@ -1,0 +1,21 @@
+# 原创视觉素材记录
+
+生成方式：OpenAI 内置图像生成。所有项目内图片均保留对应的高分辨率原图于 Codex `generated_images` 目录；应用资源为缩放后的交付副本。
+
+## 共用视觉约束
+
+- HarmonyOS 原生内容应用取向，成熟、克制、非模板化。
+- 半扁平矢量与轻绘画质感结合，柔和空间层次与细微纸张颗粒。
+- 不在图片中烘焙标题、按钮、Logo、水印、字母或数字。
+- 音乐和阅读卡为全出血画面；场景卡在下方预留较暗的 UI 文本区；旅程插画使用透明背景。
+
+## Prompt set
+
+| 资源组 | 基础 prompt | 各资源主题 |
+| --- | --- | --- |
+| 旅程 | “Create an original transparent-background editorial spot illustration for a polished HarmonyOS Japanese-learning journey card; refined semi-flat vector-meets-painted style, restrained Japanese palette, no text/logos/UI/watermark.” | 五十音图：假名纸片与笔；单词：词卡与生活物件；语法：句子结构与连接；音乐：耳机与声波；阅读：打开的书与光；场景：对话气泡与城市空间。 |
+| 音乐 | “Create one original square full-bleed album artwork for a premium Japanese-learning music card; cinematic editorial illustration, subtle grain, no text/logos/UI/watermark.” | 清晨电车、雨天咖啡店、小小旅行、海边的信、仰望星空。 |
+| 阅读 | “Create one original square editorial cover artwork for a premium HarmonyOS Japanese-learning reading card inspired by the named public-domain work; reserve a quiet dark lower band, painterly geometric forms, no title/text/logos/UI/watermark.” | 莲池与蜘蛛丝、明治书房里的猫、秋林中的神秘绿门、河畔捧栗子的小狐狸、奔向城邦的梅洛斯。 |
+| 场景 | “Create one original landscape 3:2 editorial illustration for a polished HarmonyOS Japanese-learning scenario card; show a concrete human interaction, reserve quieter darker lower-third space for UI, no readable text/logos/UI/watermark.” | 咖啡店点单、街头问路、餐厅说明忌口、办公室周末寒暄、语言交换表达观点。 |
+
+生成后的素材只承担氛围与内容识别；所有可访问文本、状态、进度和操作仍由 ArkUI 原生组件绘制。

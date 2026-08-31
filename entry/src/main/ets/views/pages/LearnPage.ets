@@ -7,7 +7,8 @@ import {
   KanaCell,
   KanaRow,
   LearningCatalog,
-  MusicTrack
+  MusicTrack,
+  ReadingWork
 } from '../../model/ContentModels';
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { ContentRepository } from '../../services/ContentRepository';
@@ -33,6 +34,7 @@ export struct LearnPage {
   @State private grammarIndex: GrammarIndexEntry[] = [];
   @State private catalog: LearningCatalog | undefined = undefined;
   @State private musicTracks: MusicTrack[] = [];
+  @State private readingWorks: ReadingWork[] = [];
   @State private manifest: ContentManifest | undefined = undefined;
   @State private loadError: string = '';
   @State private pressedCard: number = -1;
@@ -43,6 +45,7 @@ export struct LearnPage {
       this.grammarIndex = ContentRepository.loadGrammarIndex(context);
       this.catalog = ContentRepository.loadCatalog(context);
       this.musicTracks = ContentRepository.loadMusicTracks(context);
+      this.readingWorks = ContentRepository.loadReadingWorks(context);
       this.manifest = ContentRepository.loadManifest(context);
       this.loadError = '';
     } catch (error) {
@@ -140,15 +143,15 @@ export struct LearnPage {
   }
 
   private readingHeadline(): string {
-    const readings = this.catalog?.dialogues ?? [];
-    const index: number = this.clampIndex(this.readingIndex, readings.length);
-    return this.readingIndex >= 0 && index >= 0 ? readings[index].title : '尚未开始';
+    const index: number = this.clampIndex(this.readingIndex, this.readingWorks.length);
+    return this.readingIndex >= 0 && index >= 0 ? this.readingWorks[index].title : '尚未开始';
   }
 
   private readingCaption(): string {
-    const readings = this.catalog?.dialogues ?? [];
-    const index: number = this.clampIndex(this.readingIndex, readings.length);
-    return this.readingIndex >= 0 && index >= 0 ? readings[index].setting : `${readings.length} 篇情境阅读`;
+    const index: number = this.clampIndex(this.readingIndex, this.readingWorks.length);
+    return this.readingIndex >= 0 && index >= 0 ?
+      `${this.readingWorks[index].author} · ${this.readingWorks[index].level}` :
+      `${this.readingWorks.length} 篇开放文学阅读`;
   }
 
   private scenarioHeadline(): string {
@@ -214,7 +217,7 @@ export struct LearnPage {
               this.kanaDetail(),
               this.kanaCaption(),
               `${Math.max(0, this.kanaIndex() + 1)} / ${this.kanaCells().length}`,
-              this.kanaIndex() >= 0 ? this.kanaCells()[this.kanaIndex()].hira : 'あ',
+              $r('app.media.journey_kana'),
               $r('sys.symbol.character_square_fill'),
               $r('app.color.word_card_blue'),
               this.progress(this.kanaIndex() + 1, this.kanaCells().length),
@@ -228,7 +231,7 @@ export struct LearnPage {
               `已学 ${this.learnedWordCount} 个单词`,
               'N5-N1 词库',
               `${this.learnedWordCount} / ${this.manifest?.vocabulary.total ?? 0}`,
-              '語',
+              $r('app.media.journey_vocabulary'),
               $r('sys.symbol.translate_square_fill'),
               $r('app.color.word_card_cyan'),
               this.progress(this.learnedWordCount, this.manifest?.vocabulary.total ?? 0),
@@ -242,7 +245,7 @@ export struct LearnPage {
               this.grammarDetail(),
               this.grammarCaption(),
               `${Math.min(this.savedLessonIndex + 1, this.grammarIndex.length)} / ${this.grammarIndex.length}`,
-              '文',
+              $r('app.media.journey_grammar'),
               $r('sys.symbol.bookmark_fill'),
               $r('app.color.word_card_green'),
               this.progress(this.savedLessonIndex + 1, this.grammarIndex.length),
@@ -256,7 +259,7 @@ export struct LearnPage {
               this.musicHeadline(),
               this.musicCaption(),
               `${this.musicIndex < 0 ? 0 : Math.min(this.musicIndex + 1, this.musicTracks.length)} / ${this.musicTracks.length}`,
-              '音',
+              $r('app.media.journey_music'),
               $r('sys.symbol.music_note_circle_fill'),
               $r('app.color.word_card_amber'),
               this.progress(this.musicIndex + 1, this.musicTracks.length),
@@ -270,11 +273,11 @@ export struct LearnPage {
               this.readingHeadline(),
               this.readingCaption(),
               `${this.readingIndex < 0 ? 0 : Math.min(this.readingIndex + 1,
-                this.catalog?.dialogues.length ?? 0)} / ${this.catalog?.dialogues.length ?? 0}`,
-              '読',
+                this.readingWorks.length)} / ${this.readingWorks.length}`,
+              $r('app.media.journey_reading'),
               $r('sys.symbol.book_pages_fill'),
               $r('app.color.word_card_rose'),
-              this.progress(this.readingIndex + 1, this.catalog?.dialogues.length ?? 0),
+              this.progress(this.readingIndex + 1, this.readingWorks.length),
               () => this.onOpenExplore(1))
           }
 
@@ -286,7 +289,7 @@ export struct LearnPage {
               this.scenarioCaption(),
               `${this.scenarioIndex < 0 ? 0 : Math.min(this.scenarioIndex + 1,
                 this.catalog?.practiceScenarios.length ?? 0)} / ${this.catalog?.practiceScenarios.length ?? 0}`,
-              '話',
+              $r('app.media.journey_scenario'),
               $r('sys.symbol.person_2_fill'),
               $r('app.color.word_card_violet'),
               this.progress(this.scenarioIndex + 1, this.catalog?.practiceScenarios.length ?? 0),
@@ -309,14 +312,14 @@ export struct LearnPage {
 
   @Builder
   private journeyCard(index: number, title: string, headline: string, caption: string, meta: string,
-    watermark: string, icon: Resource, tone: ResourceColor, progress: number, onSelect: () => void) {
-    Stack({ alignContent: Alignment.TopStart }) {
-      Text(watermark)
-        .fontSize(132)
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.ink'))
-        .opacity(0.07)
-        .position({ x: '68%', y: -13 })
+    artwork: Resource, icon: Resource, tone: ResourceColor, progress: number, onSelect: () => void) {
+    Stack({ alignContent: Alignment.TopEnd }) {
+      Image(artwork)
+        .width(326)
+        .height(218)
+        .objectFit(ImageFit.Contain)
+        .opacity(0.96)
+        .margin({ top: -4, right: -36 })
         .hitTestBehavior(HitTestMode.None)
 
       Column() {
@@ -338,9 +341,15 @@ export struct LearnPage {
 
           Blank()
 
-          SymbolGlyph($r('sys.symbol.chevron_right'))
-            .fontSize(18)
-            .fontColor([$r('app.color.ink_muted')])
+          Stack({ alignContent: Alignment.Center }) {
+            SymbolGlyph($r('sys.symbol.chevron_right'))
+              .fontSize(17)
+              .fontColor([$r('app.color.ink')])
+          }
+          .width(32)
+          .height(32)
+          .borderRadius(11)
+          .backgroundColor($r('app.color.immersive_plane'))
         }
         .width('100%')
         .alignItems(VerticalAlign.Center)
@@ -348,7 +357,7 @@ export struct LearnPage {
         Blank()
 
         Text(headline)
-          .width('82%')
+          .width('58%')
           .fontSize(25)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
@@ -356,7 +365,7 @@ export struct LearnPage {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
 
         Text(caption)
-          .width('78%')
+          .width('56%')
           .fontSize(13)
           .fontColor($r('app.color.ink_muted'))
           .maxLines(1)
@@ -374,7 +383,7 @@ export struct LearnPage {
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.accent'))
         }
-        .width('100%')
+        .width('58%')
         .margin({ top: 17 })
 
         Stack({ alignContent: Alignment.Start }) {
@@ -389,7 +398,7 @@ export struct LearnPage {
             .borderRadius(2)
             .backgroundColor($r('app.color.accent'))
         }
-        .width('100%')
+        .width('58%')
         .height(3)
         .margin({ top: 7 })
       }
@@ -399,7 +408,7 @@ export struct LearnPage {
       .padding(20)
     }
     .width('100%')
-    .height(190)
+    .height(210)
     .borderRadius(28)
     .clip(true)
     .backgroundEffect({ radius: 34, color: tone, saturation: 1.08 })

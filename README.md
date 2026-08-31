@@ -8,7 +8,8 @@
 - 五十音：清音、浊音/半浊音、拗音在同一纵向页面完整展示，并与当前旅程的关键声音关联。
 - 语法：75 课 N5–N2 离线课程，横向滑动切课；课内纵向阅读，文中词汇点按后原位显示释义。
 - 词汇：7,742 条 N5–N1 离线词汇，支持按级别和关键词检索；选中词集中显示读音、释义和例句。
-- 日常对话：5 组内置场景，按人物呈现台词、读音和释义。
+- 探索：音乐、阅读、场景三个原生子页签；音乐与场景使用原创沉浸主视觉，阅读收录 5 篇青空文库开放文学节选并展示来源与权利信息。
+- 日常对话：5 组内置旅程对话，按人物呈现台词、读音和释义。
 - AI 对练：5 个角色任务；支持离线开场提示，也可使用 `deepseek-v4-flash` 进行多轮对话。
 - 内容问答：从假名、单词、例句、语法段落或对话行直接打开上下文 AI Sheet，并围绕所选内容连续追问。
 - 沉浸光感：API 23 上由页面级动态光源统一驱动正文和内容平面，使用 HDS `pointLight`、`pressShadow` 与官方 `systemMaterialEffect`；系统不支持时由框架降级。
@@ -45,4 +46,4 @@ npm run build:hap
 
 ## 内容来源
 
-词汇与语法内容的许可和归属文件已一起打包在 `entry/src/main/resources/rawfile/content/licenses/`。N1–N5 词汇级别是社区估计，不是 JLPT 官方词表。
+词汇与语法内容的许可和归属文件已一起打包在 `entry/src/main/resources/rawfile/content/licenses/`。开放阅读、音乐元数据和音频候选源的接入边界见 [`docs/OPEN_CONTENT.md`](docs/OPEN_CONTENT.md)；机器可读清单位于 `entry/src/main/resources/rawfile/content/open-sources.json`。N1–N5 词汇级别是社区估计，不是 JLPT 官方词表。

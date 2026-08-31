@@ -7,6 +7,7 @@ import {
   LearningJourney,
   LearningCatalog,
   MusicTrack,
+  ReadingWork,
   VocabularyEntry
 } from '../model/ContentModels';
 
@@ -25,6 +26,10 @@ export class ContentRepository {
 
   static loadMusicTracks(context: common.Context): MusicTrack[] {
     return JSON.parse(ContentRepository.readText(context, 'content/music.json')) as MusicTrack[];
+  }
+
+  static loadReadingWorks(context: common.Context): ReadingWork[] {
+    return JSON.parse(ContentRepository.readText(context, 'content/reading.json')) as ReadingWork[];
   }
 
   static loadGrammarIndex(context: common.Context): GrammarIndexEntry[] {
