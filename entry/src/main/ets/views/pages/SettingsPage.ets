@@ -1,12 +1,34 @@
 import { showImmersiveNotice } from '../../common/ImmersiveNotice';
+import {
+  CloudSyncPhase,
+  CloudSyncSnapshot,
+  HuaweiAccountPhase,
+  HuaweiAccountSnapshot
+} from '../../model/SyncModels';
+import { DISTRIBUTED_SYNC_PERMISSION_REQUIRED } from '../../services/DistributedSyncPermission';
 import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
 import { contentLightEffect, planeLightEffect } from '../components/ImmersiveCanvas';
+
+const EMPTY_ACCOUNT: HuaweiAccountSnapshot = {
+  phase: HuaweiAccountPhase.SIGNED_OUT,
+  unionId: '',
+  openId: '',
+  detail: ''
+};
+const EMPTY_SYNC: CloudSyncSnapshot = {
+  phase: CloudSyncPhase.LOCAL_ONLY,
+  lastSyncedAt: 0,
+  detail: ''
+};
 
 @Component
 export struct SettingsPage {
   initialApiKey: string = '';
+  @Prop account: HuaweiAccountSnapshot = EMPTY_ACCOUNT;
+  @Prop syncState: CloudSyncSnapshot = EMPTY_SYNC;
   onBack: () => void = () => {};
   onSave: (apiKey: string) => void = (apiKey: string) => {};
+  onSync: () => void = () => {};
 
   @State private apiKey: string = '';
   @State private deepSeekSheetOpen: boolean = false;
@@ -50,6 +72,16 @@ export struct SettingsPage {
     this.deepSeekSheetOpen = false;
   }
 
+  private canSync(): boolean {
+    return this.account.phase === HuaweiAccountPhase.SIGNED_IN &&
+      this.syncState.phase !== CloudSyncPhase.SYNCING;
+  }
+
+  private lastSyncTime(): string {
+    return this.syncState.lastSyncedAt > 0 ?
+      new Date(this.syncState.lastSyncedAt).toLocaleString() : '';
+  }
+
   build() {
     Column() {
       ImmersiveBackChrome({
@@ -83,7 +115,8 @@ export struct SettingsPage {
       List({ scroller: this.pageScroller }) {
         ListItem() {
           Row() {
-            Column() {
+            Column({ space: 24 }) {
+              this.cloudSyncSection()
               this.deepSeekSection()
             }
             .width('100%')
@@ -99,6 +132,143 @@ export struct SettingsPage {
       .scrollBar(BarState.Off)
       .edgeEffect(EdgeEffect.Spring)
       .clip(false)
+  }
+
+  @Builder
+  private cloudSyncSection() {
+    Column({ space: 8 }) {
+      Text($r('app.string.cloud_space_section'))
+        .width('100%')
+        .padding({ left: 8 })
+        .fontSize(14)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.ink_muted'))
+
+      Column() {
+        Row({ space: 14 }) {
+          SymbolGlyph($r('sys.symbol.icloud'))
+            .fontSize(22)
+            .fontColor([$r('app.color.accent')])
+
+          Column({ space: 3 }) {
+            Text($r('app.string.cloud_sync_title'))
+              .fontSize(17)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.ink'))
+            this.syncStatus()
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+
+          if (this.syncState.phase === CloudSyncPhase.SYNCING) {
+            LoadingProgress()
+              .width(22)
+              .height(22)
+              .color($r('app.color.accent'))
+          } else if (this.canSync()) {
+            Text($r('app.string.cloud_sync_now'))
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.accent'))
+          } else {
+            SymbolGlyph($r('sys.symbol.arrow_2_circlepath'))
+              .fontSize(19)
+              .fontColor([$r('app.color.ink_muted')])
+          }
+        }
+        .width('100%')
+        .height(76)
+        .padding({ left: 18, right: 18, top: 12, bottom: 12 })
+        .visualEffect(contentLightEffect())
+        .accessibilityText(this.canSync() ? $r('app.string.cloud_sync_now') :
+          $r('app.string.cloud_sync_title'))
+        .onClick(() => {
+          if (this.canSync()) {
+            this.onSync();
+          }
+        })
+
+        Divider()
+          .strokeWidth(0.5)
+          .color($r('app.color.line'))
+          .margin({ left: 54 })
+
+        Row({ space: 14 }) {
+          SymbolGlyph($r('sys.symbol.translate_square_fill'))
+            .fontSize(22)
+            .fontColor([$r('app.color.ink_muted')])
+          Column({ space: 3 }) {
+            Text($r('app.string.cloud_sync_scope_title'))
+              .fontSize(16)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.ink'))
+            Text($r('app.string.cloud_sync_scope_value'))
+              .fontSize(13)
+              .fontColor($r('app.color.ink_muted'))
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+        }
+        .width('100%')
+        .height(68)
+        .padding({ left: 18, right: 18 })
+        .visualEffect(contentLightEffect())
+      }
+      .width('100%')
+      .borderRadius(24)
+      .clip(true)
+      .backgroundEffect({ radius: 28, color: $r('app.color.immersive_plane_strong'), saturation: 1.06 })
+      .border({ width: 0.5, color: $r('app.color.immersive_edge') })
+      .visualEffect(planeLightEffect())
+
+      Text($r('app.string.cloud_sync_privacy'))
+        .width('100%')
+        .padding({ left: 8, right: 8, top: 2 })
+        .fontSize(13)
+        .lineHeight(19)
+        .fontColor($r('app.color.ink_muted'))
+
+      if (this.account.phase !== HuaweiAccountPhase.SIGNED_IN) {
+        Text($r('app.string.cloud_sync_sign_in_first'))
+          .width('100%')
+          .padding({ left: 8, right: 8 })
+          .fontSize(13)
+          .fontColor($r('app.color.ink_muted'))
+      }
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
+  private syncStatus() {
+    if (this.syncState.phase === CloudSyncPhase.SYNCING) {
+      Text($r('app.string.cloud_sync_syncing'))
+        .fontSize(13)
+        .fontColor($r('app.color.accent'))
+    } else if (this.syncState.phase === CloudSyncPhase.SYNCED && this.lastSyncTime().length > 0) {
+      Text($r('app.string.cloud_sync_last_time', this.lastSyncTime()))
+        .fontSize(13)
+        .fontColor($r('app.color.success'))
+    } else if (this.syncState.phase === CloudSyncPhase.NEEDS_CONFIGURATION) {
+      Text(this.syncState.detail === DISTRIBUTED_SYNC_PERMISSION_REQUIRED ?
+        $r('app.string.cloud_sync_permission_required') :
+        $r('app.string.cloud_sync_needs_configuration'))
+        .fontSize(13)
+        .fontColor($r('app.color.ink_muted'))
+    } else if (this.syncState.phase === CloudSyncPhase.ERROR) {
+      Text($r('app.string.cloud_sync_error'))
+        .fontSize(13)
+        .fontColor($r('app.color.danger'))
+    } else if (this.syncState.phase === CloudSyncPhase.LOCAL_ONLY) {
+      Text($r('app.string.cloud_sync_local_only'))
+        .fontSize(13)
+        .fontColor($r('app.color.ink_muted'))
+    } else {
+      Text($r('app.string.cloud_sync_ready'))
+        .fontSize(13)
+        .fontColor($r('app.color.ink_muted'))
+    }
   }
 
   @Builder

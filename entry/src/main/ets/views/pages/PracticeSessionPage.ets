@@ -1,8 +1,16 @@
+import { common } from '@kit.AbilityKit';
+import { util } from '@kit.ArkTS';
 import { showImmersiveNotice } from '../../common/ImmersiveNotice';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { DeepSeekMessage, PracticeMessage } from '../../model/DeepSeekModels';
 import { PracticeScenario } from '../../model/ContentModels';
 import { DeepSeekClient } from '../../services/DeepSeekClient';
+import {
+  DEFAULT_COURSE_ID,
+  DEFAULT_SUPPORT_LOCALE,
+  DEFAULT_TARGET_LOCALE
+} from '../../model/SyncModels';
+import { VocabularyLearningStore } from '../../services/VocabularyLearningStore';
 import { ImmersiveAction } from '../components/ImmersiveAction';
 import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
 import { contentLightEffect, planeLightEffect } from '../components/ImmersiveCanvas';
@@ -25,6 +33,9 @@ const EMPTY_SCENARIO: PracticeScenario = {
 export struct PracticeSessionPage {
   scenario: PracticeScenario = EMPTY_SCENARIO;
   apiKey: string = '';
+  courseId: string = DEFAULT_COURSE_ID;
+  targetLocale: string = DEFAULT_TARGET_LOCALE;
+  supportLocale: string = DEFAULT_SUPPORT_LOCALE;
   onExit: () => void = () => {};
 
   @State private messages: PracticeMessage[] = [];
@@ -40,6 +51,7 @@ export struct PracticeSessionPage {
     hilog.info(LOG_DOMAIN, LOG_TAG,
       'Session appeared scenario=%{public}s keyConfigured=%{public}s',
       this.scenario.id, this.apiKey.trim().length > 0 ? 'true' : 'false');
+    this.restoreConversation();
     setTimeout(() => this.begin(), 180);
   }
 
@@ -47,6 +59,7 @@ export struct PracticeSessionPage {
     hilog.info(LOG_DOMAIN, LOG_TAG, 'Session disappeared scenario=%{public}s generating=%{public}s',
       this.scenario.id, this.generating ? 'true' : 'false');
     this.client?.cancel();
+    this.persistConversation();
   }
 
   private begin(): void {
@@ -137,8 +150,16 @@ export struct PracticeSessionPage {
   }
 
   private appendMessage(role: string, text: string): string {
-    const id: string = `${role}-${Date.now()}-${this.messages.length}`;
-    this.messages = this.messages.concat([{ id: id, role: role, text: text, revision: 0 }]);
+    const id: string = util.generateRandomUUID();
+    this.messages = this.messages.concat([{
+      id: id,
+      role: role,
+      text: text,
+      revision: 0,
+      languageTag: this.targetLocale,
+      createdAt: Date.now()
+    }]);
+    this.persistConversation();
     this.scrollToLatest();
     return id;
   }
@@ -154,13 +175,16 @@ export struct PracticeSessionPage {
           id: next[index].id,
           role: next[index].role,
           text: next[index].text + delta,
-          revision: revision
+          revision: revision,
+          languageTag: next[index].languageTag,
+          createdAt: next[index].createdAt
         };
         updated = true;
         break;
       }
     }
     this.messages = next;
+    this.persistConversation();
     hilog.info(LOG_DOMAIN, LOG_TAG,
       'Message state updated found=%{public}s chars=%{public}d revision=%{public}d',
       updated ? 'true' : 'false', delta.length, revision);
@@ -175,6 +199,43 @@ export struct PracticeSessionPage {
       }
     }
     this.messages = next;
+    this.persistConversation();
+  }
+
+  private restoreConversation(): void {
+    this.messages = [];
+    this.history = [];
+    if (this.scenario.id.length === 0) {
+      return;
+    }
+    const context: common.Context = this.getUIContext().getHostContext() as common.Context;
+    this.messages = VocabularyLearningStore.loadConversation(
+      context, this.conversationKey(), this.courseId);
+    for (let index: number = 0; index < this.messages.length; index++) {
+      this.history.push({
+        role: this.messages[index].role,
+        content: this.messages[index].text
+      });
+    }
+    this.scrollToLatest();
+  }
+
+  private persistConversation(): void {
+    if (this.scenario.id.length === 0) {
+      return;
+    }
+    VocabularyLearningStore.saveConversation(
+      this.getUIContext().getHostContext() as common.Context,
+      this.conversationKey(),
+      this.messages,
+      this.targetLocale,
+      this.supportLocale,
+      this.courseId
+    );
+  }
+
+  private conversationKey(): string {
+    return `scenario-${this.scenario.id}`;
   }
 
   private scrollToLatest(): void {

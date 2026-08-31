@@ -1,9 +1,50 @@
 {
   "app": {
-    "signingConfigs": [],
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "/Users/morisi/.ohos/config/default_kotoba-harmony_d2KlYxHabQb5vnNuqMrDIdf_Iu-2cxVYfBUN3foMHOY=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001AA00A51C0BFDE1572CEC631D4E6AD44453226F6E6EE7318DD5B4BD7679FF97CA16EB6178D838D",
+          "profile": "/Users/morisi/.ohos/config/default_kotoba-harmony_d2KlYxHabQb5vnNuqMrDIdf_Iu-2cxVYfBUN3foMHOY=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "/Users/morisi/.ohos/config/default_kotoba-harmony_d2KlYxHabQb5vnNuqMrDIdf_Iu-2cxVYfBUN3foMHOY=.p12",
+          "storePassword": "0000001A0CBBE66D9135DEA0CBE064DC34B4D698A083D329CDA7808A149C4D8B9B7B060DB1D85EFD13C0"
+        }
+      },
+      {
+        "name": "Release",
+        "type": "HarmonyOS",
+        "material": {
+          "storeFile": "/Users/morisi/Documents/Lib/Woven.p12",
+          "storePassword": "00000018A2CA5CA6AE95F6C50BCC97483BA574E6A0367878226BA6701903A5D0D9E6C2A8248E716E",
+          "keyAlias": "WovenKey",
+          "keyPassword": "00000018B538133EBBDB006C82A621872EE8484BEA8293C4FF65272685FCE0B49907997E06D53302",
+          "signAlg": "SHA256withECDSA",
+          "profile": "/Users/morisi/Documents/Lib/WovenRelease.p7b",
+          "certpath": "/Users/morisi/Documents/Lib/Woven.cer"
+        }
+      }
+    ],
     "products": [
       {
         "name": "default",
+        "signingConfig": "Release",
+        "compatibleSdkVersion": "6.1.0(23)",
+        "targetSdkVersion": "6.1.0(23)",
+        "runtimeOS": "HarmonyOS",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      },
+      {
+        "name": "emulator",
+        "signingConfig": "default",
         "compatibleSdkVersion": "6.1.0(23)",
         "targetSdkVersion": "6.1.0(23)",
         "runtimeOS": "HarmonyOS",
@@ -32,11 +73,11 @@
         {
           "name": "default",
           "applyToProducts": [
-            "default"
+            "default",
+            "emulator"
           ]
         }
       ]
     }
   ]
 }
-

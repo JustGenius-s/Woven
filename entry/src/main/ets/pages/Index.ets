@@ -11,8 +11,20 @@ import {
 import { preferredImmersiveMaterial } from '../common/ImmersiveMaterial';
 import { AppSection, LearningJourney, PracticeScenario } from '../model/ContentModels';
 import { AiInquiryContext } from '../model/DeepSeekModels';
+import {
+  CloudSyncPhase,
+  CloudSyncSnapshot,
+  HuaweiAccountPhase,
+  HuaweiAccountSnapshot
+} from '../model/SyncModels';
 import { ContentRepository } from '../services/ContentRepository';
+import {
+  DISTRIBUTED_SYNC_PERMISSION_REQUIRED,
+  DistributedSyncPermission
+} from '../services/DistributedSyncPermission';
+import { HuaweiAccountService } from '../services/HuaweiAccountService';
 import { LearningPreferences } from '../services/LearningPreferences';
+import { LearningSyncCoordinator } from '../services/LearningSyncCoordinator';
 import { VocabularyLearningStore } from '../services/VocabularyLearningStore';
 import { ExplorePage } from '../views/pages/ExplorePage';
 import { KanaPage } from '../views/pages/KanaPage';
@@ -52,6 +64,17 @@ struct Index {
   @State private readingIndex: number = -1;
   @State private scenarioIndex: number = -1;
   @State private learnedWordCount: number = 0;
+  @State private accountSnapshot: HuaweiAccountSnapshot = {
+    phase: HuaweiAccountPhase.SIGNED_OUT,
+    unionId: '',
+    openId: '',
+    detail: ''
+  };
+  @State private cloudSyncSnapshot: CloudSyncSnapshot = {
+    phase: CloudSyncPhase.LOCAL_ONLY,
+    lastSyncedAt: 0,
+    detail: ''
+  };
 
   aboutToAppear(): void {
     const context: common.Context = this.getUIContext().getHostContext() as common.Context;
@@ -82,6 +105,68 @@ struct Index {
       this.journeys = [];
       this.currentJourney = undefined;
     }
+    this.initializeAccountAndSync(context);
+  }
+
+  private async initializeAccountAndSync(context: common.Context): Promise<void> {
+    this.accountSnapshot = HuaweiAccountService.checking();
+    this.cloudSyncSnapshot = await LearningSyncCoordinator.initialize(context);
+    this.accountSnapshot = await HuaweiAccountService.refresh(context);
+    if (this.accountSnapshot.phase === HuaweiAccountPhase.SIGNED_IN) {
+      await this.syncLearningState(context, false);
+    }
+  }
+
+  private async syncLearningState(context: common.Context, requestPermission: boolean): Promise<void> {
+    if (this.accountSnapshot.phase !== HuaweiAccountPhase.SIGNED_IN ||
+      this.cloudSyncSnapshot.phase === CloudSyncPhase.SYNCING) {
+      return;
+    }
+    const permissionGranted: boolean = await DistributedSyncPermission.ensure(
+      context as common.UIAbilityContext, requestPermission);
+    if (!permissionGranted) {
+      this.cloudSyncSnapshot = {
+        phase: CloudSyncPhase.NEEDS_CONFIGURATION,
+        lastSyncedAt: this.cloudSyncSnapshot.lastSyncedAt,
+        detail: DISTRIBUTED_SYNC_PERMISSION_REQUIRED
+      };
+      return;
+    }
+    this.cloudSyncSnapshot = {
+      phase: CloudSyncPhase.SYNCING,
+      lastSyncedAt: this.cloudSyncSnapshot.lastSyncedAt,
+      detail: ''
+    };
+    this.cloudSyncSnapshot = await LearningSyncCoordinator.syncNow(
+      context, this.cloudSyncSnapshot.lastSyncedAt);
+    if (this.cloudSyncSnapshot.phase === CloudSyncPhase.SYNCED) {
+      this.reloadSyncedLearningState(context);
+    }
+  }
+
+  private handleAccountChange(snapshot: HuaweiAccountSnapshot): void {
+    this.accountSnapshot = snapshot;
+    if (snapshot.phase === HuaweiAccountPhase.SIGNED_IN) {
+      this.syncLearningState(this.getUIContext().getHostContext() as common.Context, true);
+    }
+  }
+
+  private reloadSyncedLearningState(context: common.Context): void {
+    this.grammarIndex = LearningPreferences.grammarIndex(context);
+    this.journeyStage = LearningPreferences.journeyStage(context);
+    this.journeyCompletedMask = LearningPreferences.journeyCompletedMask(context);
+    this.kanaKey = LearningPreferences.kanaKey(context);
+    this.musicIndex = LearningPreferences.musicIndex(context);
+    this.readingIndex = LearningPreferences.readingIndex(context);
+    this.scenarioIndex = LearningPreferences.scenarioIndex(context);
+    this.learnedWordCount = VocabularyLearningStore.loadLearnedWords(context).length;
+    const journeyId: string = LearningPreferences.journeyId(context);
+    for (let index: number = 0; index < this.journeys.length; index++) {
+      if (this.journeys[index].id === journeyId) {
+        this.currentJourney = this.journeys[index];
+        break;
+      }
+    }
   }
 
   private selectSection(section: number): void {
@@ -94,12 +179,16 @@ struct Index {
 
   private saveGrammarIndex(index: number): void {
     this.grammarIndex = index;
-    LearningPreferences.saveGrammarIndex(this.getUIContext().getHostContext() as common.Context, index);
+    const context: common.Context = this.getUIContext().getHostContext() as common.Context;
+    LearningPreferences.saveGrammarIndex(context, index);
+    LearningSyncCoordinator.saveGrammarProgress(context, index);
   }
 
   private saveKanaKey(key: string): void {
     this.kanaKey = key;
-    LearningPreferences.saveKanaKey(this.getUIContext().getHostContext() as common.Context, key);
+    const context: common.Context = this.getUIContext().getHostContext() as common.Context;
+    LearningPreferences.saveKanaKey(context, key);
+    LearningSyncCoordinator.saveKanaProgress(context, key);
   }
 
   private saveExploreTab(index: number): void {
@@ -115,17 +204,23 @@ struct Index {
 
   private saveMusicIndex(index: number): void {
     this.musicIndex = index;
-    LearningPreferences.saveMusicIndex(this.getUIContext().getHostContext() as common.Context, index);
+    const context: common.Context = this.getUIContext().getHostContext() as common.Context;
+    LearningPreferences.saveMusicIndex(context, index);
+    LearningSyncCoordinator.saveMusicProgress(context, index);
   }
 
   private saveReadingIndex(index: number): void {
     this.readingIndex = index;
-    LearningPreferences.saveReadingIndex(this.getUIContext().getHostContext() as common.Context, index);
+    const context: common.Context = this.getUIContext().getHostContext() as common.Context;
+    LearningPreferences.saveReadingIndex(context, index);
+    LearningSyncCoordinator.saveReadingProgress(context, index);
   }
 
   private saveScenarioIndex(index: number): void {
     this.scenarioIndex = index;
-    LearningPreferences.saveScenarioIndex(this.getUIContext().getHostContext() as common.Context, index);
+    const context: common.Context = this.getUIContext().getHostContext() as common.Context;
+    LearningPreferences.saveScenarioIndex(context, index);
+    LearningSyncCoordinator.saveScenarioProgress(context, index);
   }
 
   private saveDeepSeekApiKey(apiKey: string): void {
@@ -242,8 +337,12 @@ struct Index {
       } else if (this.settingsOpen) {
         SettingsPage({
           initialApiKey: this.deepSeekApiKey,
+          account: this.accountSnapshot,
+          syncState: this.cloudSyncSnapshot,
           onBack: () => this.settingsOpen = false,
-          onSave: (apiKey: string) => this.saveDeepSeekApiKey(apiKey)
+          onSave: (apiKey: string) => this.saveDeepSeekApiKey(apiKey),
+          onSync: () => this.syncLearningState(
+            this.getUIContext().getHostContext() as common.Context, true)
         })
         .width('100%')
         .constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
@@ -331,7 +430,9 @@ struct Index {
           TabContent() {
             MePage({
               journey: this.currentJourney,
-              onSettings: () => this.settingsOpen = true
+              account: this.accountSnapshot,
+              onSettings: () => this.settingsOpen = true,
+              onAccountChange: (snapshot: HuaweiAccountSnapshot) => this.handleAccountChange(snapshot)
             })
           }
           .tabBar(BottomTabBarStyle.of(this.tabSymbol(

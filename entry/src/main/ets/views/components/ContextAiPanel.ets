@@ -1,10 +1,16 @@
 import { common } from '@kit.AbilityKit';
+import { util } from '@kit.ArkTS';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import {
   AiInquiryContext,
   DeepSeekMessage,
   PracticeMessage
 } from '../../model/DeepSeekModels';
+import {
+  DEFAULT_COURSE_ID,
+  DEFAULT_SUPPORT_LOCALE,
+  DEFAULT_TARGET_LOCALE
+} from '../../model/SyncModels';
 import { DeepSeekClient } from '../../services/DeepSeekClient';
 import { VocabularyLearningStore } from '../../services/VocabularyLearningStore';
 import { ImmersiveAction } from './ImmersiveAction';
@@ -148,7 +154,11 @@ export struct ContextAiPanel {
       return;
     }
     const context: common.Context = this.getUIContext().getHostContext() as common.Context;
-    this.messages = VocabularyLearningStore.loadConversation(context, conversationKey);
+    this.messages = VocabularyLearningStore.loadConversation(
+      context,
+      conversationKey,
+      this.context.courseId === undefined ? DEFAULT_COURSE_ID : this.context.courseId
+    );
     for (let index: number = 0; index < this.messages.length; index++) {
       this.history.push({
         role: this.messages[index].role,
@@ -164,12 +174,26 @@ export struct ContextAiPanel {
       return;
     }
     VocabularyLearningStore.saveConversation(
-      this.getUIContext().getHostContext() as common.Context, conversationKey, this.messages);
+      this.getUIContext().getHostContext() as common.Context,
+      conversationKey,
+      this.messages,
+      this.context.targetLocale === undefined ? DEFAULT_TARGET_LOCALE : this.context.targetLocale,
+      this.context.supportLocale === undefined ? DEFAULT_SUPPORT_LOCALE : this.context.supportLocale,
+      this.context.courseId === undefined ? DEFAULT_COURSE_ID : this.context.courseId
+    );
   }
 
   private appendMessage(role: string, text: string): string {
-    const id: string = `${role}-${Date.now()}-${this.messages.length}`;
-    this.messages = this.messages.concat([{ id: id, role: role, text: text, revision: 0 }]);
+    const id: string = util.generateRandomUUID();
+    this.messages = this.messages.concat([{
+      id: id,
+      role: role,
+      text: text,
+      revision: 0,
+      languageTag: role === 'user' ?
+        (this.context.supportLocale === undefined ? DEFAULT_SUPPORT_LOCALE : this.context.supportLocale) : 'und',
+      createdAt: Date.now()
+    }]);
     this.persistConversation();
     this.scrollToLatest();
     return id;
@@ -183,7 +207,9 @@ export struct ContextAiPanel {
           id: next[index].id,
           role: next[index].role,
           text: text,
-          revision: next[index].revision + 1
+          revision: next[index].revision + 1,
+          languageTag: next[index].languageTag,
+          createdAt: next[index].createdAt
         };
         break;
       }

@@ -14,6 +14,7 @@
 - 内容问答：从假名、单词、例句、语法段落或对话行直接打开上下文 AI Sheet，并围绕所选内容连续追问。
 - 沉浸光感：API 23 上由页面级动态光源统一驱动正文和内容平面，使用 HDS `pointLight`、`pressShadow` 与官方 `systemMaterialEffect`；系统不支持时由框架降级。
 - HDS 组件：导航、悬浮导航栏、核心动作和选择行使用官方 HDS 组件，并跟随系统深浅色。
+- 华为账号与云空间：使用系统标准账号按钮，并将学习进度、已学单词及对话按课程同步；未配置 AGC 时自动降级为本地模式。
 
 ## 目录
 
@@ -27,6 +28,10 @@ scripts/                       内容校验与 HAP 构建脚本
 ## DeepSeek 对练
 
 在 App 的「我的 → 设置」中填写 DeepSeek API Key。Key 只写入应用私有的本地偏好数据，不进入源码或 Git；AI 对练和内容问答请求由 App 直接发送到 `https://api.deepseek.com/chat/completions`，离线课程浏览本身不会调用 AI。
+
+## 华为账号与云空间
+
+端侧接入、Client ID 和多语言数据模型已完成。联调前仍需在 AGC 登记对应构建的证书指纹并创建云表；模拟器使用 `emulator + debug`，发布包使用 `default + release`。完整清单见 [`docs/HUAWEI_ACCOUNT_CLOUD_SYNC.md`](docs/HUAWEI_ACCOUNT_CLOUD_SYNC.md)。DeepSeek API Key 不参与云同步。
 
 ## 校验与构建
 
@@ -42,7 +47,7 @@ macOS + DevEco Studio 默认安装路径下构建 HAP：
 npm run build:hap
 ```
 
-输出位于 `entry/build/default/outputs/default/`。仓库不包含签名凭据；真机安装前，需在 DevEco Studio 为 `default` product 配置调试或发布签名，然后重新构建。
+默认发布 HAP 输出位于 `entry/build/default/outputs/default/`；模拟器调试产物位于 `entry/build/emulator/outputs/default/`。`build-profile.json5` 保存本机证书路径和 DevEco Studio 加密后的签名配置，证书、Profile、密钥库及明文密码均不进入仓库；其他开发环境需要重新配置各自的签名材料。
 
 ## 内容来源
 

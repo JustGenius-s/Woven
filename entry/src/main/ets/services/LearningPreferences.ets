@@ -1,5 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
+import { DEFAULT_COURSE_ID } from '../model/SyncModels';
 
 const STORE_NAME: string = 'kotoba_settings';
 const KEY_DEEPSEEK_API_KEY: string = 'deepseek_api_key';
@@ -40,8 +41,40 @@ export class LearningPreferences {
     }
   }
 
-  static grammarIndex(context: common.Context): number {
-    return LearningPreferences.readNumber(context, KEY_GRAMMAR_INDEX, 0);
+  private static courseKey(key: string, courseId: string): string {
+    return `course.${courseId.replace(/[^A-Za-z0-9_-]/g, '_')}.${key}`;
+  }
+
+  private static readCourseString(context: common.Context, key: string, fallback: string,
+    courseId: string): string {
+    try {
+      const store: preferences.Preferences = LearningPreferences.store(context);
+      const scopedKey: string = LearningPreferences.courseKey(key, courseId);
+      if (store.hasSync(scopedKey)) {
+        return store.getSync(scopedKey, fallback) as string;
+      }
+      return courseId === DEFAULT_COURSE_ID ? store.getSync(key, fallback) as string : fallback;
+    } catch (error) {
+      return fallback;
+    }
+  }
+
+  private static readCourseNumber(context: common.Context, key: string, fallback: number,
+    courseId: string): number {
+    try {
+      const store: preferences.Preferences = LearningPreferences.store(context);
+      const scopedKey: string = LearningPreferences.courseKey(key, courseId);
+      if (store.hasSync(scopedKey)) {
+        return store.getSync(scopedKey, fallback) as number;
+      }
+      return courseId === DEFAULT_COURSE_ID ? store.getSync(key, fallback) as number : fallback;
+    } catch (error) {
+      return fallback;
+    }
+  }
+
+  static grammarIndex(context: common.Context, courseId: string = DEFAULT_COURSE_ID): number {
+    return LearningPreferences.readCourseNumber(context, KEY_GRAMMAR_INDEX, 0, courseId);
   }
 
   static deepSeekApiKey(context: common.Context): string {
@@ -52,36 +85,36 @@ export class LearningPreferences {
     return LearningPreferences.readNumber(context, KEY_SECTION, 0);
   }
 
-  static journeyId(context: common.Context): string {
-    return LearningPreferences.readString(context, KEY_JOURNEY_ID, 'first-meeting');
+  static journeyId(context: common.Context, courseId: string = DEFAULT_COURSE_ID): string {
+    return LearningPreferences.readCourseString(context, KEY_JOURNEY_ID, 'first-meeting', courseId);
   }
 
-  static journeyStage(context: common.Context): number {
-    return LearningPreferences.readNumber(context, KEY_JOURNEY_STAGE, 0);
+  static journeyStage(context: common.Context, courseId: string = DEFAULT_COURSE_ID): number {
+    return LearningPreferences.readCourseNumber(context, KEY_JOURNEY_STAGE, 0, courseId);
   }
 
-  static journeyCompletedMask(context: common.Context): number {
-    return LearningPreferences.readNumber(context, KEY_JOURNEY_COMPLETED_MASK, 0);
+  static journeyCompletedMask(context: common.Context, courseId: string = DEFAULT_COURSE_ID): number {
+    return LearningPreferences.readCourseNumber(context, KEY_JOURNEY_COMPLETED_MASK, 0, courseId);
   }
 
-  static kanaKey(context: common.Context): string {
-    return LearningPreferences.readString(context, KEY_KANA_KEY, 'あ');
+  static kanaKey(context: common.Context, courseId: string = DEFAULT_COURSE_ID): string {
+    return LearningPreferences.readCourseString(context, KEY_KANA_KEY, 'あ', courseId);
   }
 
-  static exploreTab(context: common.Context): number {
-    return LearningPreferences.readNumber(context, KEY_EXPLORE_TAB, 0);
+  static exploreTab(context: common.Context, courseId: string = DEFAULT_COURSE_ID): number {
+    return LearningPreferences.readCourseNumber(context, KEY_EXPLORE_TAB, 0, courseId);
   }
 
-  static musicIndex(context: common.Context): number {
-    return LearningPreferences.readNumber(context, KEY_MUSIC_INDEX, -1);
+  static musicIndex(context: common.Context, courseId: string = DEFAULT_COURSE_ID): number {
+    return LearningPreferences.readCourseNumber(context, KEY_MUSIC_INDEX, -1, courseId);
   }
 
-  static readingIndex(context: common.Context): number {
-    return LearningPreferences.readNumber(context, KEY_READING_INDEX, -1);
+  static readingIndex(context: common.Context, courseId: string = DEFAULT_COURSE_ID): number {
+    return LearningPreferences.readCourseNumber(context, KEY_READING_INDEX, -1, courseId);
   }
 
-  static scenarioIndex(context: common.Context): number {
-    return LearningPreferences.readNumber(context, KEY_SCENARIO_INDEX, -1);
+  static scenarioIndex(context: common.Context, courseId: string = DEFAULT_COURSE_ID): number {
+    return LearningPreferences.readCourseNumber(context, KEY_SCENARIO_INDEX, -1, courseId);
   }
 
   static shouldShowHomeGuide(context: common.Context): boolean {
@@ -98,7 +131,8 @@ export class LearningPreferences {
         KEY_JOURNEY_COMPLETED_MASK
       ];
       for (let index: number = 0; index < historyKeys.length; index++) {
-        if (store.hasSync(historyKeys[index])) {
+        if (store.hasSync(historyKeys[index]) ||
+          store.hasSync(LearningPreferences.courseKey(historyKeys[index], DEFAULT_COURSE_ID))) {
           return false;
         }
       }
@@ -108,14 +142,9 @@ export class LearningPreferences {
     }
   }
 
-  static saveGrammarIndex(context: common.Context, index: number): void {
-    try {
-      const store: preferences.Preferences = LearningPreferences.store(context);
-      store.putSync(KEY_GRAMMAR_INDEX, index);
-      store.flush();
-    } catch (error) {
-      return;
-    }
+  static saveGrammarIndex(context: common.Context, index: number,
+    courseId: string = DEFAULT_COURSE_ID): void {
+    LearningPreferences.saveCourseNumber(context, KEY_GRAMMAR_INDEX, index, courseId);
   }
 
   static saveDeepSeekApiKey(context: common.Context, apiKey: string): void {
@@ -138,33 +167,37 @@ export class LearningPreferences {
     }
   }
 
-  static saveKanaKey(context: common.Context, key: string): void {
-    LearningPreferences.saveString(context, KEY_KANA_KEY, key);
+  static saveKanaKey(context: common.Context, key: string, courseId: string = DEFAULT_COURSE_ID): void {
+    LearningPreferences.saveCourseString(context, KEY_KANA_KEY, key, courseId);
   }
 
-  static saveExploreTab(context: common.Context, index: number): void {
-    LearningPreferences.saveNumber(context, KEY_EXPLORE_TAB, index);
+  static saveExploreTab(context: common.Context, index: number,
+    courseId: string = DEFAULT_COURSE_ID): void {
+    LearningPreferences.saveCourseNumber(context, KEY_EXPLORE_TAB, index, courseId);
   }
 
-  static saveMusicIndex(context: common.Context, index: number): void {
-    LearningPreferences.saveNumber(context, KEY_MUSIC_INDEX, index);
+  static saveMusicIndex(context: common.Context, index: number,
+    courseId: string = DEFAULT_COURSE_ID): void {
+    LearningPreferences.saveCourseNumber(context, KEY_MUSIC_INDEX, index, courseId);
   }
 
-  static saveReadingIndex(context: common.Context, index: number): void {
-    LearningPreferences.saveNumber(context, KEY_READING_INDEX, index);
+  static saveReadingIndex(context: common.Context, index: number,
+    courseId: string = DEFAULT_COURSE_ID): void {
+    LearningPreferences.saveCourseNumber(context, KEY_READING_INDEX, index, courseId);
   }
 
-  static saveScenarioIndex(context: common.Context, index: number): void {
-    LearningPreferences.saveNumber(context, KEY_SCENARIO_INDEX, index);
+  static saveScenarioIndex(context: common.Context, index: number,
+    courseId: string = DEFAULT_COURSE_ID): void {
+    LearningPreferences.saveCourseNumber(context, KEY_SCENARIO_INDEX, index, courseId);
   }
 
   static saveJourneyProgress(context: common.Context, journeyId: string, stage: number,
-    completedMask: number): void {
+    completedMask: number, courseId: string = DEFAULT_COURSE_ID): void {
     try {
       const store: preferences.Preferences = LearningPreferences.store(context);
-      store.putSync(KEY_JOURNEY_ID, journeyId);
-      store.putSync(KEY_JOURNEY_STAGE, stage);
-      store.putSync(KEY_JOURNEY_COMPLETED_MASK, completedMask);
+      store.putSync(LearningPreferences.courseKey(KEY_JOURNEY_ID, courseId), journeyId);
+      store.putSync(LearningPreferences.courseKey(KEY_JOURNEY_STAGE, courseId), stage);
+      store.putSync(LearningPreferences.courseKey(KEY_JOURNEY_COMPLETED_MASK, courseId), completedMask);
       store.flush();
     } catch (error) {
       return;
@@ -199,6 +232,16 @@ export class LearningPreferences {
     } catch (error) {
       return;
     }
+  }
+
+  private static saveCourseString(context: common.Context, key: string, value: string,
+    courseId: string): void {
+    LearningPreferences.saveString(context, LearningPreferences.courseKey(key, courseId), value);
+  }
+
+  private static saveCourseNumber(context: common.Context, key: string, value: number,
+    courseId: string): void {
+    LearningPreferences.saveNumber(context, LearningPreferences.courseKey(key, courseId), value);
   }
 
 }

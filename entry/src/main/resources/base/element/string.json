@@ -11,7 +11,142 @@
     {
       "name": "EntryAbility_label",
       "value": "言葉"
+    },
+    {
+      "name": "account_section",
+      "value": "账号"
+    },
+    {
+      "name": "huawei_account_title",
+      "value": "华为账号"
+    },
+    {
+      "name": "huawei_account_signed_in",
+      "value": "已连接华为账号"
+    },
+    {
+      "name": "huawei_account_signed_out",
+      "value": "登录后同步学习记录"
+    },
+    {
+      "name": "huawei_account_checking",
+      "value": "正在检查账号状态"
+    },
+    {
+      "name": "huawei_account_needs_configuration",
+      "value": "账号服务尚未完成配置"
+    },
+    {
+      "name": "huawei_account_configuration_title",
+      "value": "华为账号待配置"
+    },
+    {
+      "name": "huawei_account_error_title",
+      "value": "无法连接华为账号"
+    },
+    {
+      "name": "huawei_account_client_id_missing",
+      "value": "当前构建缺少 AGC Client ID，账号登录尚未启用。"
+    },
+    {
+      "name": "huawei_account_device_unsupported",
+      "value": "当前设备不支持完整的华为账号能力，请使用真机验证。"
+    },
+    {
+      "name": "huawei_account_fingerprint_error",
+      "value": "应用身份校验未通过。模拟器请使用调试签名；真机请检查 AGC 的 Client ID 与证书指纹。"
+    },
+    {
+      "name": "huawei_account_authorization_error",
+      "value": "应用尚未完成账号授权，请检查 Client ID、应用授权和权限配置。"
+    },
+    {
+      "name": "huawei_account_network_error",
+      "value": "网络连接不可用，请检查网络后重试。"
+    },
+    {
+      "name": "huawei_account_restricted",
+      "value": "当前账号或运行环境暂不支持此登录能力。"
+    },
+    {
+      "name": "huawei_account_service_error",
+      "value": "华为账号服务暂时不可用，请稍后重试。"
+    },
+    {
+      "name": "huawei_account_error_code",
+      "value": "错误码：%s"
+    },
+    {
+      "name": "huawei_account_error",
+      "value": "暂时无法连接华为账号"
+    },
+    {
+      "name": "huawei_account_description",
+      "value": "用于在你的设备间识别同一学习空间"
+    },
+    {
+      "name": "cloud_space_section",
+      "value": "华为云空间"
+    },
+    {
+      "name": "cloud_sync_title",
+      "value": "学习记录同步"
+    },
+    {
+      "name": "cloud_sync_ready",
+      "value": "可以同步"
+    },
+    {
+      "name": "cloud_sync_local_only",
+      "value": "当前仅保存在本机"
+    },
+    {
+      "name": "cloud_sync_syncing",
+      "value": "正在同步"
+    },
+    {
+      "name": "cloud_sync_synced",
+      "value": "已同步"
+    },
+    {
+      "name": "cloud_sync_needs_configuration",
+      "value": "云空间服务尚未完成配置"
+    },
+    {
+      "name": "cloud_sync_permission_required",
+      "value": "需要允许跨设备协同"
+    },
+    {
+      "name": "cloud_sync_error",
+      "value": "同步暂时中断"
+    },
+    {
+      "name": "cloud_sync_now",
+      "value": "立即同步"
+    },
+    {
+      "name": "cloud_sync_sign_in_first",
+      "value": "请先在“我的”中登录华为账号"
+    },
+    {
+      "name": "cloud_sync_scope_title",
+      "value": "同步范围"
+    },
+    {
+      "name": "cloud_sync_scope_value",
+      "value": "日语课程 · 简体中文辅助"
+    },
+    {
+      "name": "cloud_sync_privacy",
+      "value": "同步学习进度、已学单词和聊天记录；API Key 不会上传。"
+    },
+    {
+      "name": "cloud_sync_last_time",
+      "value": "上次同步：%s"
+    },
+    {
+      "name": "distributed_datasync_reason",
+      "value": "用于在登录同一华为账号的设备间同步学习进度、已学内容和对话记录。"
     }
   ]
 }
-

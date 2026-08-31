@@ -1,12 +1,27 @@
 import { FLOATING_TAB_CONTENT_INSET } from '../../common/AppTheme';
 import { LearningJourney } from '../../model/ContentModels';
-import { contentLightEffect, planeLightEffect } from '../components/ImmersiveCanvas';
+import {
+  HuaweiAccountPhase,
+  HuaweiAccountSnapshot
+} from '../../model/SyncModels';
+import { HuaweiAccountCard } from '../components/HuaweiAccountCard';
+import { contentLightEffect } from '../components/ImmersiveCanvas';
 import { PageChrome } from '../components/PageChrome';
+
+const EMPTY_ACCOUNT: HuaweiAccountSnapshot = {
+  phase: HuaweiAccountPhase.SIGNED_OUT,
+  unionId: '',
+  openId: '',
+  detail: ''
+};
 
 @Component
 export struct MePage {
   journey: LearningJourney | undefined = undefined;
+  @Prop account: HuaweiAccountSnapshot = EMPTY_ACCOUNT;
   onSettings: () => void = () => {};
+  onAccountChange: (snapshot: HuaweiAccountSnapshot) => void =
+    (snapshot: HuaweiAccountSnapshot) => {};
   private pageScroller: Scroller = new Scroller();
 
   build() {
@@ -43,37 +58,11 @@ export struct MePage {
 
   @Builder
   private profileCard() {
-    Row({ space: 16 }) {
-      Stack() {
-        SymbolGlyph($r('sys.symbol.person_crop_circle_fill'))
-          .fontSize(34)
-          .fontColor([$r('app.color.accent')])
-      }
-      .width(56)
-      .height(56)
-      .borderRadius(28)
-      .backgroundColor($r('app.color.accent_soft'))
-
-      Column({ space: 5 }) {
-        Text('我的学习')
-          .fontSize(20)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.ink'))
-        Text(this.journey === undefined ? '日语学习' : `当前旅程 · ${this.journey.title}`)
-          .fontSize(14)
-          .fontColor($r('app.color.ink_muted'))
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-      }
-      .layoutWeight(1)
-      .alignItems(HorizontalAlign.Start)
-    }
-    .width('100%')
-    .padding(18)
-    .borderRadius(24)
-    .backgroundEffect({ radius: 28, color: $r('app.color.immersive_plane_strong'), saturation: 1.06 })
-    .border({ width: 0.5, color: $r('app.color.immersive_edge') })
-    .visualEffect(planeLightEffect())
+    HuaweiAccountCard({
+      account: this.account,
+      journeyCaption: this.journey === undefined ? '日语学习' : `当前旅程 · ${this.journey.title}`,
+      onAccountChange: this.onAccountChange
+    })
   }
 
   @Builder

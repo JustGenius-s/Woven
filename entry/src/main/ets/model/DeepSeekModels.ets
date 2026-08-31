@@ -43,6 +43,9 @@ export interface AiInquiryContext {
   suggestions: string[];
   conversationKey?: string;
   initialPrompt?: string;
+  courseId?: string;
+  targetLocale?: string;
+  supportLocale?: string;
 }
 
 export interface PracticeMessage {
@@ -50,4 +53,6 @@ export interface PracticeMessage {
   role: string;
   text: string;
   revision: number;
+  languageTag?: string;
+  createdAt?: number;
 }

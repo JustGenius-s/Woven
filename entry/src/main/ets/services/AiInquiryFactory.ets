@@ -5,6 +5,11 @@ import {
   VocabularyEntry
 } from '../model/ContentModels';
 import { AiInquiryContext } from '../model/DeepSeekModels';
+import {
+  DEFAULT_COURSE_ID,
+  DEFAULT_SUPPORT_LOCALE,
+  DEFAULT_TARGET_LOCALE
+} from '../model/SyncModels';
 
 export class AiInquiryFactory {
   static selection(text: string, source: string, surroundingContext: string = ''): AiInquiryContext {
@@ -17,7 +22,10 @@ export class AiInquiryFactory {
       title: AiInquiryFactory.compact(selection),
       subtitle: source,
       content: `来源：${source}\n用户选中的内容：${selection}${contextLine}`,
-      suggestions: ['解释这段内容', '分析读音和语法', '给我两个相似例句']
+      suggestions: ['解释这段内容', '分析读音和语法', '给我两个相似例句'],
+      courseId: DEFAULT_COURSE_ID,
+      targetLocale: DEFAULT_TARGET_LOCALE,
+      supportLocale: DEFAULT_SUPPORT_LOCALE
     };
   }
 
@@ -29,7 +37,10 @@ export class AiInquiryFactory {
       title: `${cell.hira}・${cell.kata}`,
       subtitle: cell.romaji,
       content: `平假名：${cell.hira}\n片假名：${cell.kata}\n罗马音：${cell.romaji}${cueLine}`,
-      suggestions: ['怎么发音？', '给我几个常用词', '容易和哪个假名混淆？']
+      suggestions: ['怎么发音？', '给我几个常用词', '容易和哪个假名混淆？'],
+      courseId: DEFAULT_COURSE_ID,
+      targetLocale: DEFAULT_TARGET_LOCALE,
+      supportLocale: DEFAULT_SUPPORT_LOCALE
     };
   }
 
@@ -46,7 +57,10 @@ export class AiInquiryFactory {
       content: `单词：${item.word}\n读音：${item.reading}\n释义：${item.meanings.join('；')}${example}${progress}`,
       suggestions: ['用我学过的内容再造一句', '说明常见搭配', '和相近词比较'],
       conversationKey: `word-${item.id}`,
-      initialPrompt: initialPrompt.trim()
+      initialPrompt: initialPrompt.trim(),
+      courseId: DEFAULT_COURSE_ID,
+      targetLocale: DEFAULT_TARGET_LOCALE,
+      supportLocale: DEFAULT_SUPPORT_LOCALE
     };
   }
 
@@ -57,7 +71,10 @@ export class AiInquiryFactory {
       title: AiInquiryFactory.compact(japanese),
       subtitle: meaning,
       content: `来源：${source}\n日语例句：${japanese}\n释义：${meaning}`,
-      suggestions: ['拆解这句话', '这里的语气自然吗？', '换一种自然说法']
+      suggestions: ['拆解这句话', '这里的语气自然吗？', '换一种自然说法'],
+      courseId: DEFAULT_COURSE_ID,
+      targetLocale: DEFAULT_TARGET_LOCALE,
+      supportLocale: DEFAULT_SUPPORT_LOCALE
     };
   }
 
@@ -69,7 +86,10 @@ export class AiInquiryFactory {
       subtitle: `${line.speaker} · ${line.meaning}`,
       content: `场景：${dialogue.setting}\n对话主题：${dialogue.title}\n说话人：${line.speaker}\n` +
         `原句：${line.text}\n读音：${line.reading}\n释义：${line.meaning}`,
-      suggestions: ['这句在什么场合用？', '为什么这样说？', '给我一个接话示例']
+      suggestions: ['这句在什么场合用？', '为什么这样说？', '给我一个接话示例'],
+      courseId: DEFAULT_COURSE_ID,
+      targetLocale: DEFAULT_TARGET_LOCALE,
+      supportLocale: DEFAULT_SUPPORT_LOCALE
     };
   }
 
@@ -80,7 +100,10 @@ export class AiInquiryFactory {
       title: AiInquiryFactory.compact(text),
       subtitle: source,
       content: `来源：${source}\n选中的日语内容：${text}`,
-      suggestions: ['拆解语法和助词', '翻译并说明语气', '给我两个相似例句']
+      suggestions: ['拆解语法和助词', '翻译并说明语气', '给我两个相似例句'],
+      courseId: DEFAULT_COURSE_ID,
+      targetLocale: DEFAULT_TARGET_LOCALE,
+      supportLocale: DEFAULT_SUPPORT_LOCALE
     };
   }
 
