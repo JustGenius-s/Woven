@@ -73,6 +73,7 @@ export interface MusicTrack {
 }
 
 export interface ReadingPassage {
+  title?: string;
   text: string;
   note: string;
 }
@@ -88,6 +89,7 @@ export interface ReadingWork {
   sourceName: string;
   sourceUrl: string;
   rights: string;
+  complete?: boolean;
   passages: ReadingPassage[];
 }
 

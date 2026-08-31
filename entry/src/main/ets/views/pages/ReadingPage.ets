@@ -195,6 +195,11 @@ export struct ReadingPage {
     return `${start} / ${total}`;
   }
 
+  private passageTitle(index: number): string {
+    return this.reading.passages[index].title ??
+      (this.reading.complete ? `第 ${index + 1} 阅读页` : `節選 ${index + 1}`);
+  }
+
   private minimumFontSize(): number {
     return this.viewportWidth >= 1140 || this.viewportHeight >= 1140 ? 20 : 18;
   }
@@ -611,7 +616,7 @@ export struct ReadingPage {
           .fontSize(13)
           .fontColor(this.theme().mutedColor)
           .margin({ top: 6, bottom: compact ? 26 : 36 })
-        Text(`節選 ${index + 1}`)
+        Text(this.passageTitle(index))
           .width('100%')
           .fontSize(12)
           .fontColor(this.theme().mutedColor)
@@ -753,7 +758,7 @@ export struct ReadingPage {
 
       ForEach(this.reading.passages, (passage: ReadingPassage, index: number) => {
         ListItem() {
-          this.catalogRow(`節選 ${index + 1}`, index, () => this.jumpToPassage(index))
+          this.catalogRow(this.passageTitle(index), index, () => this.jumpToPassage(index))
         }
       }, (passage: ReadingPassage, index: number) => `${index}-${passage.text}`)
     }
@@ -772,7 +777,8 @@ export struct ReadingPage {
           .fontSize(16)
           .fontWeight(index === this.currentPassageIndex ? FontWeight.Medium : FontWeight.Regular)
           .fontColor(index === this.currentPassageIndex ? $r('app.color.accent') : $r('app.color.ink'))
-        Text(index === this.currentPassageIndex ? '正在阅读' : `第 ${index + 1} 节`)
+        Text(index === this.currentPassageIndex ? '正在阅读' :
+          (this.reading.complete ? `全文 · 第 ${index + 1} 阅读页` : `第 ${index + 1} 节`))
           .width('100%')
           .fontSize(12)
           .fontColor($r('app.color.ink_muted'))

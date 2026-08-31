@@ -28,7 +28,14 @@ def write_entry(archive: zipfile.ZipFile, path: str, content: str,
     archive.writestr(zip_info(path, compression), content.encode("utf-8"))
 
 
+def passage_title(work: dict, passage: dict, index: int) -> str:
+    return passage.get("title") or (
+        f"第 {index} 阅读页" if work.get("complete") else f"節選 {index}"
+    )
+
+
 def chapter_document(work: dict, passage: dict, index: int, total: int) -> str:
+    title = passage_title(work, passage, index)
     source = ""
     if index == total:
         source = f"""
@@ -41,7 +48,7 @@ def chapter_document(work: dict, passage: dict, index: int, total: int) -> str:
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ja" lang="ja">
   <head>
     <meta charset="utf-8" />
-    <title>{escape(work['title'])} · 節選 {index}</title>
+    <title>{escape(work['title'])} · {escape(title)}</title>
     <link rel="stylesheet" type="text/css" href="styles.css" />
   </head>
   <body>
@@ -49,7 +56,7 @@ def chapter_document(work: dict, passage: dict, index: int, total: int) -> str:
       <p class="eyebrow">{escape(work['genre'])} · {escape(work['level'])}</p>
       <h1>{escape(work['title'])}</h1>
       <p class="author">{escape(work['author'])} · {escape(work['titleReading'])}</p>
-      <p class="section">節選 {index} / {total}</p>
+      <p class="section">{escape(title)} · {index} / {total}</p>
       <p class="original" lang="ja">{escape(passage['text'])}</p>
       <aside>
         <p class="note-title">学习提示</p>
@@ -69,12 +76,14 @@ def build_epub(work: dict, output_path: Path) -> None:
     ]
     spine_items = []
     nav_items = []
-    for index, _ in enumerate(passages, start=1):
+    for index, passage in enumerate(passages, start=1):
         manifest_items.append(
             f'<item id="chapter-{index}" href="chapter-{index}.xhtml" media-type="application/xhtml+xml"/>'
         )
         spine_items.append(f'<itemref idref="chapter-{index}"/>')
-        nav_items.append(f'<li><a href="chapter-{index}.xhtml">節選 {index}</a></li>')
+        nav_items.append(
+            f'<li><a href="chapter-{index}.xhtml">{escape(passage_title(work, passage, index))}</a></li>'
+        )
 
     package = f"""<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id" xml:lang="ja">
@@ -113,7 +122,7 @@ main { padding: 1.2em 1.1em 2em; }
 h1 { margin: 0; font-size: 1.48em; line-height: 1.25; font-weight: 700; }
 .author { margin: 0.45em 0 1.9em; font-size: 0.78em; opacity: 0.68; }
 .section { margin: 0 0 1.15em; font-size: 0.72em; letter-spacing: 0.08em; opacity: 0.58; }
-.original { margin: 0; font-size: 1.08em; line-height: 1.95; text-align: justify; }
+.original { margin: 0; font-size: 1.08em; line-height: 1.95; text-align: justify; white-space: pre-line; }
 aside { margin-top: 2.2em; padding: 1em 1.05em; border: 1px solid rgba(80, 67, 45, 0.16); border-radius: 0.75em; }
 aside p { margin: 0; font-size: 0.76em; line-height: 1.7; opacity: 0.72; }
 aside .note-title { margin-bottom: 0.4em; font-weight: 700; opacity: 0.9; }

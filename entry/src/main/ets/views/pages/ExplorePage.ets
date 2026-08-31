@@ -418,7 +418,7 @@ export struct ExplorePage {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .margin({ top: 5 })
         Row() {
-          Text(`${reading.passages.length} 段节选`)
+          Text(reading.complete ? `${reading.passages.length} 阅读页 · 全文` : `${reading.passages.length} 段节选`)
             .fontSize(12)
             .fontColor('#D9F7F8FA')
           Blank()

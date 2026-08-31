@@ -54,10 +54,20 @@ if (readingWorks.length < 5 || readingIds.size !== readingWorks.length ||
   throw new Error('Bundled open reading content is incomplete.')
 }
 for (const work of readingWorks) {
+  if (work.complete) {
+    const fullTextLength = work.passages.reduce((total, passage) =>
+      total + passage.text.replace(/\s/g, '').length, 0)
+    if (fullTextLength < 2500 || work.passages.some((passage) => !passage.title)) {
+      throw new Error(`Complete reading ${work.id} is missing full text or page titles.`)
+    }
+  }
   const readerBook = await stat(resolve(contentRoot, `../reader/${work.id}.epub`))
   if (!readerBook.isFile() || readerBook.size < 1000) {
     throw new Error(`Reader book ${work.id}.epub is missing or incomplete.`)
   }
+}
+if (!readingWorks.some((work) => work.complete)) {
+  throw new Error('At least one complete reading work must be bundled.')
 }
 
 const openSources = JSON.parse(await readFile(resolve(contentRoot, 'open-sources.json'), 'utf8'))
