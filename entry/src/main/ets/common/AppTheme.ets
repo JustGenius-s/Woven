@@ -1,6 +1,12 @@
 export const APP_HORIZONTAL_PADDING: number = 24;
 export const FLOATING_TAB_BAR_BOTTOM_MARGIN: number = 12;
+// Bottom breathing room for scroll content so the floating tab bar (and the
+// mini player stacked above it) never covers the last row.
 export const FLOATING_TAB_CONTENT_INSET: number = 170;
+// Height of the tab bar's gradient mask. HdsTabs defaults it to the floating
+// bar height (56vp) plus 16vp; a taller mask fades more content but also sits
+// over more of the bar's material layer and visibly dilutes the effect.
+export const FLOATING_TAB_MASK_HEIGHT: number = 72;
 export const CONTENT_MAX_WIDTH: number = 840;
 export const MOTION_DURATION: number = 320;
 

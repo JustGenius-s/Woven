@@ -1,9 +1,19 @@
+import { uiMaterial } from '@kit.ArkUI';
 import { MusicTrack } from '../../model/ContentModels';
 import {
   emptyMusicPlaybackSnapshot,
   MusicPlaybackPhase,
   MusicPlaybackSnapshot
 } from '../../model/MusicPlaybackModels';
+
+// The mini bar is custom content, so it can use uiMaterial directly and gets
+// the auto-invert capability that HDS's hdsMaterial does not expose. Invert
+// only kicks in for thin materials and only for the official special color
+// resources, hence the sys.color.* foreground colors below.
+const MINI_BAR_MATERIAL: uiMaterial.Material = new uiMaterial.ImmersiveMaterial({
+  style: uiMaterial.ImmersiveStyle.THIN,
+  colorInvert: true
+});
 
 @Component
 export struct MusicMiniPlayer {
@@ -64,13 +74,13 @@ export struct MusicMiniPlayer {
               .width('100%')
               .fontSize(15)
               .fontWeight(FontWeight.Medium)
-              .fontColor($r('app.color.ink'))
+              .fontColor($r('sys.color.font_primary'))
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
             Text(this.track()?.artist ?? '')
               .width('100%')
               .fontSize(12)
-              .fontColor($r('app.color.ink_muted'))
+              .fontColor($r('sys.color.font_secondary'))
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
@@ -87,7 +97,7 @@ export struct MusicMiniPlayer {
             } else {
               SymbolGlyph(this.playing() ? $r('sys.symbol.pause_fill') : $r('sys.symbol.play_fill'))
                 .fontSize(22)
-                .fontColor([$r('app.color.ink')])
+                .fontColor([$r('sys.color.icon_primary')])
             }
           }
           .width(42)
@@ -99,7 +109,7 @@ export struct MusicMiniPlayer {
           Button({ type: ButtonType.Circle, stateEffect: true }) {
             SymbolGlyph($r('sys.symbol.forward_end_fill'))
               .fontSize(21)
-              .fontColor([$r('app.color.ink')])
+              .fontColor([$r('sys.color.icon_primary')])
           }
           .width(42)
           .height(42)
@@ -126,6 +136,9 @@ export struct MusicMiniPlayer {
       }
       .width('100%')
       .height(66)
+      // systemMaterial must come after the other style attributes, otherwise
+      // its priority is not what the caller expects.
+      .systemMaterial(MINI_BAR_MATERIAL)
     }
   }
 }

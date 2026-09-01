@@ -11,3 +11,18 @@ export function preferredImmersiveMaterial(): SystemMaterialParams {
     materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
   };
 }
+
+/**
+ * Material for the floating bottom bars (tab bar and mini player).
+ *
+ * ADAPTIVE is documented as defaulting to the immersive material, but the
+ * official HdsTabs immersive sample asks for IMMERSIVE explicitly, and the
+ * bottom bars showed a noticeably weaker effect under ADAPTIVE. The level
+ * stays ADAPTIVE so the system still tunes the strength per device.
+ */
+export function bottomBarImmersiveMaterial(): SystemMaterialParams {
+  return {
+    materialType: hdsMaterial.MaterialType.IMMERSIVE,
+    materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
+  };
+}

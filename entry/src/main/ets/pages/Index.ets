@@ -13,10 +13,10 @@ import { SymbolGlyphModifier } from '@ohos.arkui.modifier';
 import {
   CONTENT_MAX_WIDTH,
   FLOATING_TAB_BAR_BOTTOM_MARGIN,
-  FLOATING_TAB_CONTENT_INSET,
+  FLOATING_TAB_MASK_HEIGHT,
   MOTION_DURATION
 } from '../common/AppTheme';
-import { preferredImmersiveMaterial } from '../common/ImmersiveMaterial';
+import { bottomBarImmersiveMaterial } from '../common/ImmersiveMaterial';
 import { AppSection, LearningJourney, MusicTrack, PracticeScenario, ReadingWork } from '../model/ContentModels';
 import { AiInquiryContext } from '../model/DeepSeekModels';
 import {
@@ -618,14 +618,16 @@ struct Index {
             // The mask paints on top of the bar's material layer, so an opaque
             // color cancels the immersive effect entirely. HdsTabs defaults to
             // a translucent mask (#CCF1F3F5 light / #99000000 dark) for exactly
-            // this reason; mirror that so the material stays visible.
+            // this reason; mirror that so the material stays visible. Keep the
+            // mask near the bar's own height (56vp + 16vp) instead of reusing
+            // the content inset, which covers far more of the material.
             maskColor: $r('app.color.tab_gradient_mask'),
-            maskHeight: FLOATING_TAB_CONTENT_INSET
+            maskHeight: FLOATING_TAB_MASK_HEIGHT
           },
           adaptToHandedness: true,
           lightColor: $r('app.color.accent'),
           miniBar: this.musicMiniBarOptions(),
-          systemMaterialEffect: preferredImmersiveMaterial(),
+          systemMaterialEffect: bottomBarImmersiveMaterial(),
           thermoCtrl: true
         })
         .onChange((section: number) => {
