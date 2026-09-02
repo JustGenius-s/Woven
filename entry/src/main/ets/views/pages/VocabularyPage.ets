@@ -153,14 +153,6 @@ export struct VocabularyPage {
       `读音：${item.reading}\n释义：${item.meanings.join('；')}`));
   }
 
-  private isLexiconLevel(): boolean {
-    return this.level === '日常' || this.level === '一般' || this.level === '补遗';
-  }
-
-  private levelHeadline(): string {
-    return `${this.level} 词汇`;
-  }
-
   private levelCaption(): string {
     switch (this.level) {
       case '日常':
@@ -171,6 +163,29 @@ export struct VocabularyPage {
         return '编辑补遗';
       default:
         return '基础词库';
+    }
+  }
+
+  private levelArtwork(level: string): Resource {
+    switch (level) {
+      case 'N5':
+        return $r('app.media.vocabulary_n5');
+      case 'N4':
+        return $r('app.media.vocabulary_n4');
+      case 'N3':
+        return $r('app.media.vocabulary_n3');
+      case 'N2':
+        return $r('app.media.vocabulary_n2');
+      case 'N1':
+        return $r('app.media.vocabulary_n1');
+      case '日常':
+        return $r('app.media.vocabulary_daily');
+      case '一般':
+        return $r('app.media.vocabulary_general');
+      case '补遗':
+        return $r('app.media.vocabulary_supplement');
+      default:
+        return $r('app.media.vocabulary_n5');
     }
   }
 
@@ -223,12 +238,24 @@ export struct VocabularyPage {
       `${item.reading}  ${meaning}`;
   }
 
-  private sampleWords(): string {
-    const words: string[] = [];
-    for (let index: number = 0; index < Math.min(4, this.source.length); index++) {
-      words.push(this.source[index].word);
+  private levelProgress(): number {
+    if (this.source.length === 0) {
+      return 0;
     }
-    return words.join('  ');
+    return this.learnedInLevel() / this.source.length;
+  }
+
+  private progressWidth(progress: number): string {
+    const percent: number = Math.round(Math.max(0, Math.min(1, progress)) * 100);
+    return `${progress > 0 ? Math.max(3, percent) : 0}%`;
+  }
+
+  private progressPercent(progress: number): string {
+    const percent: number = Math.max(0, Math.min(1, progress)) * 100;
+    if (percent > 0 && percent < 1) {
+      return '<1%';
+    }
+    return `${Math.round(percent)}%`;
   }
 
   private recentLearnedEntries(): VocabularyEntry[] {
@@ -466,39 +493,63 @@ export struct VocabularyPage {
   @Builder
   private levelDeck() {
     Stack({ alignContent: Alignment.BottomStart }) {
-      Text(this.level)
-        .fontSize(this.isLexiconLevel() ? 92 : 136)
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.ink'))
-        .opacity(0.075)
-        .position({ x: this.isLexiconLevel() ? 86 : 124, y: -18 })
+      Image(this.levelArtwork(this.level))
+        .width('100%')
+        .height('100%')
+        .objectFit(ImageFit.Cover)
+        .hitTestBehavior(HitTestMode.None)
+
+      Column()
+        .width('100%')
+        .height('100%')
+        .linearGradient({
+          angle: 90,
+          colors: [['#F5FFFFFF', 0], ['#B8FFFFFF', 0.48], ['#14FFFFFF', 1]]
+        })
+        .hitTestBehavior(HitTestMode.None)
+
+      Column()
+        .width('100%')
+        .height('100%')
+        .linearGradient({
+          angle: 180,
+          colors: [[Color.Transparent, 0.42], ['#E6FFFFFF', 1]]
+        })
         .hitTestBehavior(HitTestMode.None)
 
       Column() {
-        Text(this.levelHeadline())
-          .fontSize(12)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.accent'))
-        Blank()
         Text(this.levelCaption())
-          .fontSize(32)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.ink'))
-        Text(this.sampleWords())
-          .width('100%')
-          .fontSize(15)
+          .fontSize(11)
+          .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.ink_muted'))
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .margin({ top: 5 })
+        Blank()
+        Row() {
+          Stack({ alignContent: Alignment.Start }) {
+            Column()
+              .width('100%')
+              .height(3)
+              .borderRadius(2)
+              .backgroundColor($r('app.color.line'))
+            Column()
+              .width(this.progressWidth(this.levelProgress()))
+              .height(3)
+              .borderRadius(2)
+              .backgroundColor($r('app.color.accent'))
+          }
+          .layoutWeight(1)
+          .height(3)
+          Text(this.progressPercent(this.levelProgress()))
+            .fontSize(11)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.accent'))
+            .margin({ left: 10 })
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Center)
         Row() {
           Text(`${this.source.length} 个单词`)
             .fontSize(12)
             .fontColor($r('app.color.ink_muted'))
-          Text(`已学 ${this.learnedInLevel()}`)
-            .fontSize(12)
-            .fontColor($r('app.color.success'))
-            .margin({ left: 12 })
           Blank()
           Button(this.learnedInLevel() > 0 ? '继续' : '开始', {
             type: ButtonType.ROUNDED_RECTANGLE,
@@ -510,7 +561,7 @@ export struct VocabularyPage {
         }
         .width('100%')
         .alignItems(VerticalAlign.Center)
-        .margin({ top: 18 })
+        .margin({ top: 12 })
       }
       .width('100%')
       .height('100%')
@@ -527,7 +578,7 @@ export struct VocabularyPage {
       colors: [[$r('app.color.surface_raised'), 0], [this.levelTone(this.level), 1]]
     })
     .visualEffect(planeLightEffect())
-    .accessibilityText(`${this.levelHeadline()}，共 ${this.source.length} 个单词`)
+    .accessibilityText(`${this.level} ${this.levelCaption()}，已学 ${this.progressPercent(this.levelProgress())}，共 ${this.source.length} 个单词`)
     .onClick(() => this.openLevelDeck())
   }
 
