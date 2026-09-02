@@ -4,6 +4,7 @@ import { JourneyKanaFocus, KanaCell, KanaRow, LearningCatalog, LearningJourney }
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { AiInquiryFactory } from '../../services/AiInquiryFactory';
 import { ContentRepository } from '../../services/ContentRepository';
+import { KanaAudioService } from '../../services/KanaAudioService';
 import { aiTextSelectionMenu } from '../components/AiTextSelection';
 import { contentLightEffect, planeLightEffect } from '../components/ImmersiveCanvas';
 import { FloatingBarScrollTracker } from '../components/FloatingBarScrollTracker';
@@ -28,6 +29,7 @@ export struct KanaPage {
     this.onScrollerReady(this.pageScroller);
     try {
       const context: common.Context = this.getUIContext().getHostContext() as common.Context;
+      KanaAudioService.initialize(context);
       this.catalog = ContentRepository.loadCatalog(context);
       if (this.catalog.kanaGroups.basic.length > 0 && this.catalog.kanaGroups.basic[0].cells.length > 0) {
         this.selected = this.catalog.kanaGroups.basic[0].cells[0];
@@ -188,6 +190,7 @@ export struct KanaPage {
   private selectKana(cell: KanaCell): void {
     this.selected = cell;
     this.onKanaChange(cell.key);
+    KanaAudioService.play(cell.romaji);
   }
 
   @Builder
