@@ -136,6 +136,10 @@ export interface LearningCatalog {
 
 export interface ContentManifestVocabulary {
   total: number;
+  extraTotal?: number;
+  lexiconTotal?: number;
+  pitchCoverage?: number;
+  extraPitchCoverage?: number;
 }
 
 export interface ContentManifestGrammar {
@@ -198,6 +202,16 @@ export interface VocabularyExample {
   english: string;
 }
 
+/**
+ * Tokyo-style pitch drop. `accent` is the NHK/Wadoku nucleus:
+ * 0 heiban, 1 atamadaka, 2..n-1 nakadaka, n odaka.
+ */
+export interface WordPitch {
+  accent: number;
+  morae: string[];
+  source: string;
+}
+
 export interface VocabularyEntry {
   id: string;
   level: string;
@@ -205,5 +219,6 @@ export interface VocabularyEntry {
   reading: string;
   meanings: string[];
   common: boolean;
+  pitches: WordPitch[];
   example?: VocabularyExample;
 }

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-08-31",
+  "reviewedAt": "2026-09-02",
   "sources": [
     {
       "id": "aozora-bunko",
@@ -55,6 +55,35 @@
       "licenseSummary": "句子下载集通常为 CC BY 2.0 FR，部分贡献为 CC0；音频许可由贡献者逐项选择。",
       "integrationStatus": "candidate",
       "requirements": ["保存句子 ID 与作者归属", "逐条检查音频许可", "提供应用内署名入口"]
+    },
+    {
+      "id": "wadoku",
+      "kind": "pitch-accent",
+      "name": "WadokuJT",
+      "homepage": "https://www.wadoku.de/",
+      "sourceUrl": "https://github.com/WaDoku/WaDokuJT-Data",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "licenseSummary": "CC BY-SA 3.0。用作东京式音调主源，保留下调核与署名。",
+      "integrationStatus": "bundled"
+    },
+    {
+      "id": "kanjium",
+      "kind": "pitch-accent",
+      "name": "Kanjium",
+      "homepage": "https://github.com/mifunetoshiro/kanjium",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "licenseSummary": "作者宣称 CC BY-SA 4.0；仅在 Wadoku 没有精确匹配时补缺。",
+      "integrationStatus": "bundled"
+    },
+    {
+      "id": "jmdict-common",
+      "kind": "vocabulary",
+      "name": "JMdict common",
+      "homepage": "https://www.edrdg.org/",
+      "sourceUrl": "https://github.com/scriptin/jmdict-simplified",
+      "licenseUrl": "https://www.edrdg.org/edrdg/licence.html",
+      "licenseSummary": "CC BY-SA 4.0。考试词以外的常用词按报纸频段拆成日常 / 一般 / 补遗；暂用英语释义，中文和例句后期补。",
+      "integrationStatus": "bundled"
     }
   ]
 }

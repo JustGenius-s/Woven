@@ -15,7 +15,9 @@ import {
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { AiInquiryFactory } from '../../services/AiInquiryFactory';
 import { ContentRepository } from '../../services/ContentRepository';
+import { PitchNotation } from '../../services/PitchNotation';
 import { aiTextSelectionMenu } from '../components/AiTextSelection';
+import { PitchAccentMark } from '../components/PitchAccentMark';
 import { ImmersiveAction } from '../components/ImmersiveAction';
 import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
 import { contentLightEffect, HdsInteractiveSurface, planeLightEffect } from '../components/ImmersiveCanvas';
@@ -176,9 +178,11 @@ export struct JourneyPage {
       return '';
     }
     const item: VocabularyEntry = this.words[index];
+    const pitch: string = PitchNotation.summary(item);
+    const pitchLine: string = pitch.length > 0 ? `\n音调：${pitch}` : '';
     const example: string = item.example === undefined ? '' :
       `\n例句：${item.example.japanese}\n例句释义：${item.example.english}`;
-    return `单词：${item.word}\n读音：${item.reading}\n释义：${item.meanings.join('；')}${example}`;
+    return `单词：${item.word}\n读音：${item.reading}${pitchLine}\n释义：${item.meanings.join('；')}${example}`;
   }
 
   private askWordSelection(selection: string, index: number): void {
@@ -717,6 +721,12 @@ export struct JourneyPage {
               Math.min(this.selectedWordIndex, this.words.length - 1))))
       }
       .width('100%')
+      if (this.words[Math.min(this.selectedWordIndex, this.words.length - 1)].pitches !== undefined &&
+        this.words[Math.min(this.selectedWordIndex, this.words.length - 1)].pitches.length > 0) {
+        PitchAccentMark({
+          pitches: this.words[Math.min(this.selectedWordIndex, this.words.length - 1)].pitches
+        })
+      }
       Text(this.words[Math.min(this.selectedWordIndex, this.words.length - 1)].meanings.slice(0, 2).join('；'))
         .width('100%')
         .fontSize(17)

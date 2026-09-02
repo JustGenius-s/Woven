@@ -5,6 +5,7 @@ import {
   VocabularyEntry
 } from '../model/ContentModels';
 import { AiInquiryContext } from '../model/DeepSeekModels';
+import { PitchNotation } from './PitchNotation';
 import {
   DEFAULT_COURSE_ID,
   DEFAULT_SUPPORT_LOCALE,
@@ -47,6 +48,8 @@ export class AiInquiryFactory {
   static word(item: VocabularyEntry, learningContext: string = '', initialPrompt: string = ''): AiInquiryContext {
     const example: string = item.example === undefined ? '' :
       `\n例句：${item.example.japanese}\n例句释义：${item.example.english}`;
+    const pitch: string = PitchNotation.summary(item);
+    const pitchLine: string = pitch.length === 0 ? '' : `\n音调：${pitch}`;
     const progress: string = learningContext.trim().length === 0 ? '' :
       `\n用户的学习进度：\n${learningContext.trim()}`;
     return {
@@ -54,7 +57,7 @@ export class AiInquiryFactory {
       kind: '单词对话',
       title: item.word,
       subtitle: `${item.reading} · ${item.meanings.slice(0, 2).join('；')}`,
-      content: `单词：${item.word}\n读音：${item.reading}\n释义：${item.meanings.join('；')}${example}${progress}`,
+      content: `单词：${item.word}\n读音：${item.reading}${pitchLine}\n释义：${item.meanings.join('；')}${example}${progress}`,
       suggestions: ['用我学过的内容再造一句', '说明常见搭配', '和相近词比较'],
       conversationKey: `word-${item.id}`,
       initialPrompt: initialPrompt.trim(),

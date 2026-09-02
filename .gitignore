@@ -11,3 +11,4 @@
 /gateway/.env
 local.properties
 /.codegenie/
+/.cache/

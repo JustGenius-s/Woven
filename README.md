@@ -7,7 +7,7 @@
 - 场景旅程：以“入景 → 识音 → 记词 → 懂句 → 会话 → 开口”贯通五十音、词汇、语法、日常对话和开口练习；当前旅程及完成阶段会保存在本地。
 - 五十音：清音、浊音/半浊音、拗音在同一纵向页面完整展示，并与当前旅程的关键声音关联。
 - 语法：75 课 N5–N2 离线课程，横向滑动切课；课内纵向阅读，文中词汇点按后原位显示释义。
-- 词汇：7,742 条 N5–N1 离线词汇，支持按级别和关键词检索；选中词集中显示读音、释义和例句。
+- 词汇：7,742 条 N5–N1 考试词，外加 15,433 条考试外常用词（日常 / 一般 / 补遗）；支持按级别和关键词检索，选中词显示读音、东京式音调和释义。
 - 探索：音乐、阅读、场景三个原生子页签；音乐与场景使用原创沉浸主视觉，阅读收录 5 篇青空文库开放文学节选并展示来源与权利信息。
 - 日常对话：5 组内置旅程对话，按人物呈现台词、读音和释义。
 - AI 对练：5 个角色任务；支持离线开场提示，也可使用 `deepseek-v4-flash` 进行多轮对话。
@@ -51,4 +51,4 @@ npm run build:hap
 
 ## 内容来源
 
-词汇与语法内容的许可和归属文件已一起打包在 `entry/src/main/resources/rawfile/content/licenses/`。开放阅读、音乐元数据和音频候选源的接入边界见 [`docs/OPEN_CONTENT.md`](docs/OPEN_CONTENT.md)；机器可读清单位于 `entry/src/main/resources/rawfile/content/open-sources.json`。N1–N5 词汇级别是社区估计，不是 JLPT 官方词表。
+词汇与语法内容的许可和归属文件已一起打包在 `entry/src/main/resources/rawfile/content/licenses/`。词库字段、音调来源和后期预留项见 [`docs/VOCABULARY_SCHEMA.md`](docs/VOCABULARY_SCHEMA.md)。开放阅读、音乐元数据和音频候选源的接入边界见 [`docs/OPEN_CONTENT.md`](docs/OPEN_CONTENT.md)；机器可读清单位于 `entry/src/main/resources/rawfile/content/open-sources.json`。N1–N5 词汇级别是社区估计，不是 JLPT 官方词表。

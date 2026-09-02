@@ -10,9 +10,11 @@ import {
   LearnedVocabularySnapshot,
   VocabularyLearningStore
 } from '../../services/VocabularyLearningStore';
+import { PitchNotation } from '../../services/PitchNotation';
 import { aiTextSelectionMenu } from '../components/AiTextSelection';
 import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
 import { planeLightEffect } from '../components/ImmersiveCanvas';
+import { PitchAccentMark } from '../components/PitchAccentMark';
 
 const JOURNEY_WORD_STAGE_MASK: number = 1 << 2;
 const JOURNEY_GRAMMAR_STAGE_MASK: number = 1 << 3;
@@ -245,8 +247,18 @@ export struct VocabularyStudyPage {
     }
   }
 
+  private artworkBadge(item: VocabularyEntry): string {
+    const pitch: string = PitchNotation.summary(item);
+    const level: string = item.common ? `${item.level}  常用` : item.level;
+    return pitch.length > 0 ? `${level}  ${pitch}` : level;
+  }
+
   private watermark(item: VocabularyEntry): string {
     return item.word.length > 2 ? item.word.slice(0, 2) : item.word;
+  }
+
+  private shouldShowReading(item: VocabularyEntry): boolean {
+    return item.reading.length > 0 && item.reading !== item.word;
   }
 
   private wordFontSize(item: VocabularyEntry): number {
@@ -386,42 +398,11 @@ export struct VocabularyStudyPage {
   private wordDetails(item: VocabularyEntry) {
     Scroll() {
       Column() {
-        Row() {
-          Column({ space: 3 }) {
-            Text(item.word)
-              .width('100%')
-              .fontSize(item.word.length > 8 ? 25 : 30)
-              .fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.ink'))
-              .copyOption(CopyOptions.LocalDevice)
-              .editMenuOptions(aiTextSelectionMenu(item.word,
-                (selection: string) => this.askSelection(selection, item)))
-            Text(item.reading)
-              .width('100%')
-              .fontSize(15)
-              .fontColor($r('app.color.ink_muted'))
-              .copyOption(CopyOptions.LocalDevice)
-              .editMenuOptions(aiTextSelectionMenu(item.reading,
-                (selection: string) => this.askSelection(selection, item)))
-          }
-          .layoutWeight(1)
-          .alignItems(HorizontalAlign.Start)
-          if (this.containsLearnedWord(item.id)) {
-            SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
-              .fontSize(24)
-              .fontColor([$r('app.color.success')])
-              .accessibilityText('已学会')
-          }
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Top)
-
         Text(item.meanings.join('；'))
           .width('100%')
           .fontSize(17)
           .lineHeight(27)
           .fontColor($r('app.color.ink'))
-          .margin({ top: 14 })
           .copyOption(CopyOptions.LocalDevice)
           .editMenuOptions(aiTextSelectionMenu(item.meanings.join('；'),
             (selection: string) => this.askSelection(selection, item)))
@@ -495,28 +476,35 @@ export struct VocabularyStudyPage {
         .opacity(0.075)
         .hitTestBehavior(HitTestMode.None)
 
-      Column({ space: 5 }) {
+      Row({ space: 10 }) {
         Text(item.word)
           .fontSize(this.wordFontSize(item))
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
-          .textAlign(TextAlign.Center)
           .maxLines(2)
           .copyOption(CopyOptions.LocalDevice)
           .editMenuOptions(aiTextSelectionMenu(item.word,
             (selection: string) => this.askSelection(selection, item)))
-        Text(item.reading)
-          .fontSize(15)
-          .fontColor($r('app.color.accent'))
-          .textAlign(TextAlign.Center)
-          .copyOption(CopyOptions.LocalDevice)
-          .editMenuOptions(aiTextSelectionMenu(item.reading,
-            (selection: string) => this.askSelection(selection, item)))
+        if (this.shouldShowReading(item)) {
+          if (item.pitches !== undefined && item.pitches.length > 0) {
+            PitchAccentMark({ pitches: item.pitches, asReading: true })
+          } else {
+            Text(item.reading)
+              .fontSize(15)
+              .fontColor($r('app.color.ink_muted'))
+              .maxLines(2)
+              .copyOption(CopyOptions.LocalDevice)
+              .editMenuOptions(aiTextSelectionMenu(item.reading,
+                (selection: string) => this.askSelection(selection, item)))
+          }
+        }
       }
+      .alignItems(VerticalAlign.Bottom)
+      .constraintSize({ maxWidth: this.artworkSize() - 36 })
       .padding({ left: 18, right: 18 })
 
       Row() {
-        Text(item.common ? `${item.level}  常用` : item.level)
+        Text(this.artworkBadge(item))
           .fontSize(11)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.ink_muted'))
@@ -536,7 +524,8 @@ export struct VocabularyStudyPage {
       colors: [[$r('app.color.surface_raised'), 0], [this.wordTone(item), 1]]
     })
     .visualEffect(planeLightEffect())
-    .accessibilityText(`${item.word}，${item.reading}`)
+    .accessibilityText(`${item.word}，${item.reading}${PitchNotation.summary(item).length > 0 ?
+      `，${PitchNotation.summary(item)}` : ''}`)
   }
 
   @Builder

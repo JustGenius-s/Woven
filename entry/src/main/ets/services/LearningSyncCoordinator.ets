@@ -29,7 +29,7 @@ import {
   VocabularyLearningStore
 } from './VocabularyLearningStore';
 
-const VOCABULARY_LEVELS: string[] = ['N5', 'N4', 'N3', 'N2', 'N1'];
+const VOCABULARY_LEVELS: string[] = ['N5', 'N4', 'N3', 'N2', 'N1', '日常', '一般', '补遗'];
 
 export class LearningSyncCoordinator {
   static async initialize(context: common.Context): Promise<CloudSyncSnapshot> {

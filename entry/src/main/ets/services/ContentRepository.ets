@@ -42,7 +42,20 @@ export class ContentRepository {
 
   static loadVocabulary(context: common.Context, level: string): VocabularyEntry[] {
     return JSON.parse(ContentRepository.readText(context,
-      `content/vocabulary/${level.toLowerCase()}.json`)) as VocabularyEntry[];
+      `content/vocabulary/${ContentRepository.vocabularyFileName(level)}.json`)) as VocabularyEntry[];
+  }
+
+  private static vocabularyFileName(level: string): string {
+    switch (level) {
+      case '日常':
+        return 'extra-daily';
+      case '一般':
+        return 'extra-general';
+      case '补遗':
+        return 'extra-supplement';
+      default:
+        return level.toLowerCase();
+    }
   }
 
   private static readText(context: common.Context, path: string): string {

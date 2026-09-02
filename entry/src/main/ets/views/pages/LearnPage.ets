@@ -172,6 +172,10 @@ export struct LearnPage {
     return this.scenarioIndex >= 0 && index >= 0 ? scenarios[index].setting : `${scenarios.length} 个日常场景`;
   }
 
+  private vocabularyTotal(): number {
+    return this.manifest?.vocabulary.lexiconTotal ?? this.manifest?.vocabulary.total ?? 0;
+  }
+
   private progressWidth(progress: number): string {
     const percent: number = Math.round(Math.max(0, Math.min(1, progress)) * 100);
     return `${progress > 0 ? Math.max(3, percent) : 0}%`;
@@ -244,12 +248,12 @@ export struct LearnPage {
               1,
               '单词',
               `已学 ${this.learnedWordCount} 个单词`,
-              'N5-N1 词库',
-              `${this.learnedWordCount} / ${this.manifest?.vocabulary.total ?? 0}`,
+              '考试词与常用词',
+              `${this.learnedWordCount} / ${this.vocabularyTotal()}`,
               $r('app.media.journey_vocabulary'),
               $r('sys.symbol.translate_square_fill'),
               $r('app.color.word_card_cyan'),
-              this.progress(this.learnedWordCount, this.manifest?.vocabulary.total ?? 0),
+              this.progress(this.learnedWordCount, this.vocabularyTotal()),
               () => this.onOpenVocabulary())
           }
 

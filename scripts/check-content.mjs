@@ -13,14 +13,82 @@ if (grammarIndex.length !== manifest.grammar.totalLessons || lessonFiles.length 
 }
 
 let vocabularyCount = 0
+let pitchCoverage = 0
 const vocabularyIdsByLevel = new Map()
 for (const level of ['n1', 'n2', 'n3', 'n4', 'n5']) {
   const entries = JSON.parse(await readFile(resolve(contentRoot, `vocabulary/${level}.json`), 'utf8'))
   vocabularyCount += entries.length
   vocabularyIdsByLevel.set(level.toUpperCase(), new Set(entries.map((entry) => entry.id)))
+  for (const entry of entries) {
+    if (!Array.isArray(entry.pitches)) {
+      throw new Error(`Vocabulary ${entry.id} is missing pitches.`)
+    }
+    for (const pitch of entry.pitches) {
+      if (!Number.isInteger(pitch.accent) || pitch.accent < 0 ||
+        !Array.isArray(pitch.morae) || pitch.morae.length === 0 || !pitch.source) {
+        throw new Error(`Vocabulary ${entry.id} has an invalid pitch entry.`)
+      }
+    }
+    if (entry.pitches.length > 0) {
+      pitchCoverage += 1
+    }
+  }
 }
 if (vocabularyCount !== manifest.vocabulary.total) {
   throw new Error(`Vocabulary count mismatch: ${vocabularyCount} != ${manifest.vocabulary.total}`)
+}
+if (pitchCoverage !== (manifest.vocabulary.pitchCoverage ?? pitchCoverage)) {
+  throw new Error(`Pitch coverage mismatch: ${pitchCoverage} != ${manifest.vocabulary.pitchCoverage}`)
+}
+if (pitchCoverage < Math.floor(vocabularyCount * 0.9)) {
+  throw new Error(`Pitch coverage too low: ${pitchCoverage}/${vocabularyCount}`)
+}
+
+const lexiconFiles = [
+  ['日常', 'extra-daily.json'],
+  ['一般', 'extra-general.json'],
+  ['补遗', 'extra-supplement.json']
+]
+const extraIds = new Set()
+let extraPitchCoverage = 0
+let extraEntries = 0
+const examIds = new Set([...vocabularyIdsByLevel.values()].flatMap((ids) => [...ids]))
+for (const [level, filename] of lexiconFiles) {
+  const entries = JSON.parse(await readFile(resolve(contentRoot, `vocabulary/${filename}`), 'utf8'))
+  extraEntries += entries.length
+  if (entries.length !== (manifest.vocabulary.levels?.[level] ?? entries.length)) {
+    throw new Error(`Lexicon ${level} count mismatch: ${entries.length} != ${manifest.vocabulary.levels?.[level]}`)
+  }
+  for (const entry of entries) {
+    if (entry.level !== level || !entry.id || !entry.word || !entry.reading) {
+      throw new Error(`Lexicon extra entry ${entry.id || '<unknown>'} is incomplete.`)
+    }
+    if (!Array.isArray(entry.pitches)) {
+      throw new Error(`Vocabulary ${entry.id} is missing pitches.`)
+    }
+    for (const pitch of entry.pitches) {
+      if (!Number.isInteger(pitch.accent) || pitch.accent < 0 ||
+        !Array.isArray(pitch.morae) || pitch.morae.length === 0 || !pitch.source) {
+        throw new Error(`Vocabulary ${entry.id} has an invalid pitch entry.`)
+      }
+    }
+    if (examIds.has(entry.id) || extraIds.has(entry.id)) {
+      throw new Error(`Vocabulary id ${entry.id} is duplicated across levels.`)
+    }
+    extraIds.add(entry.id)
+    if (entry.pitches.length > 0) {
+      extraPitchCoverage += 1
+    }
+  }
+}
+if (extraEntries !== (manifest.vocabulary.extraTotal ?? extraEntries)) {
+  throw new Error(`Extra vocabulary count mismatch: ${extraEntries} != ${manifest.vocabulary.extraTotal}`)
+}
+if (extraPitchCoverage !== (manifest.vocabulary.extraPitchCoverage ?? extraPitchCoverage)) {
+  throw new Error(`Extra pitch coverage mismatch: ${extraPitchCoverage} != ${manifest.vocabulary.extraPitchCoverage}`)
+}
+if (extraEntries < 10000) {
+  throw new Error(`Lexicon extras are too small: ${extraEntries}`)
 }
 
 const catalog = JSON.parse(await readFile(resolve(contentRoot, 'catalog.json'), 'utf8'))
@@ -109,4 +177,4 @@ for (const journey of journeys) {
   }
 }
 
-console.log(`Content OK: ${lessonFiles.length} lessons, ${vocabularyCount} words, ${musicTracks.length} music tracks, ${readingWorks.length} open readings, ${catalog.dialogues.length} journey dialogues, ${catalog.practiceScenarios.length} scenarios.`)
+console.log(`Content OK: ${lessonFiles.length} lessons, ${vocabularyCount} exam words (${pitchCoverage} with pitch), ${extraEntries} lexicon extras (${extraPitchCoverage} with pitch), ${musicTracks.length} music tracks, ${readingWorks.length} open readings, ${catalog.dialogues.length} journey dialogues, ${catalog.practiceScenarios.length} scenarios.`)

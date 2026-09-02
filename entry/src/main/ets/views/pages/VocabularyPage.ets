@@ -5,6 +5,7 @@ import { LearningJourney, VocabularyEntry } from '../../model/ContentModels';
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { AiInquiryFactory } from '../../services/AiInquiryFactory';
 import { ContentRepository } from '../../services/ContentRepository';
+import { PitchNotation } from '../../services/PitchNotation';
 import { VocabularyDataSource } from '../../services/VocabularyDataSource';
 import {
   LearnedVocabularySnapshot,
@@ -15,7 +16,7 @@ import { FloatingBarScrollTracker } from '../components/FloatingBarScrollTracker
 import { planeLightEffect } from '../components/ImmersiveCanvas';
 import { PageChrome } from '../components/PageChrome';
 
-const VOCABULARY_LEVELS: string[] = ['N5', 'N4', 'N3', 'N2', 'N1'];
+const VOCABULARY_LEVELS: string[] = ['N5', 'N4', 'N3', 'N2', 'N1', '日常', '一般', '补遗'];
 
 @Component
 export struct VocabularyPage {
@@ -152,6 +153,27 @@ export struct VocabularyPage {
       `读音：${item.reading}\n释义：${item.meanings.join('；')}`));
   }
 
+  private isLexiconLevel(): boolean {
+    return this.level === '日常' || this.level === '一般' || this.level === '补遗';
+  }
+
+  private levelHeadline(): string {
+    return `${this.level} 词汇`;
+  }
+
+  private levelCaption(): string {
+    switch (this.level) {
+      case '日常':
+        return '高频常用';
+      case '一般':
+        return '中低频常用';
+      case '补遗':
+        return '编辑补遗';
+      default:
+        return '基础词库';
+    }
+  }
+
   private levelTone(level: string): ResourceColor {
     switch (level) {
       case 'N5':
@@ -162,6 +184,12 @@ export struct VocabularyPage {
         return $r('app.color.word_card_green');
       case 'N2':
         return $r('app.color.word_card_amber');
+      case '日常':
+        return $r('app.color.word_card_violet');
+      case '一般':
+        return $r('app.color.word_card_rose');
+      case '补遗':
+        return $r('app.color.word_card_cyan');
       default:
         return $r('app.color.word_card_rose');
     }
@@ -186,6 +214,13 @@ export struct VocabularyPage {
       default:
         return $r('app.color.word_card_violet');
     }
+  }
+
+  private wordSubtitle(item: VocabularyEntry): string {
+    const pitch: string = PitchNotation.summary(item);
+    const meaning: string = item.meanings.slice(0, 1).join('');
+    return pitch.length > 0 ? `${item.reading}  ${pitch}  ${meaning}` :
+      `${item.reading}  ${meaning}`;
   }
 
   private sampleWords(): string {
@@ -432,20 +467,20 @@ export struct VocabularyPage {
   private levelDeck() {
     Stack({ alignContent: Alignment.BottomStart }) {
       Text(this.level)
-        .fontSize(136)
+        .fontSize(this.isLexiconLevel() ? 92 : 136)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
         .opacity(0.075)
-        .position({ x: 124, y: -18 })
+        .position({ x: this.isLexiconLevel() ? 86 : 124, y: -18 })
         .hitTestBehavior(HitTestMode.None)
 
       Column() {
-        Text(`${this.level} 词汇`)
+        Text(this.levelHeadline())
           .fontSize(12)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.accent'))
         Blank()
-        Text('基础词库')
+        Text(this.levelCaption())
           .fontSize(32)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
@@ -492,7 +527,7 @@ export struct VocabularyPage {
       colors: [[$r('app.color.surface_raised'), 0], [this.levelTone(this.level), 1]]
     })
     .visualEffect(planeLightEffect())
-    .accessibilityText(`${this.level} 基础词库，共 ${this.source.length} 个单词`)
+    .accessibilityText(`${this.levelHeadline()}，共 ${this.source.length} 个单词`)
     .onClick(() => this.openLevelDeck())
   }
 
@@ -647,14 +682,14 @@ export struct VocabularyPage {
           .copyOption(CopyOptions.LocalDevice)
           .editMenuOptions(aiTextSelectionMenu(item.word,
             (selection: string) => this.askSelection(selection, item)))
-        Text(`${item.reading}  ${item.meanings.slice(0, 1).join('')}`)
+        Text(this.wordSubtitle(item))
           .width('100%')
           .fontSize(13)
           .fontColor($r('app.color.ink_muted'))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .copyOption(CopyOptions.LocalDevice)
-          .editMenuOptions(aiTextSelectionMenu(`${item.reading}  ${item.meanings.slice(0, 1).join('')}`,
+          .editMenuOptions(aiTextSelectionMenu(this.wordSubtitle(item),
             (selection: string) => this.askSelection(selection, item)))
       }
       .layoutWeight(1)
