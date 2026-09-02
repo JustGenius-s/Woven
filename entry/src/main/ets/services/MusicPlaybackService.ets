@@ -14,6 +14,7 @@ import {
 } from '../model/MusicPlaybackModels';
 import { LearningPreferences } from './LearningPreferences';
 import { LearningSyncCoordinator } from './LearningSyncCoordinator';
+import { musicRendererInfo, PlayerStateMachine } from './MusicPlaybackStateMachine';
 
 const POSITION_PERSIST_INTERVAL_MS: number = 3000;
 const POSITION_SYNC_INTERVAL_MS: number = 15000;
@@ -40,6 +41,10 @@ export class MusicPlaybackService {
   private static lastPersistedPosition: number = 0;
   private static lastSyncedPosition: number = 0;
   private static lastSessionUpdateAt: number = 0;
+  // AVPlayer's transitions are asynchronous and only legal from specific
+  // states. The machine owns that bookkeeping so callers await a state instead
+  // of assuming an operation already moved the player into it.
+  private static machine: PlayerStateMachine = new PlayerStateMachine();
 
   static initialize(context: common.Context, tracks: MusicTrack[]): void {
     MusicPlaybackService.context = context as common.UIAbilityContext;
@@ -105,6 +110,16 @@ export class MusicPlaybackService {
     }
   }
 
+  /**
+   * Whether the player is in one of the states where play() and seek() are
+   * legal: prepared/playing/paused/completed. Calling either from idle,
+   * initialized or stopped is rejected with 5400102.
+   */
+  private static canOperate(): boolean {
+    const state: string = MusicPlaybackService.machine.state;
+    return state === 'prepared' || state === 'playing' || state === 'paused' || state === 'completed';
+  }
+
   static async play(): Promise<void> {
     const index: number = MusicPlaybackService.playback.trackIndex >= 0 ?
       MusicPlaybackService.playback.trackIndex : 0;
@@ -123,6 +138,15 @@ export class MusicPlaybackService {
       return;
     }
     try {
+      // A stopped player has no prepared source; bring it back before playing.
+      if (!MusicPlaybackService.canOperate()) {
+        await player.prepare();
+        const prepared: boolean = await MusicPlaybackService.machine.waitFor('prepared', () => false);
+        if (!prepared) {
+          MusicPlaybackService.fail(new Error('reprepare failed'));
+          return;
+        }
+      }
       if (MusicPlaybackService.playback.phase === MusicPlaybackPhase.COMPLETED) {
         player.seek(0, media.SeekMode.SEEK_PREV_SYNC);
         MusicPlaybackService.updatePosition(0, true);
@@ -160,9 +184,7 @@ export class MusicPlaybackService {
 
   static seek(positionMs: number): void {
     const player: media.AVPlayer | undefined = MusicPlaybackService.player;
-    if (player === undefined || MusicPlaybackService.playback.phase === MusicPlaybackPhase.IDLE ||
-      MusicPlaybackService.playback.phase === MusicPlaybackPhase.LOADING ||
-      MusicPlaybackService.playback.phase === MusicPlaybackPhase.ERROR) {
+    if (player === undefined || !MusicPlaybackService.canOperate()) {
       return;
     }
     const upper: number = Math.max(0, MusicPlaybackService.playback.durationMs);
@@ -181,6 +203,8 @@ export class MusicPlaybackService {
 
   static async release(): Promise<void> {
     MusicPlaybackService.sourceToken++;
+    // Wake anything awaiting a transition; the player is going away.
+    MusicPlaybackService.machine.cancelAll();
     MusicPlaybackService.persistPosition(true);
     await MusicPlaybackService.stopBackgroundTask();
     if (MusicPlaybackService.player !== undefined) {
@@ -242,9 +266,17 @@ export class MusicPlaybackService {
       if (token !== MusicPlaybackService.sourceToken) {
         return;
       }
-      if (player.state !== 'idle') {
-        await player.reset();
+
+      // fdSrc is only accepted in idle, so get there first and wait for the
+      // transition to actually land before touching the player.
+      const reset: boolean = await MusicPlaybackService.machine.resetIfNeeded(player);
+      if (token !== MusicPlaybackService.sourceToken) {
+        return;
       }
+      if (!reset) {
+        throw new Error('player reset failed');
+      }
+
       await MusicPlaybackService.closeRawFile();
       if (token !== MusicPlaybackService.sourceToken) {
         return;
@@ -261,13 +293,34 @@ export class MusicPlaybackService {
         offset: descriptor.offset,
         length: descriptor.length
       };
-      player.audioRendererInfo = {
-        usage: audio.StreamUsage.STREAM_USAGE_MUSIC,
-        rendererFlags: 0
-      };
+
+      // Setting the source moves the player to initialized asynchronously.
+      // prepare() is illegal until that happens — this wait is what prevents
+      // the 5400102 "Operate Not Permit" failure.
+      const initialized: boolean = await MusicPlaybackService.machine.waitFor('initialized',
+        () => token !== MusicPlaybackService.sourceToken);
+      if (token !== MusicPlaybackService.sourceToken) {
+        return;
+      }
+      if (!initialized) {
+        throw new Error('source not initialized');
+      }
+
+      // audioRendererInfo is only accepted in initialized, before prepare().
+      player.audioRendererInfo = musicRendererInfo();
+
       await player.prepare();
       if (token !== MusicPlaybackService.sourceToken) {
         return;
+      }
+
+      const prepared: boolean = await MusicPlaybackService.machine.waitFor('prepared',
+        () => token !== MusicPlaybackService.sourceToken);
+      if (token !== MusicPlaybackService.sourceToken) {
+        return;
+      }
+      if (!prepared) {
+        throw new Error('prepare did not complete');
       }
 
       const durationMs: number = player.duration > 0 ? player.duration : track.durationMs;
@@ -319,6 +372,9 @@ export class MusicPlaybackService {
     const player: media.AVPlayer = await media.createAVPlayer();
     MusicPlaybackService.player = player;
     player.on('stateChange', (state: media.AVPlayerState, reason: media.StateChangeReason) => {
+      // Feed the machine first: it resolves any awaiters, and the phase mapping
+      // below reads the state the machine just recorded.
+      MusicPlaybackService.machine.onStateChange(state);
       MusicPlaybackService.handlePlayerState(state);
     });
     player.on('timeUpdate', (positionMs: number) => {
@@ -349,6 +405,10 @@ export class MusicPlaybackService {
 
   private static handlePlayerState(state: media.AVPlayerState): void {
     switch (state) {
+      case 'initialized':
+        // The source is set and prepare() is now legal. The load is still in
+        // flight, so keep the phase as LOADING until prepared arrives.
+        break;
       case 'prepared':
         MusicPlaybackService.playback.phase = MusicPlaybackPhase.READY;
         break;
@@ -370,6 +430,17 @@ export class MusicPlaybackService {
         MusicPlaybackService.updateSessionState(true);
         MusicPlaybackService.playAdjacent(1);
         return;
+      case 'stopped':
+        // Reached via stop(); the player is still usable but needs a new
+        // prepare() before it can play again.
+        MusicPlaybackService.playback.phase = MusicPlaybackPhase.READY;
+        break;
+      case 'idle':
+        // After reset, before a new source is assigned.
+        break;
+      case 'released':
+        MusicPlaybackService.playback.phase = MusicPlaybackPhase.IDLE;
+        break;
       case 'error':
         MusicPlaybackService.playback.phase = MusicPlaybackPhase.ERROR;
         MusicPlaybackService.stopBackgroundTask();
@@ -448,6 +519,9 @@ export class MusicPlaybackService {
       (standardError.message === undefined ? 'unknown' : standardError.message);
     MusicPlaybackService.playback.phase = MusicPlaybackPhase.ERROR;
     MusicPlaybackService.playback.error = detail;
+    // Drop any in-flight transition waits so a failed load cannot later resolve
+    // and resurrect a stale track.
+    MusicPlaybackService.machine.cancelAll();
     MusicPlaybackService.notify();
     MusicPlaybackService.updateSessionState(true);
     MusicPlaybackService.stopBackgroundTask();
