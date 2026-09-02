@@ -1,4 +1,7 @@
+import { KanaLookupService } from '../../services/KanaLookupService';
+
 const ASK_AI_MENU_ID: TextMenuItemId = TextMenuItemId.of('kotoba.selection.ask_ai');
+const KANA_MENU_ID: TextMenuItemId = TextMenuItemId.of('kotoba.selection.kana');
 
 function selectedText(content: string, range: TextRange): string {
   const rawStart: number = range.start ?? 0;
@@ -14,6 +17,7 @@ export function aiTextSelectionMenu(content: string, onAsk: (selected: string) =
       const next: TextMenuItem[] = [];
       for (let index: number = 0; index < menuItems.length; index++) {
         if (!menuItems[index].id.equals(ASK_AI_MENU_ID) &&
+          !menuItems[index].id.equals(KANA_MENU_ID) &&
           !menuItems[index].id.equals(TextMenuItemId.askAI)) {
           next.push(menuItems[index]);
         }
@@ -22,13 +26,25 @@ export function aiTextSelectionMenu(content: string, onAsk: (selected: string) =
         content: '问 AI',
         id: ASK_AI_MENU_ID
       });
+      next.push({
+        content: '查五十音',
+        id: KANA_MENU_ID
+      });
       return next;
     },
     onMenuItemClick: (menuItem: TextMenuItem, range: TextRange): boolean => {
+      const selection: string = selectedText(content, range);
+      if (menuItem.id.equals(KANA_MENU_ID)) {
+        // Routed through the service rather than a per-call-site callback: this
+        // menu is built at dozens of call sites that all pass only onAsk.
+        if (selection.length > 0) {
+          KanaLookupService.request(selection);
+        }
+        return true;
+      }
       if (!menuItem.id.equals(ASK_AI_MENU_ID)) {
         return false;
       }
-      const selection: string = selectedText(content, range);
       if (selection.length > 0) {
         onAsk(selection);
       }

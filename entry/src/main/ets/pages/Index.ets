@@ -38,6 +38,7 @@ import {
 import { HuaweiAccountService } from '../services/HuaweiAccountService';
 import { LearningPreferences } from '../services/LearningPreferences';
 import { LearningSyncCoordinator } from '../services/LearningSyncCoordinator';
+import { KanaLookupService } from '../services/KanaLookupService';
 import { MusicPlaybackService } from '../services/MusicPlaybackService';
 import { VocabularyLearningStore } from '../services/VocabularyLearningStore';
 import { ExplorePage } from '../views/pages/ExplorePage';
@@ -52,6 +53,7 @@ import { VocabularyPage } from '../views/pages/VocabularyPage';
 import { VocabularyStudyPage } from '../views/pages/VocabularyStudyPage';
 import { ImmersiveBackdrop } from '../views/components/ImmersiveCanvas';
 import { ContextAiPanel } from '../views/components/ContextAiPanel';
+import { KanaLookupSheet } from '../views/components/KanaLookupSheet';
 import { MusicMiniPlayer } from '../views/components/MusicMiniPlayer';
 
 @Entry
@@ -73,6 +75,10 @@ struct Index {
   @State private journeyCompletedMask: number = 0;
   @State private activeInquiry: AiInquiryContext | undefined = undefined;
   @State private inquiryPopupOpen: boolean = false;
+  // Kana chart opened from a selection menu; the request arrives through
+  // KanaLookupService so the menu call sites need no per-page wiring.
+  @State private kanaLookupOpen: boolean = false;
+  @State private kanaLookupQuery: string = '';
   @State private vocabularyStudyOpen: boolean = false;
   @State private vocabularyStudyLevel: string = 'N5';
   @State private vocabularyStudyWordId: string = '';
@@ -123,6 +129,7 @@ struct Index {
   };
 
   aboutToAppear(): void {
+    KanaLookupService.subscribe(this.kanaLookupListener);
     const context: common.Context = this.getUIContext().getHostContext() as common.Context;
     const storedSection: number = LearningPreferences.section(context);
     this.section = storedSection >= AppSection.LEARN && storedSection <= AppSection.ME ?
@@ -162,8 +169,14 @@ struct Index {
   }
 
   aboutToDisappear(): void {
+    KanaLookupService.unsubscribe(this.kanaLookupListener);
     MusicPlaybackService.unsubscribe(this.musicPlaybackListener);
   }
+
+  private kanaLookupListener: (query: string) => void = (query: string) => {
+    this.kanaLookupQuery = query;
+    this.kanaLookupOpen = true;
+  };
 
   private async initializeAccountAndSync(context: common.Context): Promise<void> {
     this.accountSnapshot = HuaweiAccountService.checking();
@@ -693,6 +706,17 @@ struct Index {
     }
     .width('100%')
     .height('100%')
+    .bindSheet($$this.kanaLookupOpen, this.kanaLookupSheet(), {
+      height: SheetSize.LARGE,
+      preferType: SheetType.BOTTOM,
+      title: { title: '五十音图' },
+      dragBar: true,
+      showClose: true,
+      blurStyle: BlurStyle.COMPONENT_REGULAR,
+      backgroundColor: $r('app.color.surface_raised'),
+      maskColor: '#52000000',
+      onDisappear: () => this.kanaLookupOpen = false
+    })
     .padding({
       bottom: this.shellBottomInset(),
       left: this.activeReading === undefined && !this.musicPlayerOpen ? this.leftSafeInset() : 0,
@@ -730,6 +754,13 @@ struct Index {
       .borderRadius(24)
       .clip(true)
     }
+  }
+
+  @Builder
+  private kanaLookupSheet() {
+    KanaLookupSheet({
+      query: this.kanaLookupQuery
+    })
   }
 
   onBackPress(): boolean {
