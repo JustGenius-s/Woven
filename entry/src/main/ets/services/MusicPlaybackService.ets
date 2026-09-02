@@ -15,6 +15,10 @@ import {
 import { LearningPreferences } from './LearningPreferences';
 import { LearningSyncCoordinator } from './LearningSyncCoordinator';
 import { musicRendererInfo, PlayerStateMachine } from './MusicPlaybackStateMachine';
+import { hilog } from '@kit.PerformanceAnalysisKit';
+
+const LOG_DOMAIN: number = 0x4b4f;
+const LOG_TAG: string = 'KotobaMusic';
 
 const POSITION_PERSIST_INTERVAL_MS: number = 3000;
 const POSITION_SYNC_INTERVAL_MS: number = 15000;
@@ -113,6 +117,9 @@ export class MusicPlaybackService {
     // real state; when it does, toggle() picks the wrong branch and the
     // matching call is then rejected, so the button appears dead.
     const state: string = MusicPlaybackService.machine.state;
+    hilog.info(LOG_DOMAIN, LOG_TAG,
+      'toggle: state=%{public}s phase=%{public}d inFlight=%{public}s', state,
+      MusicPlaybackService.playback.phase, String(MusicPlaybackService.commandInFlight));
     if (state === 'playing') {
       await MusicPlaybackService.pause();
       return;
@@ -150,10 +157,13 @@ export class MusicPlaybackService {
     if (player === undefined || MusicPlaybackService.playback.trackId !== MusicPlaybackService.tracks[index].id ||
       MusicPlaybackService.playback.phase === MusicPlaybackPhase.IDLE ||
       MusicPlaybackService.playback.phase === MusicPlaybackPhase.ERROR) {
+      hilog.info(LOG_DOMAIN, LOG_TAG, 'play: reloading track, state=%{public}s phase=%{public}d',
+        MusicPlaybackService.machine.state, MusicPlaybackService.playback.phase);
       await MusicPlaybackService.selectTrack(index, true);
       return;
     }
     if (MusicPlaybackService.playback.phase === MusicPlaybackPhase.LOADING) {
+      hilog.info(LOG_DOMAIN, LOG_TAG, 'play: deferring, still loading');
       MusicPlaybackService.autoplayOnPrepared = true;
       return;
     }
@@ -186,12 +196,16 @@ export class MusicPlaybackService {
   static async pause(): Promise<void> {
     const player: media.AVPlayer | undefined = MusicPlaybackService.player;
     if (player === undefined || MusicPlaybackService.commandInFlight) {
+      hilog.warn(LOG_DOMAIN, LOG_TAG, 'pause: SKIP player=%{public}s inFlight=%{public}s',
+        String(player === undefined), String(MusicPlaybackService.commandInFlight));
       return;
     }
     // pause() is only legal from playing. The app-level phase is updated from
     // the asynchronous stateChange event, so it can still read PLAYING after
     // pause() has already been accepted; the machine's state is the authority.
     if (MusicPlaybackService.machine.state !== 'playing') {
+      hilog.warn(LOG_DOMAIN, LOG_TAG, 'pause: SKIP not playing, state=%{public}s',
+        MusicPlaybackService.machine.state);
       return;
     }
     MusicPlaybackService.commandInFlight = true;

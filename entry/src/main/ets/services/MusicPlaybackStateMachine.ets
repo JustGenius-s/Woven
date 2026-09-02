@@ -1,5 +1,9 @@
 import { audio } from '@kit.AudioKit';
 import { media } from '@kit.MediaKit';
+import { hilog } from '@kit.PerformanceAnalysisKit';
+
+const DOMAIN: number = 0x4b4f;
+const TAG: string = 'KotobaMusic';
 
 /**
  * Official AVPlayer states. Kept as a local union so the state machine can be
@@ -45,6 +49,9 @@ export class PlayerStateMachine {
    * Records a transition reported by AVPlayer and wakes anyone waiting for it.
    */
   onStateChange(state: PlayerState): void {
+    if (this.current !== state) {
+      hilog.info(DOMAIN, TAG, 'state: %{public}s -> %{public}s', this.current, state);
+    }
     this.current = state;
     const settled: PendingWaiter[] = [];
     for (let index: number = this.waiters.length - 1; index >= 0; index--) {
@@ -68,12 +75,14 @@ export class PlayerStateMachine {
    */
   waitFor(target: PlayerState, isCancelled: () => boolean): Promise<boolean> {
     if (isCancelled()) {
+      hilog.info(DOMAIN, TAG, 'wait %{public}s: cancelled before start', target);
       return Promise.resolve(false);
     }
     if (this.current === target) {
       return Promise.resolve(true);
     }
     if (this.current === 'error' || this.current === 'released') {
+      hilog.info(DOMAIN, TAG, 'wait %{public}s: aborted, state=%{public}s', target, this.current);
       return Promise.resolve(false);
     }
     return new Promise<boolean>((resolve: (reached: boolean) => void) => {
@@ -84,8 +93,10 @@ export class PlayerStateMachine {
       };
       waiter.timer = setTimeout(() => {
         this.remove(waiter);
+        hilog.warn(DOMAIN, TAG, 'wait %{public}s: TIMEOUT, state=%{public}s', target, this.current);
         resolve(false);
       }, STATE_TIMEOUT_MS);
+      hilog.info(DOMAIN, TAG, 'wait %{public}s: awaiting from %{public}s', target, this.current);
       this.waiters.push(waiter);
     });
   }

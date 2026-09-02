@@ -86,6 +86,9 @@ struct Index {
   @State private scenarioIndex: number = -1;
   @State private learnedWordCount: number = 0;
   @State private floatingBarsVertical: boolean = true;
+  // Tracks the style HdsTabs actually settled on. The collapsed mini bar is the
+  // shorter of the two, so its content has to shrink to fit.
+  @State private miniBarCollapsed: boolean = true;
   @State private accountSnapshot: HuaweiAccountSnapshot = {
     phase: HuaweiAccountPhase.SIGNED_OUT,
     unionId: '',
@@ -98,9 +101,24 @@ struct Index {
     detail: ''
   };
   private musicPlaybackListener: MusicPlaybackListener = (snapshot: MusicPlaybackSnapshot) => {
-    this.musicPlayback = snapshot;
     if (snapshot.trackIndex >= 0) {
       this.musicIndex = snapshot.trackIndex;
+    }
+    // timeUpdate fires roughly every 100ms. Index only reads trackIndex and
+    // trackId from the snapshot, but replacing this @State on every tick
+    // rebuilds the whole shell — which makes HdsTabs rebuild its miniBar
+    // content, so taps on the mini bar land on an instance that is about to be
+    // discarded and are lost. Only structural changes belong here; the bar
+    // keeps its live position through its own subscription.
+    if (this.musicPlayerOpen ||
+      this.musicPlayback.trackIndex !== snapshot.trackIndex ||
+      this.musicPlayback.trackId !== snapshot.trackId ||
+      this.musicPlayback.phase !== snapshot.phase ||
+      this.musicPlayback.durationMs !== snapshot.durationMs ||
+      this.musicPlayback.error !== snapshot.error) {
+      // While the full player is open the mini bar is hidden, so frequent
+      // rebuilds cost nothing and the player's progress bar stays live.
+      this.musicPlayback = snapshot;
     }
   };
 
@@ -406,7 +424,13 @@ struct Index {
       miniBarStyle: this.floatingBarsVertical ? HdsBarStyle.COLLAPSE : HdsBarStyle.EXPAND,
       barLayoutMode: this.floatingBarsVertical ? HdsBarLayoutMode.VERTICAL : HdsBarLayoutMode.HORIZONTAL,
       enableMiniBarBackground: true,
-      enableMiniBarClip: true
+      enableMiniBarClip: true,
+      onBarStyleChange: (miniBarStyle: HdsBarStyle) => {
+        const collapsed: boolean = miniBarStyle === HdsBarStyle.COLLAPSE;
+        if (this.miniBarCollapsed !== collapsed) {
+          this.miniBarCollapsed = collapsed;
+        }
+      }
     };
   }
 
@@ -682,6 +706,9 @@ struct Index {
     MusicMiniPlayer({
       tracks: this.musicTracks,
       snapshot: this.musicPlayback,
+      // The collapsed mini bar is the shorter of the two styles, so its content
+      // steps down to fit; the expanded one keeps the regular sizes.
+      compact: this.miniBarCollapsed,
       onOpen: () => this.openMusic(this.musicPlayback.trackIndex, false),
       onToggle: () => MusicPlaybackService.toggle(),
       onNext: () => MusicPlaybackService.next()
