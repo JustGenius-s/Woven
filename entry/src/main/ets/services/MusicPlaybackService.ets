@@ -108,6 +108,21 @@ export class MusicPlaybackService {
   }
 
   static async toggle(): Promise<void> {
+    // Branch on the state machine, not the app-level phase. The phase is
+    // updated from the asynchronous stateChange event and can lag behind the
+    // real state; when it does, toggle() picks the wrong branch and the
+    // matching call is then rejected, so the button appears dead.
+    const state: string = MusicPlaybackService.machine.state;
+    if (state === 'playing') {
+      await MusicPlaybackService.pause();
+      return;
+    }
+    if (state === 'prepared' || state === 'paused' || state === 'completed') {
+      await MusicPlaybackService.play();
+      return;
+    }
+    // idle/initialized/stopped/error/released: no source is ready, so pick the
+    // branch from the phase and let play() reload it.
     if (MusicPlaybackService.playback.phase === MusicPlaybackPhase.PLAYING) {
       await MusicPlaybackService.pause();
     } else {
