@@ -45,6 +45,11 @@ export class MusicPlaybackService {
   // states. The machine owns that bookkeeping so callers await a state instead
   // of assuming an operation already moved the player into it.
   private static machine: PlayerStateMachine = new PlayerStateMachine();
+  // Serialises transport commands. AVPlayer rejects play()/pause() issued from
+  // a state it has not reached yet, and stateChange is asynchronous, so a fast
+  // double tap can otherwise fire pause() twice — the second one lands in
+  // paused and throws, which reads as the button doing nothing.
+  private static commandInFlight: boolean = false;
 
   static initialize(context: common.Context, tracks: MusicTrack[]): void {
     MusicPlaybackService.context = context as common.UIAbilityContext;
@@ -147,6 +152,10 @@ export class MusicPlaybackService {
           return;
         }
       }
+      if (MusicPlaybackService.machine.state === 'playing') {
+        return;
+      }
+      MusicPlaybackService.commandInFlight = true;
       if (MusicPlaybackService.playback.phase === MusicPlaybackPhase.COMPLETED) {
         player.seek(0, media.SeekMode.SEEK_PREV_SYNC);
         MusicPlaybackService.updatePosition(0, true);
@@ -154,19 +163,30 @@ export class MusicPlaybackService {
       await player.play();
     } catch (error) {
       MusicPlaybackService.fail(error);
+    } finally {
+      MusicPlaybackService.commandInFlight = false;
     }
   }
 
   static async pause(): Promise<void> {
     const player: media.AVPlayer | undefined = MusicPlaybackService.player;
-    if (player === undefined || MusicPlaybackService.playback.phase !== MusicPlaybackPhase.PLAYING) {
+    if (player === undefined || MusicPlaybackService.commandInFlight) {
       return;
     }
+    // pause() is only legal from playing. The app-level phase is updated from
+    // the asynchronous stateChange event, so it can still read PLAYING after
+    // pause() has already been accepted; the machine's state is the authority.
+    if (MusicPlaybackService.machine.state !== 'playing') {
+      return;
+    }
+    MusicPlaybackService.commandInFlight = true;
     try {
       await player.pause();
       MusicPlaybackService.persistPosition(true);
     } catch (error) {
       MusicPlaybackService.fail(error);
+    } finally {
+      MusicPlaybackService.commandInFlight = false;
     }
   }
 
@@ -205,6 +225,7 @@ export class MusicPlaybackService {
     MusicPlaybackService.sourceToken++;
     // Wake anything awaiting a transition; the player is going away.
     MusicPlaybackService.machine.cancelAll();
+    MusicPlaybackService.commandInFlight = false;
     MusicPlaybackService.persistPosition(true);
     await MusicPlaybackService.stopBackgroundTask();
     if (MusicPlaybackService.player !== undefined) {
@@ -522,6 +543,7 @@ export class MusicPlaybackService {
     // Drop any in-flight transition waits so a failed load cannot later resolve
     // and resurrect a stale track.
     MusicPlaybackService.machine.cancelAll();
+    MusicPlaybackService.commandInFlight = false;
     MusicPlaybackService.notify();
     MusicPlaybackService.updateSessionState(true);
     MusicPlaybackService.stopBackgroundTask();

@@ -15,6 +15,57 @@ const MINI_BAR_MATERIAL: uiMaterial.Material = new uiMaterial.ImmersiveMaterial(
   colorInvert: true
 });
 
+/**
+ * Static half of the mini bar: artwork and track text.
+ *
+ * The service emits a new snapshot on every timeUpdate (roughly twice a
+ * second). Keeping this in its own component lets ArkUI skip it when only the
+ * position or phase changed, which otherwise re-decodes the artwork on every
+ * tick and makes it flicker.
+ */
+@Component
+struct MiniBarTrackInfo {
+  @Prop trackId: string = '';
+  @Prop title: string = '';
+  @Prop artist: string = '';
+  @Prop artwork: Resource = $r('app.media.music_look_at_stars');
+  onOpen: () => void = () => {};
+
+  build() {
+    Row({ space: 12 }) {
+      Image(this.artwork)
+        .width(48)
+        .height(48)
+        .borderRadius(15)
+        .objectFit(ImageFit.Cover)
+        // Small local artwork: loading it synchronously on the main thread is
+        // what the Image docs recommend when it flickers while reloading.
+        .syncLoad(true)
+        .onClick(() => this.onOpen())
+
+      Column({ space: 3 }) {
+        Text(this.title)
+          .width('100%')
+          .fontSize(15)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('sys.color.font_primary'))
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text(this.artist)
+          .width('100%')
+          .fontSize(12)
+          .fontColor($r('sys.color.font_secondary'))
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+      .onClick(() => this.onOpen())
+    }
+    .width('100%')
+  }
+}
+
 @Component
 export struct MusicMiniPlayer {
   @Prop tracks: MusicTrack[] = [];
@@ -62,31 +113,14 @@ export struct MusicMiniPlayer {
     if (this.track() !== undefined) {
       Column() {
         Row({ space: 12 }) {
-          Image(this.artwork(this.track()?.id ?? ''))
-            .width(48)
-            .height(48)
-            .borderRadius(15)
-            .objectFit(ImageFit.Cover)
-            .onClick(() => this.onOpen())
-
-          Column({ space: 3 }) {
-            Text(this.track()?.title ?? '')
-              .width('100%')
-              .fontSize(15)
-              .fontWeight(FontWeight.Medium)
-              .fontColor($r('sys.color.font_primary'))
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-            Text(this.track()?.artist ?? '')
-              .width('100%')
-              .fontSize(12)
-              .fontColor($r('sys.color.font_secondary'))
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-          }
+          MiniBarTrackInfo({
+            trackId: this.track()?.id ?? '',
+            title: this.track()?.title ?? '',
+            artist: this.track()?.artist ?? '',
+            artwork: this.artwork(this.track()?.id ?? ''),
+            onOpen: () => this.onOpen()
+          })
           .layoutWeight(1)
-          .alignItems(HorizontalAlign.Start)
-          .onClick(() => this.onOpen())
 
           Button({ type: ButtonType.Circle, stateEffect: true }) {
             if (this.snapshot.phase === MusicPlaybackPhase.LOADING) {
