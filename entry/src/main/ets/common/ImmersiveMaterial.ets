@@ -1,28 +1,50 @@
+import { uiMaterial } from '@kit.ArkUI';
 import { hdsMaterial, SystemMaterialParams } from '@kit.UIDesignKit';
 
-/**
- * Let HarmonyOS choose both the material implementation and its level.
- * This keeps immersive light aligned with the user's system policy and the
- * current device capability instead of forcing an app-defined strength.
- */
-export function preferredImmersiveMaterial(): SystemMaterialParams {
+let cachedHighest: SystemMaterialParams | undefined = undefined;
+
+function resolveHighestImmersiveMaterial(): SystemMaterialParams {
+  let immersive = false;
+  try {
+    const types: Array<hdsMaterial.MaterialType> = hdsMaterial.getSystemMaterialTypes();
+    immersive = types.indexOf(hdsMaterial.MaterialType.IMMERSIVE) >= 0;
+  } catch (_error) {
+    immersive = false;
+  }
   return {
-    materialType: hdsMaterial.MaterialType.ADAPTIVE,
-    materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
+    materialType: immersive ? hdsMaterial.MaterialType.IMMERSIVE : hdsMaterial.MaterialType.ADAPTIVE,
+    materialLevel: immersive ? hdsMaterial.MaterialLevel.EXQUISITE : hdsMaterial.MaterialLevel.ADAPTIVE
   };
 }
 
 /**
- * Material for the floating bottom bars (tab bar and mini player).
- *
- * ADAPTIVE is documented as defaulting to the immersive material, but the
- * official HdsTabs immersive sample asks for IMMERSIVE explicitly, and the
- * bottom bars showed a noticeably weaker effect under ADAPTIVE. The level
- * stays ADAPTIVE so the system still tunes the strength per device.
+ * Highest HDS immersive grade the device can run. Cached because title bars
+ * and tabs call this during build; a new object every frame can reset the bar.
+ */
+export function preferredImmersiveMaterial(): SystemMaterialParams {
+  if (cachedHighest === undefined) {
+    cachedHighest = resolveHighestImmersiveMaterial();
+  }
+  return cachedHighest;
+}
+
+/**
+ * Same grade as the title bars. The bottom bars used to ask for IMMERSIVE at
+ * ADAPTIVE level; EXQUISITE is the actual top rung once the device allows it.
  */
 export function bottomBarImmersiveMaterial(): SystemMaterialParams {
-  return {
-    materialType: hdsMaterial.MaterialType.IMMERSIVE,
-    materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
-  };
+  return preferredImmersiveMaterial();
 }
+
+/**
+ * ArkUI floating chrome: buttons, chips, and toolbars that sit on content.
+ * Auto-invert only works on THIN / ULTRA_THIN and only for sys.color.*.
+ */
+export const FLOATING_CHROME_MATERIAL: uiMaterial.Material = new uiMaterial.ImmersiveMaterial({
+  style: uiMaterial.ImmersiveStyle.THIN,
+  colorInvert: true,
+  interactive: true,
+  lightEffect: {
+    color: Color.White
+  }
+});

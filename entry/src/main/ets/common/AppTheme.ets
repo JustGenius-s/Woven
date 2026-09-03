@@ -1,3 +1,5 @@
+import { window } from '@kit.ArkUI';
+
 export const APP_HORIZONTAL_PADDING: number = 24;
 export const FLOATING_TAB_BAR_BOTTOM_MARGIN: number = 12;
 // Bottom breathing room for scroll content so the floating tab bar (and the
@@ -9,6 +11,11 @@ export const FLOATING_TAB_CONTENT_INSET: number = 170;
 export const FLOATING_TAB_MASK_HEIGHT: number = 72;
 export const CONTENT_MAX_WIDTH: number = 840;
 export const MOTION_DURATION: number = 320;
+
+export function systemGestureInset(avoidAreas: window.UIEnvWindowAvoidAreaInfoVP): number {
+  return Math.max(avoidAreas.navigationIndicator.bottomRect.height, avoidAreas.cutout.bottomRect.height,
+    avoidAreas.statusBar.bottomRect.height);
+}
 
 export function levelAccent(level: string): ResourceColor {
   if (level === 'N5' || level === '入门') {

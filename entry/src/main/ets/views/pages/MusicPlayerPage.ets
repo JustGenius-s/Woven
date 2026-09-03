@@ -1,3 +1,5 @@
+import { curves, window } from '@kit.ArkUI';
+import { MOTION_DURATION, systemGestureInset } from '../../common/AppTheme';
 import { MusicLine, MusicTrack } from '../../model/ContentModels';
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import {
@@ -7,13 +9,15 @@ import {
 } from '../../model/MusicPlaybackModels';
 import { AiInquiryFactory } from '../../services/AiInquiryFactory';
 import { aiTextSelectionMenu } from '../components/AiTextSelection';
+import { FLOATING_CHROME_MATERIAL } from '../../common/ImmersiveMaterial';
 import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
-import { planeLightEffect } from '../components/ImmersiveCanvas';
+import { contentLightEffect, planeLightEffect } from '../components/ImmersiveCanvas';
 
 const RESPONSIVE_SPLIT_BREAKPOINT: number = 600;
 
 @Component
 export struct MusicPlayerPage {
+  @Env(SystemProperties.WINDOW_AVOID_AREA) private avoidAreas: window.UIEnvWindowAvoidAreaInfoVP;
   @Prop tracks: MusicTrack[] = [];
   @Prop snapshot: MusicPlaybackSnapshot = emptyMusicPlaybackSnapshot();
   onBack: () => void = () => {};
@@ -24,7 +28,7 @@ export struct MusicPlayerPage {
   onAsk: (context: AiInquiryContext) => void = (context: AiInquiryContext) => {};
 
   @State private pageWidth: number = 360;
-  private mobileScroller: Scroller = new Scroller();
+  @State private stage: number = 0;
   private lyricScroller: Scroller = new Scroller();
 
   private track(): MusicTrack | undefined {
@@ -115,14 +119,10 @@ export struct MusicPlayerPage {
         ImmersiveBackChrome({
           title: '正在播放',
           subtitle: `${this.track()?.artist ?? ''} · 探索`,
-          scrollers: [this.mobileScroller, this.lyricScroller],
+          scrollers: [this.lyricScroller],
           onBack: () => this.onBack(),
           pageContent: () => {
-            if (this.splitLayout()) {
-              this.wideLayout(this.track() as MusicTrack)
-            } else {
-              this.mobileLayout(this.track() as MusicTrack)
-            }
+            this.playerBody(this.track() as MusicTrack)
           }
         })
       }
@@ -134,82 +134,90 @@ export struct MusicPlayerPage {
   }
 
   @Builder
-  private mobileLayout(track: MusicTrack) {
-    Scroll(this.mobileScroller) {
-      Column() {
-        this.artworkBlock(track, 360)
-        this.trackIdentity(track)
-        this.transportControls()
-        this.mobileLyrics(track)
+  private playerBody(track: MusicTrack) {
+    Column() {
+      Swiper() {
+        this.artworkPage(track)
+        this.lyricsPage(track)
       }
+      .layoutWeight(1)
       .width('100%')
-      .alignItems(HorizontalAlign.Center)
-      .padding({ left: 20, right: 20, top: 12, bottom: 42 })
+      .index(this.stage)
+      .indicator(false)
+      .loop(false)
+      .duration(MOTION_DURATION)
+      .curve(curves.springMotion(0.42, 0.86, 0.16))
+      .cachedCount(1)
+      .onChange((index: number) => this.stage = index)
+
+      this.stageDots()
+      this.trackIdentity(track)
+      this.transportControls()
     }
     .width('100%')
     .height('100%')
+    .alignItems(HorizontalAlign.Center)
+    .constraintSize({ maxWidth: this.splitLayout() ? 760 : 520 })
+    .padding({
+      left: this.splitLayout() ? 28 : 20,
+      right: this.splitLayout() ? 28 : 20,
+      top: this.splitLayout() ? 16 : 8,
+      bottom: 28 + systemGestureInset(this.avoidAreas)
+    })
+  }
+
+  @Builder
+  private artworkPage(track: MusicTrack) {
+    Column() {
+      this.artworkBlock(track, this.splitLayout() ? 420 : 360)
+    }
+    .width('100%')
+    .height('100%')
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+  }
+
+  @Builder
+  private lyricsPage(track: MusicTrack) {
+    List({ scroller: this.lyricScroller, space: 8 }) {
+      ForEach(track.lines, (line: MusicLine, index: number) => {
+        ListItem() {
+          this.lyricLine(track, line, index)
+        }
+      }, (line: MusicLine) => `${track.id}-${line.startMs}`)
+    }
+    .width('100%')
+    .height('100%')
+    .padding({ left: 4, right: 4, top: 4 })
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.Spring)
     .clip(false)
   }
 
   @Builder
-  private wideLayout(track: MusicTrack) {
-    Row({ space: 28 }) {
-      Scroll(this.mobileScroller) {
-        Column() {
-          this.artworkBlock(track, 420)
-          this.trackIdentity(track)
-          this.transportControls()
-        }
-        .width('100%')
-        .alignItems(HorizontalAlign.Center)
-        .padding({ left: 28, right: 8, top: 20, bottom: 32 })
-      }
-      .layoutWeight(46)
-      .height('100%')
-      .scrollBar(BarState.Off)
-      .edgeEffect(EdgeEffect.Spring)
-      .clip(false)
-
-      Column() {
-        Row() {
-          Column({ space: 4 }) {
-            Text('歌词与学习')
-              .fontSize(26)
-              .fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.ink'))
-            Text(`${track.level} · ${track.focus}`)
-              .fontSize(13)
-              .fontColor($r('app.color.ink_muted'))
-          }
-          .alignItems(HorizontalAlign.Start)
-          Blank()
-        }
-        .width('100%')
-        .padding({ left: 8, right: 28, top: 22, bottom: 12 })
-
-        List({ scroller: this.lyricScroller, space: 8 }) {
-          ForEach(track.lines, (line: MusicLine, index: number) => {
-            ListItem() {
-              this.lyricLine(track, line, index)
-            }
-          }, (line: MusicLine) => `${track.id}-${line.startMs}`)
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .padding({ left: 8, right: 28, bottom: 30 })
-        .scrollBar(BarState.Off)
-        .edgeEffect(EdgeEffect.Spring)
-        .clip(false)
-      }
-      .layoutWeight(54)
-      .height('100%')
+  private stageDots() {
+    Row({ space: 8 }) {
+      this.stageDot(0, '封面')
+      this.stageDot(1, '歌词')
     }
-    .width('100%')
-    .height('100%')
-    .constraintSize({ maxWidth: 1180 })
-    .align(Alignment.Center)
+    .height(28)
+    .margin({ top: 10, bottom: 2 })
+    .justifyContent(FlexAlign.Center)
+    .visualEffect(contentLightEffect())
+  }
+
+  @Builder
+  private stageDot(index: number, label: string) {
+    Row()
+      .width(this.stage === index ? 18 : 7)
+      .height(7)
+      .borderRadius(4)
+      .backgroundColor(this.stage === index ? $r('app.color.accent') : $r('sys.color.font_secondary'))
+      .opacity(this.stage === index ? 1 : 0.38)
+      .visualEffect(this.stage === index ? planeLightEffect() : undefined)
+      .animation({ curve: curves.springMotion(0.36, 0.86, 0.14) })
+      .accessibilityText(label)
+      .onClick(() => this.stage = index)
   }
 
   @Builder
@@ -287,13 +295,15 @@ export struct MusicPlayerPage {
       })
         .width('100%')
         .selectedColor($r('app.color.accent'))
-        .blockColor($r('app.color.ink'))
-        .trackColor($r('app.color.line'))
+        .blockColor($r('sys.color.icon_primary'))
+        .trackColor($r('sys.color.font_secondary'))
+        .visualEffect(planeLightEffect())
         .onChange((value: number, mode: SliderChangeMode) => {
           if (mode === SliderChangeMode.End || mode === SliderChangeMode.Click) {
             this.onSeek(value);
           }
         })
+        .systemMaterial(FLOATING_CHROME_MATERIAL)
 
       Row() {
         Text(this.formatTime(this.snapshot.positionMs))
@@ -365,30 +375,6 @@ export struct MusicPlayerPage {
     .width('100%')
     .constraintSize({ maxWidth: 460 })
     .margin({ top: 18 })
-  }
-
-  @Builder
-  private mobileLyrics(track: MusicTrack) {
-    Column({ space: 8 }) {
-      Row() {
-        Text('歌词与学习')
-          .fontSize(22)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.ink'))
-        Blank()
-        Text(track.level)
-          .fontSize(12)
-          .fontColor($r('app.color.accent'))
-      }
-      .width('100%')
-      .margin({ top: 34, bottom: 6 })
-
-      ForEach(track.lines, (line: MusicLine, index: number) => {
-        this.lyricLine(track, line, index)
-      }, (line: MusicLine) => `${track.id}-${line.startMs}`)
-    }
-    .width('100%')
-    .constraintSize({ maxWidth: 520 })
   }
 
   @Builder

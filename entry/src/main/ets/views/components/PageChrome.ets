@@ -63,11 +63,11 @@ export struct PageChrome {
           },
           contentStyle: {
             titleStyle: {
-              mainTitleColor: $r('app.color.ink'),
+              mainTitleColor: $r('sys.color.font_primary'),
               subTitleColor: $r('app.color.accent')
             },
             menuStyle: {
-              iconColor: $r('app.color.ink')
+              iconColor: $r('sys.color.icon_primary')
             }
           }
         },
@@ -117,7 +117,7 @@ export struct PageChrome {
     .titleMode(this.largeTitle ? HdsNavigationTitleMode.FREE : HdsNavigationTitleMode.MINI)
     .hideBackButton(true)
     .bindToScrollable(this.scrollers)
-    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
+    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
     .width('100%')
     .height('100%')
     .clip(false)

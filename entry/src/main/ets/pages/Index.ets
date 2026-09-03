@@ -14,7 +14,8 @@ import {
   CONTENT_MAX_WIDTH,
   FLOATING_TAB_BAR_BOTTOM_MARGIN,
   FLOATING_TAB_MASK_HEIGHT,
-  MOTION_DURATION
+  MOTION_DURATION,
+  systemGestureInset
 } from '../common/AppTheme';
 import { bottomBarImmersiveMaterial } from '../common/ImmersiveMaterial';
 import { AppSection, LearningJourney, MusicTrack, PracticeScenario, ReadingWork } from '../model/ContentModels';
@@ -96,6 +97,10 @@ struct Index {
   // Tracks the style HdsTabs actually settled on. The collapsed mini bar is the
   // shorter of the two, so its content has to shrink to fit.
   @State private miniBarCollapsed: boolean = true;
+  // Last style we asked HdsTabs to use, including the user's tap on the
+  // collapsed tab icon. Kept off @State so onBarStyleChange can record it
+  // during layout without rebuilding the shell mid-animation.
+  private requestedMiniBarStyle: HdsBarStyle = HdsBarStyle.COLLAPSE;
   @State private accountSnapshot: HuaweiAccountSnapshot = {
     phase: HuaweiAccountPhase.SIGNED_OUT,
     unionId: '',
@@ -246,7 +251,6 @@ struct Index {
     if (section !== AppSection.VOCABULARY) {
       this.vocabularySearchOpen = false;
     }
-    this.floatingBarsVertical = true;
     this.section = section;
     LearningPreferences.saveSection(this.getUIContext().getHostContext() as common.Context, section);
   }
@@ -386,17 +390,7 @@ struct Index {
   }
 
   private bottomSafeInset(): number {
-    return Math.max(this.avoidAreas.navigationIndicator.bottomRect.height, this.avoidAreas.cutout.bottomRect.height,
-      this.avoidAreas.statusBar.bottomRect.height);
-  }
-
-  private shellBottomInset(): number {
-    if (this.activeReading !== undefined) {
-      return 0;
-    }
-    const tabsVisible: boolean = this.activeScenario === undefined && !this.settingsOpen &&
-      !this.vocabularyStudyOpen && this.activeReading === undefined && !this.musicPlayerOpen;
-    return tabsVisible ? 0 : this.bottomSafeInset();
+    return systemGestureInset(this.avoidAreas);
   }
 
   private miniPlayerVisible(): boolean {
@@ -416,8 +410,13 @@ struct Index {
     if (this.floatingBarsVertical === vertical) {
       return;
     }
+    // Only the layout-mode transition requests a new priority. Once the bars
+    // are already horizontal, leave requestedMiniBarStyle alone so a later
+    // scroll tick cannot undo a tap that expanded the tab bar.
+    this.requestedMiniBarStyle = vertical ? HdsBarStyle.COLLAPSE : HdsBarStyle.EXPAND;
     this.getUIContext().animateTo({ curve: curves.springMotion(0.42, 0.86, 0.16) }, () => {
       this.floatingBarsVertical = vertical;
+      this.miniBarCollapsed = vertical;
     });
   }
 
@@ -433,18 +432,27 @@ struct Index {
       miniBarBuilder: () => {
         this.musicMiniBar()
       },
-      // In a vertical stack, letting the tab bar take expansion priority keeps
-      // both rows visible. In a horizontal row, prioritizing the mini bar makes
-      // the tab bar collapse to the selected icon, matching the system player.
-      miniBarStyle: this.floatingBarsVertical ? HdsBarStyle.COLLAPSE : HdsBarStyle.EXPAND,
+      // Follow the last requested style, not just the layout mode. Horizontal
+      // mode starts with an expanded mini bar (tab icon only). If this stayed
+      // pinned to EXPAND, a tap that opens the tab bar would rebuild with
+      // EXPAND again and snap the tabs shut.
+      miniBarStyle: this.requestedMiniBarStyle,
       barLayoutMode: this.floatingBarsVertical ? HdsBarLayoutMode.VERTICAL : HdsBarLayoutMode.HORIZONTAL,
       enableMiniBarBackground: true,
       enableMiniBarClip: true,
       onBarStyleChange: (miniBarStyle: HdsBarStyle) => {
+        this.requestedMiniBarStyle = miniBarStyle;
         const collapsed: boolean = miniBarStyle === HdsBarStyle.COLLAPSE;
-        if (this.miniBarCollapsed !== collapsed) {
-          this.miniBarCollapsed = collapsed;
+        if (this.miniBarCollapsed === collapsed) {
+          return;
         }
+        // HdsTabs reports the new style during its own layout. Writing @State
+        // here rebuilds Index while the bar is still settling.
+        setTimeout(() => {
+          if (this.miniBarCollapsed !== collapsed) {
+            this.miniBarCollapsed = collapsed;
+          }
+        }, 0);
       }
     };
   }
@@ -477,6 +485,7 @@ struct Index {
     }
     .width('100%')
     .height('100%')
+    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
     // Opaque backgrounds render above the title bar's material layer and hide
     // the immersive effect (see the "看不到材质效果" FAQ). The window already
     // paints the surface color in EntryAbility, so keeping the root clear lets
@@ -522,6 +531,7 @@ struct Index {
             onExit: () => this.closePractice()
           })
           .width('100%')
+          .height('100%')
           .constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
           .transition(TransitionEffect.OPACITY
             .combine(TransitionEffect.scale({ x: 0.94, y: 0.94 }))
@@ -537,6 +547,7 @@ struct Index {
               this.getUIContext().getHostContext() as common.Context, true)
           })
           .width('100%')
+          .height('100%')
           .constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
           .transition(TransitionEffect.OPACITY
             .combine(TransitionEffect.scale({ x: 0.97, y: 0.97 }))
@@ -554,6 +565,7 @@ struct Index {
             onToneChange: (toneIndex: number) => this.vocabularySceneTone = toneIndex
           })
           .width('100%')
+          .height('100%')
           .constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
           .transition(TransitionEffect.OPACITY
             .combine(TransitionEffect.translate({ y: 20 }))
@@ -643,6 +655,7 @@ struct Index {
         .width('100%')
         .height('100%')
         .constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
+        .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
         .barMode(BarMode.Fixed)
         .scrollable(false)
         .animationDuration(MOTION_DURATION)
@@ -652,7 +665,7 @@ struct Index {
         .divider({ mode: DividerMode.NONE })
         .barFloatingStyle({
           barSideMargin: 16,
-          barBottomMargin: FLOATING_TAB_BAR_BOTTOM_MARGIN,
+          barBottomMargin: FLOATING_TAB_BAR_BOTTOM_MARGIN + this.bottomSafeInset(),
           gradientMask: {
             // The mask paints on top of the bar's material layer, so an opaque
             // color cancels the immersive effect entirely. HdsTabs defaults to
@@ -720,10 +733,10 @@ struct Index {
       onDisappear: () => this.kanaLookupOpen = false
     })
     .padding({
-      bottom: this.shellBottomInset(),
       left: this.activeReading === undefined && !this.musicPlayerOpen ? this.leftSafeInset() : 0,
       right: this.activeReading === undefined && !this.musicPlayerOpen ? this.rightSafeInset() : 0
     })
+    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
     .backgroundColor(Color.Transparent)
   }
 

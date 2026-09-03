@@ -69,6 +69,8 @@ export default class EntryAbility extends UIAbility {
       this.mainWindow.setWindowSystemBarProperties({
         statusBarColor: '#00000000',
         statusBarContentColor: contentColor,
+        navigationBarColor: '#00000000',
+        navigationBarContentColor: contentColor,
         enableStatusBarAnimation: true
       }).catch((error: Object) => {
         hilog.warn(DOMAIN, 'Kotoba', 'Unable to update system bar appearance: %{public}s',

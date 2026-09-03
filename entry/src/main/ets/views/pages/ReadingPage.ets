@@ -19,7 +19,8 @@ import {
   TitleSize
 } from '@kit.UIDesignKit';
 import { SymbolGlyphModifier } from '@ohos.arkui.modifier';
-import { preferredImmersiveMaterial } from '../../common/ImmersiveMaterial';
+import { systemGestureInset } from '../../common/AppTheme';
+import { FLOATING_CHROME_MATERIAL, preferredImmersiveMaterial } from '../../common/ImmersiveMaterial';
 import { ReadingAudioCue, ReadingAudioRect, ReadingPassage, ReadingWork } from '../../model/ContentModels';
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { AiInquiryFactory } from '../../services/AiInquiryFactory';
@@ -500,13 +501,14 @@ export struct ReadingPage {
   }
 
   private bottomSafeInset(): number {
-    return Math.max(this.avoidAreas.navigationIndicator.bottomRect.height,
-      this.avoidAreas.cutout.bottomRect.height, this.avoidAreas.statusBar.bottomRect.height);
+    return systemGestureInset(this.avoidAreas);
   }
 
   private readerAction(icon: Resource, label: string, action: () => void): ActionBarButton {
     return new ActionBarButton({
-      baseIconSymbolGlyphModifier: new SymbolGlyphModifier(icon).fontSize(22),
+      baseIconSymbolGlyphModifier: new SymbolGlyphModifier(icon)
+        .fontSize(22)
+        .fontColor([$r('sys.color.icon_primary')]),
       accessibilityText: label,
       hoverTips: label,
       onClick: action
@@ -530,7 +532,7 @@ export struct ReadingPage {
       startSpace: LengthMetrics.vp(8),
       endSpace: LengthMetrics.vp(8),
       margin: LengthMetrics.vp(0),
-      backgroundBlurStyle: BlurStyle.COMPONENT_REGULAR
+      backgroundBlurStyle: BlurStyle.NONE
     });
   }
 
@@ -552,10 +554,11 @@ export struct ReadingPage {
           Text(`${this.fontSize} fp`)
             .fontSize(16)
             .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.ink'))
+            .fontColor($r('sys.color.font_primary'))
             .padding({ left: 18, right: 18, top: 10, bottom: 10 })
             .borderRadius(22)
-            .backgroundColor($r('app.color.surface_raised'))
+            .backgroundColor(Color.Transparent)
+            .systemMaterial(FLOATING_CHROME_MATERIAL)
             .position({ x: '50%', y: '48%' })
             .translate({ x: '-50%', y: '-50%' })
         }
@@ -586,11 +589,11 @@ export struct ReadingPage {
           },
           contentStyle: {
             titleStyle: {
-              mainTitleColor: $r('app.color.ink'),
-              subTitleColor: $r('app.color.ink_muted')
+              mainTitleColor: $r('sys.color.font_primary'),
+              subTitleColor: $r('sys.color.font_secondary')
             },
             backIconStyle: {
-              iconColor: $r('app.color.ink')
+              iconColor: $r('sys.color.icon_primary')
             }
           }
         },
@@ -625,7 +628,7 @@ export struct ReadingPage {
     .mode(NavigationMode.Stack)
     .titleMode(HdsNavigationTitleMode.MINI)
     .hideTitleBar(!this.controlsVisible, true)
-    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
+    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
     .width('100%')
     .height('100%')
     .clip(false)
@@ -891,14 +894,15 @@ export struct ReadingPage {
     Row({ space: 6 }) {
       SymbolGlyph(this.narrationPlaying ? $r('sys.symbol.pause_fill') : $r('sys.symbol.play_fill'))
         .fontSize(16)
-        .fontColor([$r('app.color.ink')])
+        .fontColor([$r('sys.color.icon_primary')])
       Text(this.narrationPlaying ? '暂停' : '朗读')
         .fontSize(12)
-        .fontColor($r('app.color.ink'))
+        .fontColor($r('sys.color.font_primary'))
     }
     .padding({ left: 12, right: 14, top: 6, bottom: 6 })
     .borderRadius(16)
-    .backgroundColor($r('app.color.surface_raised'))
+    .backgroundColor(Color.Transparent)
+    .systemMaterial(FLOATING_CHROME_MATERIAL)
     .accessibilityText(this.narrationPlaying ? '暂停朗读' : '朗读')
     .onClick(() => {
       void this.toggleNarration();
@@ -911,22 +915,28 @@ export struct ReadingPage {
       Row({ space: 8 }) {
         Text(this.pageLabel())
           .fontSize(12)
-          .fontColor($r('app.color.ink_muted'))
+          .fontColor($r('sys.color.font_secondary'))
           .padding({ left: 13, right: 13, top: 6, bottom: 6 })
           .borderRadius(16)
-          .backgroundColor($r('app.color.surface_raised'))
+          .backgroundColor(Color.Transparent)
+          .systemMaterial(FLOATING_CHROME_MATERIAL)
         if (this.hasNarration()) {
           this.narrationChip()
         }
       }
-      HdsActionBar({
-        startButtons: [
-          this.readerAction($r('sys.symbol.book_pages_fill'), '目录', () => this.openCatalog())
-        ],
-        endButtons: this.endActions(),
-        actionBarStyle: this.actionBarStyle(),
-        blurStrategy: BlurStrategy.ADAPTIVE
-      })
+      Column() {
+        HdsActionBar({
+          startButtons: [
+            this.readerAction($r('sys.symbol.book_pages_fill'), '目录', () => this.openCatalog())
+          ],
+          endButtons: this.endActions(),
+          actionBarStyle: this.actionBarStyle(),
+          blurStrategy: BlurStrategy.ADAPTIVE
+        })
+      }
+      .width('100%')
+      .borderRadius(28)
+      .systemMaterial(FLOATING_CHROME_MATERIAL)
     }
     .width('100%')
     .alignItems(HorizontalAlign.Center)

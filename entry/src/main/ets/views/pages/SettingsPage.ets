@@ -1,3 +1,5 @@
+import { window } from '@kit.ArkUI';
+import { systemGestureInset } from '../../common/AppTheme';
 import { showImmersiveNotice } from '../../common/ImmersiveNotice';
 import {
   CloudSyncPhase,
@@ -23,6 +25,7 @@ const EMPTY_SYNC: CloudSyncSnapshot = {
 
 @Component
 export struct SettingsPage {
+  @Env(SystemProperties.WINDOW_AVOID_AREA) private avoidAreas: window.UIEnvWindowAvoidAreaInfoVP;
   initialApiKey: string = '';
   @Prop account: HuaweiAccountSnapshot = EMPTY_ACCOUNT;
   @Prop syncState: CloudSyncSnapshot = EMPTY_SYNC;
@@ -129,7 +132,7 @@ export struct SettingsPage {
       }
       .layoutWeight(1)
       .width('100%')
-      .padding({ left: 16, right: 16, top: 20, bottom: 40 })
+      .padding({ left: 16, right: 16, top: 20, bottom: 40 + systemGestureInset(this.avoidAreas) })
       .scrollBar(BarState.Off)
       .edgeEffect(EdgeEffect.Spring)
       .clip(false)

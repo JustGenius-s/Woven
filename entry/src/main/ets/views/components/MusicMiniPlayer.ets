@@ -34,7 +34,11 @@ const SHADOW_COLOR: string = '#33000000';
 // resources, hence the sys.color.* foreground colors below.
 const MINI_BAR_MATERIAL: uiMaterial.Material = new uiMaterial.ImmersiveMaterial({
   style: uiMaterial.ImmersiveStyle.THIN,
-  colorInvert: true
+  colorInvert: true,
+  interactive: true,
+  lightEffect: {
+    color: Color.White
+  }
 });
 
 /**

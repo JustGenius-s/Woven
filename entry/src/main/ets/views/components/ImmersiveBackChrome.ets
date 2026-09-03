@@ -47,11 +47,11 @@ export struct ImmersiveBackChrome {
           },
           contentStyle: {
             titleStyle: {
-              mainTitleColor: $r('app.color.ink'),
-              subTitleColor: $r('app.color.ink_muted')
+              mainTitleColor: $r('sys.color.font_primary'),
+              subTitleColor: $r('sys.color.font_secondary')
             },
             backIconStyle: {
-              iconColor: $r('app.color.ink')
+              iconColor: $r('sys.color.icon_primary')
             }
           }
         },
@@ -86,7 +86,7 @@ export struct ImmersiveBackChrome {
     .mode(NavigationMode.Stack)
     .titleMode(HdsNavigationTitleMode.MINI)
     .bindToScrollable(this.scrollers)
-    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP])
+    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
     .width('100%')
     .height('100%')
     .clip(false)

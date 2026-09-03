@@ -79,6 +79,7 @@ export struct ImmersiveBackdrop {
     }
     .width('100%')
     .height('100%')
+    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
     .clip(true)
     // An opaque backdrop sits above the HdsNavigation material layer and
     // cancels the immersive effect. Keep it transparent for the neutral tone;

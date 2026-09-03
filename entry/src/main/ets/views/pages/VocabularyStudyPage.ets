@@ -1,6 +1,6 @@
 import { common } from '@kit.AbilityKit';
-import { curves } from '@kit.ArkUI';
-import { MOTION_DURATION } from '../../common/AppTheme';
+import { curves, window } from '@kit.ArkUI';
+import { MOTION_DURATION, systemGestureInset } from '../../common/AppTheme';
 import { GrammarIndexEntry, LearningJourney, VocabularyEntry } from '../../model/ContentModels';
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { AiInquiryFactory } from '../../services/AiInquiryFactory';
@@ -13,6 +13,7 @@ import {
 } from '../../services/VocabularyLearningStore';
 import { PitchNotation } from '../../services/PitchNotation';
 import { aiTextSelectionMenu } from '../components/AiTextSelection';
+import { FLOATING_CHROME_MATERIAL } from '../../common/ImmersiveMaterial';
 import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
 import { planeLightEffect } from '../components/ImmersiveCanvas';
 import { PitchAccentMark } from '../components/PitchAccentMark';
@@ -24,6 +25,7 @@ const RECENT_WORD_LIMIT: number = 16;
 
 @Component
 export struct VocabularyStudyPage {
+  @Env(SystemProperties.WINDOW_AVOID_AREA) private avoidAreas: window.UIEnvWindowAvoidAreaInfoVP;
   level: string = 'N5';
   wordIds: string[] = [];
   initialWordId: string = '';
@@ -381,7 +383,7 @@ export struct VocabularyStudyPage {
       }
       .width('100%')
       .height('100%')
-      .padding({ left: 24, right: 24, bottom: 12 })
+      .padding({ left: 24, right: 24, bottom: 12 + systemGestureInset(this.avoidAreas) })
       .alignItems(VerticalAlign.Center)
     } else {
       Column() {
@@ -391,7 +393,7 @@ export struct VocabularyStudyPage {
       }
       .width('100%')
       .height('100%')
-      .padding({ left: 24, right: 24, bottom: 8 })
+      .padding({ left: 24, right: 24, bottom: 8 + systemGestureInset(this.avoidAreas) })
       .alignItems(HorizontalAlign.Center)
     }
   }
@@ -551,24 +553,42 @@ export struct VocabularyStudyPage {
   @Builder
   private roundAction(icon: Resource, label: string, emphasized: boolean, size: number, onAction: () => void) {
     Column({ space: 5 }) {
-      Button({
-        type: ButtonType.Circle,
-        stateEffect: true
-      }) {
-        SymbolGlyph(icon)
-          .fontSize(emphasized ? 29 : 23)
-          .fontColor([emphasized ? Color.White : $r('app.color.ink')])
+      if (emphasized) {
+        Button({
+          type: ButtonType.Circle,
+          stateEffect: true
+        }) {
+          SymbolGlyph(icon)
+            .fontSize(29)
+            .fontColor([Color.White])
+        }
+        .width(size)
+        .height(size)
+        .buttonStyle(ButtonStyleMode.EMPHASIZED)
+        .accessibilityText(label)
+        .onClick(onAction)
+      } else {
+        Button({
+          type: ButtonType.Circle,
+          stateEffect: true
+        }) {
+          SymbolGlyph(icon)
+            .fontSize(23)
+            .fontColor([$r('sys.color.icon_primary')])
+        }
+        .width(size)
+        .height(size)
+        .buttonStyle(ButtonStyleMode.NORMAL)
+        .backgroundColor(Color.Transparent)
+        .accessibilityText(label)
+        .onClick(onAction)
+        .systemMaterial(FLOATING_CHROME_MATERIAL)
       }
-      .width(size)
-      .height(size)
-      .buttonStyle(emphasized ? ButtonStyleMode.EMPHASIZED : ButtonStyleMode.NORMAL)
-      .accessibilityText(label)
-      .onClick(onAction)
 
       Text(label)
         .fontSize(12)
         .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.ink'))
+        .fontColor($r('sys.color.font_primary'))
     }
     .width(82)
     .alignItems(HorizontalAlign.Center)

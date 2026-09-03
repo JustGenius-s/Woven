@@ -1,14 +1,5 @@
 import { common } from '@kit.AbilityKit';
-import {
-  BorderRadiusMode,
-  ItemRestriction,
-  LengthMetrics,
-  Rect,
-  SegmentButton,
-  SegmentButtonOptions,
-  SegmentButtonTextItem,
-  uiMaterial
-} from '@kit.ArkUI';
+import { SegmentButtonV2Items, TabSegmentButtonV2, uiMaterial } from '@kit.ArkUI';
 import { FLOATING_TAB_CONTENT_INSET } from '../../common/AppTheme';
 import {
   LearningCatalog,
@@ -19,7 +10,7 @@ import {
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { ContentRepository } from '../../services/ContentRepository';
 import { FloatingBarScrollTracker } from '../components/FloatingBarScrollTracker';
-import { planeLightEffect } from '../components/ImmersiveCanvas';
+import { CoverCard } from '../components/CoverCard';
 import { PageChrome } from '../components/PageChrome';
 
 @Component
@@ -45,36 +36,12 @@ export struct ExplorePage {
   @State private readingWorks: ReadingWork[] = [];
   @State private loadError: string = '';
   @State private pageWidth: number = 360;
-  @State private exploreTabIndexes: number[] = [0];
-  @State private exploreTabOptions: SegmentButtonOptions = SegmentButtonOptions.tab({
-    buttons: [
-      { text: '音乐' },
-      { text: '阅读' },
-      { text: '场景' }
-    ] as ItemRestriction<SegmentButtonTextItem>,
-    fontColor: $r('app.color.ink_muted'),
-    selectedFontColor: $r('app.color.ink'),
-    fontSize: 15,
-    selectedFontSize: 15,
-    fontWeight: FontWeight.Regular,
-    selectedFontWeight: FontWeight.Medium,
-    backgroundColor: Color.Transparent,
-    selectedBackgroundColor: Color.Transparent,
-    // The material is a property of the button itself, not of its container:
-    // setting systemMaterial on the parent Row only tinted that background and
-    // left the button drawing its own opaque plate. An opaque backgroundColor
-    // would also sit on top of the material and cancel it.
-    backgroundSystemMaterial: new uiMaterial.ImmersiveMaterial({
-      style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
-      colorInvert: true,
-      interactive: true
-    }),
-    borderRadiusMode: BorderRadiusMode.CUSTOM,
-    backgroundBorderRadius: LengthMetrics.vp(22),
-    itemBorderRadius: LengthMetrics.vp(19),
-    buttonPadding: 2,
-    textPadding: { left: 8, right: 8, top: 8, bottom: 8 }
-  });
+  @State private exploreTabIndex: number = 0;
+  private exploreTabItems: SegmentButtonV2Items = new SegmentButtonV2Items([
+    { text: '音乐' },
+    { text: '阅读' },
+    { text: '场景' }
+  ]);
   private musicScroller: Scroller = new Scroller();
   private readingScroller: Scroller = new Scroller();
   private scenarioScroller: Scroller = new Scroller();
@@ -86,7 +53,7 @@ export struct ExplorePage {
     this.onScrollerReady(this.musicScroller);
     this.onScrollerReady(this.readingScroller);
     this.onScrollerReady(this.scenarioScroller);
-    this.exploreTabIndexes = [this.selectedTab];
+    this.exploreTabIndex = this.selectedTab;
     try {
       const context: common.Context = this.getUIContext().getHostContext() as common.Context;
       this.catalog = ContentRepository.loadCatalog(context);
@@ -196,32 +163,28 @@ export struct ExplorePage {
   }
 
   private selectExploreTab(index: number): void {
-    if (index < 0 || index > 2 || this.exploreTabIndexes[0] === index) {
+    if (index < 0 || index > 2 || this.exploreTabIndex === index) {
       return;
     }
-    this.exploreTabIndexes = [index];
+    this.exploreTabIndex = index;
     this.onTabChange(index);
   }
 
   private activeExploreTab(): number {
-    return this.exploreTabIndexes.length > 0 ? this.exploreTabIndexes[0] : this.selectedTab;
+    return this.exploreTabIndex;
   }
 
   @Builder
   private exploreTabSelector() {
     Row() {
-      SegmentButton({
-        options: this.exploreTabOptions,
-        selectedIndexes: this.exploreTabIndexes,
-        onItemClicked: (index: number) => this.selectExploreTab(index)
+      TabSegmentButtonV2({
+        items: this.exploreTabItems,
+        selectedIndex: this.exploreTabIndex,
+        $selectedIndex: (index: number) => this.selectExploreTab(index),
+        backgroundSystemMaterial: new uiMaterial.ImmersiveMaterial({
+          style: uiMaterial.ImmersiveStyle.ULTRA_THICK
+        })
       })
-        .layoutWeight(1)
-        .height(44)
-        // clip(true) cuts on the rectangular bounds, which squared off the
-        // material layer now that the background is transparent. SegmentButton
-        // already draws its own rounded plate via backgroundBorderRadius, so a
-        // matching rounded clip keeps the material inside that shape.
-        .clip(new Rect({ width: '100%', height: '100%', radius: 22 }))
     }
     .width('100%')
     .height(60)
@@ -293,85 +256,17 @@ export struct ExplorePage {
 
   @Builder
   private musicCard(track: MusicTrack, index: number) {
-    Stack({ alignContent: Alignment.BottomStart }) {
-      Image(this.musicArtwork(track.id))
-        .width('100%')
-        .height('100%')
-        .objectFit(ImageFit.Cover)
-        .hitTestBehavior(HitTestMode.None)
-
-      Column()
-        .width('100%')
-        .height('100%')
-        .linearGradient({
-          angle: 180,
-          colors: [[Color.Transparent, 0.24], ['#4D17181A', 0.56], ['#E617181A', 1]]
-        })
-        .hitTestBehavior(HitTestMode.None)
-
-      Column() {
-        Row() {
-          Text(track.level)
-            .fontSize(11)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.immersive_light'))
-            .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-            .borderRadius(13)
-            .backgroundColor('#6617181A')
-          Blank()
-          Text(`${track.lines.length} 句`)
-            .fontSize(12)
-            .fontColor($r('app.color.immersive_light'))
-        }
-        Blank()
-        Text(track.title)
-          .width('100%')
-          .fontSize(30)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.immersive_light'))
-          .maxLines(1)
-        Text(`${track.chineseTitle} · ${track.artist}`)
-          .width('100%')
-          .fontSize(13)
-          .fontColor('#D9F7F8FA')
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .margin({ top: 5 })
-        Row() {
-          Text(track.focus)
-            .layoutWeight(1)
-            .fontSize(12)
-            .fontColor('#D9F7F8FA')
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-          Stack({ alignContent: Alignment.Center }) {
-            SymbolGlyph($r('sys.symbol.music_note_circle_fill'))
-              .fontSize(27)
-              .fontColor([$r('app.color.ink')])
-          }
-          .width(40)
-          .height(40)
-          .borderRadius(20)
-          .backgroundColor($r('app.color.immersive_light'))
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Center)
-        .margin({ top: 14 })
-      }
-      .width('100%')
-      .height('100%')
-      .alignItems(HorizontalAlign.Start)
-      .padding(20)
-    }
-    .width('100%')
-    .height(304)
-    .borderRadius(28)
-    .clip(true)
-    .border({ width: this.musicIndex === index ? 1.5 : 0.5,
-      color: this.musicIndex === index ? $r('app.color.accent') : $r('app.color.line') })
-    .visualEffect(planeLightEffect())
-    .accessibilityText(`${track.title}，${track.chineseTitle}，${track.level}`)
-    .onClick(() => this.openMusic(index))
+    CoverCard({
+      artwork: this.musicArtwork(track.id),
+      badge: track.level,
+      meta: `${track.lines.length} 句`,
+      title: track.title,
+      subtitle: `${track.chineseTitle} · ${track.artist}`,
+      footer: track.focus,
+      actionIcon: $r('sys.symbol.music_note_circle_fill'),
+      selected: this.musicIndex === index,
+      onOpen: () => this.openMusic(index)
+    })
   }
 
   @Builder
@@ -400,94 +295,21 @@ export struct ExplorePage {
 
   @Builder
   private readingCard(reading: ReadingWork, index: number) {
-    Stack({ alignContent: Alignment.BottomStart }) {
-      Image(this.readingArtwork(reading.id))
-        .width('100%')
-        .height('100%')
-        .objectFit(ImageFit.Cover)
-        .hitTestBehavior(HitTestMode.None)
-
-      Column()
-        .width('100%')
-        .height('100%')
-        .linearGradient({
-          angle: 180,
-          colors: [[Color.Transparent, 0.28], ['#4217181A', 0.58], ['#E617181A', 1]]
-        })
-        .hitTestBehavior(HitTestMode.None)
-
-      Column() {
-        Row() {
-          Text(reading.genre)
-            .fontSize(11)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.immersive_light'))
-            .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-            .borderRadius(13)
-            .backgroundColor('#6617181A')
-          Blank()
-          Text(reading.level)
-            .fontSize(12)
-            .fontColor('#D9F7F8FA')
-        }
-        Blank()
-        Text(reading.title)
-          .width('100%')
-          .fontSize(28)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.immersive_light'))
-          .maxLines(1)
-        Text(`${reading.author} · ${reading.titleReading}`)
-          .width('100%')
-          .fontSize(13)
-          .fontColor('#D9F7F8FA')
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .margin({ top: 5 })
-        Text(reading.summary)
-          .width('100%')
-          .fontSize(12)
-          .lineHeight(18)
-          .fontColor('#CCF7F8FA')
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .margin({ top: 5 })
-        Row() {
-          Text(reading.format === 'pdf' ?
-            `${reading.passages.length} 页 · 绘本${reading.audioFile ? ' · 朗读' : ''}` :
-            (reading.complete ? `${reading.passages.length} 阅读页 · 全文` : `${reading.passages.length} 段节选`))
-            .fontSize(12)
-            .fontColor('#D9F7F8FA')
-          Blank()
-          Stack({ alignContent: Alignment.Center }) {
-            SymbolGlyph($r('sys.symbol.book_pages_fill'))
-              .fontSize(24)
-              .fontColor([$r('app.color.ink')])
-          }
-          .width(40)
-          .height(40)
-          .borderRadius(20)
-          .backgroundColor($r('app.color.immersive_light'))
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Center)
-        .margin({ top: 12 })
-      }
-      .width('100%')
-      .height('100%')
-      .alignItems(HorizontalAlign.Start)
-      .padding(20)
-    }
-    .width('100%')
-    .aspectRatio(this.readingCoverRatio(reading.id))
-    .backgroundColor(Color.White)
-    .borderRadius(28)
-    .clip(true)
-    .border({ width: this.readingIndex === index ? 1.5 : 0.5,
-      color: this.readingIndex === index ? $r('app.color.accent') : $r('app.color.line') })
-    .visualEffect(planeLightEffect())
-    .accessibilityText(`${reading.title}，${reading.author}，${reading.level}`)
-    .onClick(() => this.openReading(index))
+    CoverCard({
+      artwork: this.readingArtwork(reading.id),
+      badge: reading.genre,
+      meta: reading.level,
+      title: reading.title,
+      subtitle: `${reading.author} · ${reading.titleReading}`,
+      caption: reading.summary,
+      footer: reading.format === 'pdf' ?
+        `${reading.passages.length} 页 · 绘本${reading.audioFile ? ' · 朗读' : ''}` :
+        (reading.complete ? `${reading.passages.length} 阅读页 · 全文` : `${reading.passages.length} 段节选`),
+      actionIcon: $r('sys.symbol.book_pages_fill'),
+      selected: this.readingIndex === index,
+      coverRatio: this.readingCoverRatio(reading.id),
+      onOpen: () => this.openReading(index)
+    })
   }
 
   @Builder
@@ -516,90 +338,20 @@ export struct ExplorePage {
 
   @Builder
   private scenarioCard(scenario: PracticeScenario, index: number) {
-    Stack({ alignContent: Alignment.BottomStart }) {
-      Image(this.scenarioArtwork(scenario.id))
-        .width('100%')
-        .height('100%')
-        .objectFit(ImageFit.Cover)
-        .hitTestBehavior(HitTestMode.None)
-
-      Column()
-        .width('100%')
-        .height('100%')
-        .linearGradient({
-          angle: 180,
-          colors: [[Color.Transparent, 0.22], ['#4D17181A', 0.52], ['#ED17181A', 1]]
-        })
-        .hitTestBehavior(HitTestMode.None)
-
-      Column() {
-        Row() {
-          Text(scenario.level)
-            .fontSize(11)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.immersive_light'))
-            .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-            .borderRadius(13)
-            .backgroundColor('#6617181A')
-          Blank()
-          Text(scenario.setting)
-            .fontSize(11)
-            .fontColor('#D9F7F8FA')
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-        Blank()
-        Text(scenario.title)
-          .width('100%')
-          .fontSize(28)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.immersive_light'))
-          .maxLines(1)
-        Text(`${scenario.learnerRole} × ${scenario.aiRole}`)
-          .width('100%')
-          .fontSize(13)
-          .fontWeight(FontWeight.Medium)
-          .fontColor('#D9F7F8FA')
-          .margin({ top: 5 })
-        Text(scenario.goal)
-          .width('100%')
-          .fontSize(13)
-          .lineHeight(20)
-          .fontColor('#D9F7F8FA')
-          .maxLines(2)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .margin({ top: 7 })
-        Row() {
-          if (this.scenarioIndex === index) {
-            Text('上次进行')
-              .fontSize(11)
-              .fontColor($r('app.color.immersive_light'))
-          }
-          Blank()
-          Button('开始', { type: ButtonType.ROUNDED_RECTANGLE, stateEffect: true })
-            .controlSize(ControlSize.NORMAL)
-            .fontColor($r('app.color.ink'))
-            .backgroundColor($r('app.color.immersive_light'))
-            .enabled(this.apiKeyConfigured)
-            .onClick(() => this.startScenario(scenario, index))
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Center)
-        .margin({ top: 13 })
-      }
-      .width('100%')
-      .height('100%')
-      .alignItems(HorizontalAlign.Start)
-      .padding(20)
-    }
-    .width('100%')
-    .height(304)
-    .borderRadius(28)
-    .clip(true)
-    .border({ width: this.scenarioIndex === index ? 1.5 : 0.5,
-      color: this.scenarioIndex === index ? $r('app.color.accent') : $r('app.color.line') })
-    .visualEffect(planeLightEffect())
-    .accessibilityText(`${scenario.title}，${scenario.setting}，${scenario.level}`)
+    CoverCard({
+      artwork: this.scenarioArtwork(scenario.id),
+      badge: scenario.level,
+      meta: scenario.setting,
+      title: scenario.title,
+      subtitle: `${scenario.learnerRole} × ${scenario.aiRole}`,
+      caption: scenario.goal,
+      captionLines: 2,
+      footer: this.scenarioIndex === index ? '上次进行' : '',
+      actionLabel: '开始',
+      actionEnabled: this.apiKeyConfigured,
+      selected: this.scenarioIndex === index,
+      onOpen: () => this.startScenario(scenario, index)
+    })
   }
 
 }

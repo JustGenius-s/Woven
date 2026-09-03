@@ -13,9 +13,14 @@ export class FloatingBarScrollTracker {
     const delta: number = currentOffset - previousOffset;
     LAST_OFFSETS.set(this.key, currentOffset);
 
+    // Ignore zero-delta updates. Tab switches remount or remeasure at the
+    // saved offset and would otherwise snap a horizontal bar back to vertical.
+    if (Math.abs(delta) < 0.5) {
+      return;
+    }
     if (currentOffset <= 0.5) {
       onCompactChange(false);
-    } else if (Math.abs(delta) >= 0.5) {
+    } else {
       onCompactChange(delta > 0);
     }
   }

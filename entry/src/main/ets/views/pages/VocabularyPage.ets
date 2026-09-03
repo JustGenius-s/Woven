@@ -14,6 +14,7 @@ import {
 } from '../../services/VocabularyLearningStore';
 import { aiTextSelectionMenu } from '../components/AiTextSelection';
 import { FloatingBarScrollTracker } from '../components/FloatingBarScrollTracker';
+import { CoverCard } from '../components/CoverCard';
 import { planeLightEffect } from '../components/ImmersiveCanvas';
 import { PageChrome } from '../components/PageChrome';
 
@@ -191,27 +192,6 @@ export struct VocabularyPage {
     }
   }
 
-  private levelTone(level: string): ResourceColor {
-    switch (level) {
-      case 'N5':
-        return $r('app.color.word_card_blue');
-      case 'N4':
-        return $r('app.color.word_card_cyan');
-      case 'N3':
-        return $r('app.color.word_card_green');
-      case 'N2':
-        return $r('app.color.word_card_amber');
-      case '日常':
-        return $r('app.color.word_card_violet');
-      case '一般':
-        return $r('app.color.word_card_rose');
-      case '补遗':
-        return $r('app.color.word_card_cyan');
-      default:
-        return $r('app.color.word_card_rose');
-    }
-  }
-
   private wordTone(item: VocabularyEntry): ResourceColor {
     let hash: number = 0;
     for (let index: number = 0; index < item.id.length; index++) {
@@ -245,11 +225,6 @@ export struct VocabularyPage {
       return 0;
     }
     return this.learnedInLevel() / this.source.length;
-  }
-
-  private progressWidth(progress: number): string {
-    const percent: number = Math.round(Math.max(0, Math.min(1, progress)) * 100);
-    return `${progress > 0 ? Math.max(3, percent) : 0}%`;
   }
 
   private progressPercent(progress: number): string {
@@ -344,8 +319,12 @@ export struct VocabularyPage {
           title: '词库',
           largeTitle: false,
           showSearchAction: true,
+          bottomHeight: 52,
           scrollers: [this.homeScroller, this.searchScroller],
           onSearch: () => this.openSearch(),
+          bottomContent: () => {
+            this.levelChips()
+          },
           pageContent: () => {
             this.vocabularyContent()
           }
@@ -359,31 +338,31 @@ export struct VocabularyPage {
   }
 
   @Builder
+  private levelChips() {
+    ChipGroup({
+      items: this.levelChipItems(),
+      selectedIndexes: this.selectedLevelIndexes(),
+      multiple: false,
+      itemStyle: {
+        size: ChipSize.NORMAL
+      },
+      chipGroupSpace: {
+        itemSpace: 8,
+        startSpace: 20,
+        endSpace: 20
+      },
+      chipGroupPadding: {
+        top: 4,
+        bottom: 8
+      },
+      onChange: (indexes: number[]) => this.selectLevelIndexes(indexes)
+    })
+    .width('100%')
+  }
+
+  @Builder
   private vocabularyContent() {
     Column() {
-      if (!this.searchActive) {
-        ChipGroup({
-          items: this.levelChipItems(),
-          selectedIndexes: this.selectedLevelIndexes(),
-          multiple: false,
-          itemStyle: {
-            size: ChipSize.NORMAL
-          },
-          chipGroupSpace: {
-            itemSpace: 8,
-            startSpace: 20,
-            endSpace: 20
-          },
-          chipGroupPadding: {
-            top: 2,
-            bottom: 2
-          },
-          onChange: (indexes: number[]) => this.selectLevelIndexes(indexes)
-        })
-        .width('100%')
-        .padding({ bottom: 14 })
-      }
-
       if (this.loadError.length > 0) {
         Text(this.loadError)
           .layoutWeight(1)
@@ -446,7 +425,7 @@ export struct VocabularyPage {
           .duration(MOTION_DURATION)
           .curve(curves.springMotion(0.42, 0.86, 0.16))
           .itemSpace(this.heroDisplayCount() === 1 ? 12 : 16)
-          .height(286)
+          .height(304)
           .width('100%')
           .onChange((index: number) => this.heroIndex = index)
         }
@@ -494,178 +473,35 @@ export struct VocabularyPage {
 
   @Builder
   private levelDeck() {
-    Stack({ alignContent: Alignment.BottomStart }) {
-      Image(this.levelArtwork(this.level))
-        .width('100%')
-        .height('100%')
-        .objectFit(ImageFit.Cover)
-        .hitTestBehavior(HitTestMode.None)
-
-      Column()
-        .width('100%')
-        .height('100%')
-        .linearGradient({
-          angle: 90,
-          colors: [['#F5FFFFFF', 0], ['#B8FFFFFF', 0.48], ['#14FFFFFF', 1]]
-        })
-        .hitTestBehavior(HitTestMode.None)
-
-      Column()
-        .width('100%')
-        .height('100%')
-        .linearGradient({
-          angle: 180,
-          colors: [[Color.Transparent, 0.42], ['#E6FFFFFF', 1]]
-        })
-        .hitTestBehavior(HitTestMode.None)
-
-      Column() {
-        Text(this.levelCaption())
-          .fontSize(11)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.ink_muted'))
-        Blank()
-        Row() {
-          Stack({ alignContent: Alignment.Start }) {
-            Column()
-              .width('100%')
-              .height(3)
-              .borderRadius(2)
-              .backgroundColor($r('app.color.line'))
-            Column()
-              .width(this.progressWidth(this.levelProgress()))
-              .height(3)
-              .borderRadius(2)
-              .backgroundColor($r('app.color.accent'))
-          }
-          .layoutWeight(1)
-          .height(3)
-          Text(this.progressPercent(this.levelProgress()))
-            .fontSize(11)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.accent'))
-            .margin({ left: 10 })
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Center)
-        Row() {
-          Text(`${this.source.length} 个单词`)
-            .fontSize(12)
-            .fontColor($r('app.color.ink_muted'))
-          Blank()
-          Button(this.learnedInLevel() > 0 ? '继续' : '开始', {
-            type: ButtonType.ROUNDED_RECTANGLE,
-            stateEffect: true
-          })
-            .buttonStyle(ButtonStyleMode.EMPHASIZED)
-            .controlSize(ControlSize.NORMAL)
-            .onClick(() => this.openLevelDeck())
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Center)
-        .margin({ top: 12 })
-      }
-      .width('100%')
-      .height('100%')
-      .alignItems(HorizontalAlign.Start)
-      .padding(24)
-    }
-    .width('100%')
-    .height('100%')
-    .borderRadius(28)
-    .clip(true)
-    .backgroundColor(this.levelTone(this.level))
-    .linearGradient({
-      angle: 180,
-      colors: [[$r('app.color.surface_raised'), 0], [this.levelTone(this.level), 1]]
+    CoverCard({
+      artwork: this.levelArtwork(this.level),
+      badge: this.level,
+      meta: `${this.source.length} 个`,
+      title: this.levelCaption(),
+      subtitle: `已学 ${this.progressPercent(this.levelProgress())}`,
+      footer: `${this.source.length} 个单词`,
+      actionLabel: this.learnedInLevel() > 0 ? '继续' : '开始',
+      onOpen: () => this.openLevelDeck()
     })
-    .visualEffect(planeLightEffect())
-    .accessibilityText(`${this.level} ${this.levelCaption()}，已学 ${this.progressPercent(this.levelProgress())}，共 ${this.source.length} 个单词`)
-    .onClick(() => this.openLevelDeck())
   }
 
   @Builder
   private journeyDeck() {
-    Stack({ alignContent: Alignment.BottomStart }) {
-      Text(this.journey?.japaneseTitle ?? '')
-        .fontSize(74)
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.ink'))
-        .opacity(0.065)
-        .position({ x: 72, y: 8 })
-        .hitTestBehavior(HitTestMode.None)
-
-      Column() {
-        Text('当前旅程')
-          .fontSize(12)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.accent'))
-        Blank()
-        Text(this.journey?.title ?? '')
-          .width('100%')
-          .fontSize(30)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.ink'))
-          .maxLines(2)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-        Text(`${this.journey?.wordIds.length ?? 0} 个核心词`)
-          .fontSize(13)
-          .fontColor($r('app.color.ink_muted'))
-          .margin({ top: 7 })
-        Row() {
-          Text(this.journey?.setting ?? '')
-            .layoutWeight(1)
-            .fontSize(12)
-            .fontColor($r('app.color.ink_muted'))
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-          Button('进入', {
-            type: ButtonType.ROUNDED_RECTANGLE,
-            stateEffect: true
-          })
-            .buttonStyle(ButtonStyleMode.EMPHASIZED)
-            .controlSize(ControlSize.NORMAL)
-            .onClick(() => this.openJourneyDeck())
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Center)
-        .margin({ top: 18 })
-      }
-      .width('100%')
-      .height('100%')
-      .alignItems(HorizontalAlign.Start)
-      .padding(24)
-    }
-    .width('100%')
-    .height('100%')
-    .borderRadius(28)
-    .clip(true)
-    .backgroundColor($r('app.color.word_card_violet'))
-    .linearGradient({
-      angle: 180,
-      colors: [[$r('app.color.surface_raised'), 0], [$r('app.color.word_card_violet'), 1]]
+    CoverCard({
+      artwork: $r('app.media.journey_vocabulary'),
+      badge: '当前旅程',
+      meta: `${this.journey?.wordIds.length ?? 0} 个核心词`,
+      title: this.journey?.title ?? '',
+      subtitle: this.journey?.setting ?? '',
+      footer: this.journey?.japaneseTitle ?? '',
+      actionLabel: '进入',
+      onOpen: () => this.openJourneyDeck()
     })
-    .visualEffect(planeLightEffect())
-    .accessibilityText(`当前旅程，${this.journey?.title ?? ''}`)
-    .onClick(() => this.openJourneyDeck())
   }
 
   @Builder
   private searchResults() {
     Column() {
-      Row() {
-        Text(this.query.trim().length > 0 ? '搜索结果' : `${this.level} 单词`)
-          .fontSize(22)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.ink'))
-        Blank()
-        Text(`${this.resultCount} 个`)
-          .fontSize(13)
-          .fontColor($r('app.color.ink_muted'))
-      }
-      .width('100%')
-      .padding({ left: 20, right: 20, bottom: 8 })
-
       if (this.resultCount === 0) {
         Column({ space: 8 }) {
           SymbolGlyph($r('sys.symbol.magnifyingglass'))

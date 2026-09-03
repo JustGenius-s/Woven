@@ -13,6 +13,10 @@
     "pages": "$profile:main_pages",
     "metadata": [
       {
+        "name": "ohos.arkui.UIMaterial.state",
+        "value": "enable"
+      },
+      {
         "name": "app_id",
         "value": "6917615089465912527"
       },

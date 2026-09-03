@@ -1,5 +1,8 @@
 import { common } from '@kit.AbilityKit';
+import { window } from '@kit.ArkUI';
 import { util } from '@kit.ArkTS';
+import { systemGestureInset } from '../../common/AppTheme';
+import { FLOATING_CHROME_MATERIAL } from '../../common/ImmersiveMaterial';
 import { showImmersiveNotice } from '../../common/ImmersiveNotice';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { DeepSeekMessage, PracticeMessage } from '../../model/DeepSeekModels';
@@ -32,6 +35,7 @@ const EMPTY_SCENARIO: PracticeScenario = {
 
 @Component
 export struct PracticeSessionPage {
+  @Env(SystemProperties.WINDOW_AVOID_AREA) private avoidAreas: window.UIEnvWindowAvoidAreaInfoVP;
   scenario: PracticeScenario = EMPTY_SCENARIO;
   apiKey: string = '';
   courseId: string = DEFAULT_COURSE_ID;
@@ -351,8 +355,8 @@ export struct PracticeSessionPage {
           .layoutWeight(1)
           .height(48)
           .fontSize(16)
-          .fontColor($r('app.color.ink'))
-          .placeholderColor($r('app.color.ink_muted'))
+          .fontColor($r('sys.color.font_primary'))
+          .placeholderColor($r('sys.color.font_secondary'))
           .backgroundColor(Color.Transparent)
           .padding({ left: 4, right: 8 })
           .border({ width: { bottom: 0.5 }, color: $r('app.color.line') })
@@ -382,10 +386,11 @@ export struct PracticeSessionPage {
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)
-      .padding({ left: 20, right: 18, top: 6, bottom: 18 })
+      .padding({ left: 20, right: 18, top: 6, bottom: 18 + systemGestureInset(this.avoidAreas) })
       .borderRadius(28)
-      .backgroundColor($r('app.color.surface_raised'))
+      .backgroundColor(Color.Transparent)
       .visualEffect(planeLightEffect())
+      .systemMaterial(FLOATING_CHROME_MATERIAL)
     }
     .width('100%')
     .height('100%')
