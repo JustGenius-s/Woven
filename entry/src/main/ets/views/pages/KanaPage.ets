@@ -271,18 +271,14 @@ export struct KanaPage {
                   .fontColor($r('app.color.ink'))
                   .maxLines(1)
                   .textAlign(TextAlign.Center)
-                  .copyOption(CopyOptions.LocalDevice)
-                  .editMenuOptions(aiTextSelectionMenu(cell.hira,
-                    (selection: string) => this.askKanaSelection(selection, cell)))
+                  .hitTestBehavior(HitTestMode.Transparent)
                 Text(cell.kata)
                   .width('100%')
                   .fontSize(cell.kata.length > 1 ? 14 : 16)
                   .fontColor($r('app.color.ink_muted'))
                   .maxLines(1)
                   .textAlign(TextAlign.Center)
-                  .copyOption(CopyOptions.LocalDevice)
-                  .editMenuOptions(aiTextSelectionMenu(cell.kata,
-                    (selection: string) => this.askKanaSelection(selection, cell)))
+                  .hitTestBehavior(HitTestMode.Transparent)
                 Text(cell.romaji)
                   .width('100%')
                   .fontSize(cell.romaji.length > 4 ? 8 : 9)
@@ -290,9 +286,7 @@ export struct KanaPage {
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
                   .textAlign(TextAlign.Center)
-                  .copyOption(CopyOptions.LocalDevice)
-                  .editMenuOptions(aiTextSelectionMenu(cell.romaji,
-                    (selection: string) => this.askKanaSelection(selection, cell)))
+                  .hitTestBehavior(HitTestMode.Transparent)
               }
               .layoutWeight(1)
               .height(86)

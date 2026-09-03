@@ -65,6 +65,7 @@ struct Index {
   @State private section: number = AppSection.LEARN;
   @State private grammarIndex: number = 0;
   @State private deepSeekApiKey: string = '';
+  @State private minimaxApiKey: string = '';
   @State private settingsOpen: boolean = false;
   @State private activeScenario: PracticeScenario | undefined = undefined;
   @State private activeReading: ReadingWork | undefined = undefined;
@@ -142,6 +143,7 @@ struct Index {
       storedSection : AppSection.LEARN;
     this.grammarIndex = LearningPreferences.grammarIndex(context);
     this.deepSeekApiKey = LearningPreferences.deepSeekApiKey(context);
+    this.minimaxApiKey = LearningPreferences.minimaxApiKey(context);
     this.journeyStage = LearningPreferences.journeyStage(context);
     this.journeyCompletedMask = LearningPreferences.journeyCompletedMask(context);
     this.kanaKey = LearningPreferences.kanaKey(context);
@@ -338,6 +340,12 @@ struct Index {
   private saveDeepSeekApiKey(apiKey: string): void {
     this.deepSeekApiKey = apiKey;
     LearningPreferences.saveDeepSeekApiKey(
+      this.getUIContext().getHostContext() as common.Context, apiKey);
+  }
+
+  private saveMinimaxApiKey(apiKey: string): void {
+    this.minimaxApiKey = apiKey;
+    LearningPreferences.saveMinimaxApiKey(
       this.getUIContext().getHostContext() as common.Context, apiKey);
   }
 
@@ -539,10 +547,12 @@ struct Index {
         } else if (this.settingsOpen) {
           SettingsPage({
             initialApiKey: this.deepSeekApiKey,
+            initialMinimaxApiKey: this.minimaxApiKey,
             account: this.accountSnapshot,
             syncState: this.cloudSyncSnapshot,
             onBack: () => this.settingsOpen = false,
             onSave: (apiKey: string) => this.saveDeepSeekApiKey(apiKey),
+            onSaveMinimax: (apiKey: string) => this.saveMinimaxApiKey(apiKey),
             onSync: () => this.syncLearningState(
               this.getUIContext().getHostContext() as common.Context, true)
           })

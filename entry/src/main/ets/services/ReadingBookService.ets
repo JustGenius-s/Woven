@@ -7,10 +7,9 @@ export class ReadingBookService {
     const bookDirectory: string = `${context.filesDir}/reader/${safeId}`;
     const bookPath: string = `${bookDirectory}/${safeId}.epub`;
     try {
-      fileIo.mkdirSync(bookDirectory, true);
+      ReadingBookService.ensureDirectory(bookDirectory);
       const bytes: Uint8Array = context.resourceManager.getRawFileContentSync(`reader/${safeId}.epub`);
-      const bookFile: fileIo.File = fileIo.openSync(bookPath,
-        fileIo.OpenMode.CREATE | fileIo.OpenMode.WRITE_ONLY | fileIo.OpenMode.TRUNC);
+      const bookFile: fileIo.File = ReadingBookService.openForRewrite(bookPath);
       try {
         fileIo.writeSync(bookFile.fd, bytes.buffer as ArrayBuffer);
       } finally {
@@ -29,20 +28,75 @@ export class ReadingBookService {
     const fileName: string = slash >= 0 ? relativePath.substring(slash + 1) : relativePath;
     const bookPath: string = `${bookDirectory}/${fileName.length > 0 ? fileName : 'book.pdf'}`;
     try {
-      fileIo.mkdirSync(bookDirectory, true);
+      ReadingBookService.ensureDirectory(bookDirectory);
       const bytes: Uint8Array = context.resourceManager.getRawFileContentSync(relativePath);
+      if (bytes.byteLength === 0) {
+        throw new Error(`empty rawfile: ${relativePath}`);
+      }
+      // Copy only the typed-array window — bytes.buffer may be a larger shared slab.
       const copy: ArrayBuffer = bytes.buffer.slice(bytes.byteOffset,
         bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-      const bookFile: fileIo.File = fileIo.openSync(bookPath,
-        fileIo.OpenMode.CREATE | fileIo.OpenMode.WRITE_ONLY | fileIo.OpenMode.TRUNC);
+      const bookFile: fileIo.File = ReadingBookService.openForRewrite(bookPath);
       try {
-        fileIo.writeSync(bookFile.fd, copy);
+        const written: number = fileIo.writeSync(bookFile.fd, copy);
+        if (written !== copy.byteLength) {
+          throw new Error(`short write ${written}/${copy.byteLength}`);
+        }
       } finally {
         fileIo.closeSync(bookFile);
       }
+      const stat: fileIo.Stat = fileIo.statSync(bookPath);
+      if (stat.size <= 0) {
+        throw new Error(`empty sandbox file: ${bookPath}`);
+      }
       return bookPath;
     } catch (error) {
-      throw new Error(`Unable to prepare reader PDF: ${safeId}`);
+      const detail: string = error instanceof Error ? error.message : `${error}`;
+      throw new Error(`Unable to prepare reader PDF: ${safeId} (${detail})`);
     }
+  }
+
+  /** HarmonyOS mkdirSync throws "File exists" even with recursion when the dir is already there. */
+  private static ensureDirectory(path: string): void {
+    try {
+      if (fileIo.statSync(path).isDirectory()) {
+        return;
+      }
+    } catch (_error) {
+      // Missing — create below.
+    }
+    try {
+      fileIo.mkdirSync(path, true);
+    } catch (error) {
+      try {
+        if (fileIo.statSync(path).isDirectory()) {
+          return;
+        }
+      } catch (_statError) {
+        const detail: string = error instanceof Error ? error.message : `${error}`;
+        throw new Error(`mkdir failed: ${path} (${detail})`);
+      }
+      const detail: string = error instanceof Error ? error.message : `${error}`;
+      throw new Error(`mkdir failed: ${path} (${detail})`);
+    }
+  }
+
+  /**
+   * OpenMode.CREATE fails with "File exists" when the sandbox copy is already there.
+   * Prefer truncate-in-place; only CREATE when the file is missing.
+   * accessSync returns a boolean (false = missing) and does not throw.
+   */
+  private static openForRewrite(path: string): fileIo.File {
+    let exists: boolean = false;
+    try {
+      exists = fileIo.accessSync(path);
+    } catch (_error) {
+      exists = false;
+    }
+    if (exists) {
+      return fileIo.openSync(path, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC);
+    }
+    return fileIo.openSync(path,
+      fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC);
   }
 }

@@ -27,26 +27,39 @@ const EMPTY_SYNC: CloudSyncSnapshot = {
 export struct SettingsPage {
   @Env(SystemProperties.WINDOW_AVOID_AREA) private avoidAreas: window.UIEnvWindowAvoidAreaInfoVP;
   initialApiKey: string = '';
+  initialMinimaxApiKey: string = '';
   @Prop account: HuaweiAccountSnapshot = EMPTY_ACCOUNT;
   @Prop syncState: CloudSyncSnapshot = EMPTY_SYNC;
   onBack: () => void = () => {};
   onSave: (apiKey: string) => void = (apiKey: string) => {};
+  onSaveMinimax: (apiKey: string) => void = (apiKey: string) => {};
   onSync: () => void = () => {};
 
   @State private apiKey: string = '';
-  @State private deepSeekSheetOpen: boolean = false;
+  @State private minimaxApiKey: string = '';
+  @State private sheetOpen: boolean = false;
+  @State private activeSheet: 'deepseek' | 'minimax' = 'deepseek';
   private pageScroller: Scroller = new Scroller();
 
   aboutToAppear(): void {
     this.apiKey = this.initialApiKey;
+    this.minimaxApiKey = this.initialMinimaxApiKey;
   }
 
   private normalizedApiKey(): string {
     return this.apiKey.trim();
   }
 
+  private normalizedMinimaxApiKey(): string {
+    return this.minimaxApiKey.trim();
+  }
+
   private hasSavedApiKey(): boolean {
     return this.initialApiKey.trim().length > 0;
+  }
+
+  private hasSavedMinimaxApiKey(): boolean {
+    return this.initialMinimaxApiKey.trim().length > 0;
   }
 
   private canSave(): boolean {
@@ -54,9 +67,21 @@ export struct SettingsPage {
     return value.length > 0 && value !== this.initialApiKey.trim();
   }
 
+  private canSaveMinimax(): boolean {
+    const value: string = this.normalizedMinimaxApiKey();
+    return value.length > 0 && value !== this.initialMinimaxApiKey.trim();
+  }
+
   private openDeepSeekSheet(): void {
     this.apiKey = this.initialApiKey;
-    this.deepSeekSheetOpen = true;
+    this.activeSheet = 'deepseek';
+    this.sheetOpen = true;
+  }
+
+  private openMinimaxSheet(): void {
+    this.minimaxApiKey = this.initialMinimaxApiKey;
+    this.activeSheet = 'minimax';
+    this.sheetOpen = true;
   }
 
   private save(): void {
@@ -66,13 +91,29 @@ export struct SettingsPage {
       return;
     }
     this.onSave(value);
-    this.deepSeekSheetOpen = false;
+    this.sheetOpen = false;
+  }
+
+  private saveMinimax(): void {
+    const value: string = this.normalizedMinimaxApiKey();
+    if (value.length === 0) {
+      showImmersiveNotice(this.getUIContext(), '还不能保存', '请输入 MiniMax API Key');
+      return;
+    }
+    this.onSaveMinimax(value);
+    this.sheetOpen = false;
   }
 
   private removeApiKey(): void {
     this.apiKey = '';
     this.onSave('');
-    this.deepSeekSheetOpen = false;
+    this.sheetOpen = false;
+  }
+
+  private removeMinimaxApiKey(): void {
+    this.minimaxApiKey = '';
+    this.onSaveMinimax('');
+    this.sheetOpen = false;
   }
 
   private canSync(): boolean {
@@ -99,17 +140,17 @@ export struct SettingsPage {
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Transparent)
-    .bindSheet($$this.deepSeekSheetOpen, this.deepSeekSheet(), {
+    .bindSheet($$this.sheetOpen, this.activeSheet === 'deepseek' ? this.deepSeekSheet() : this.minimaxSheet(), {
       height: SheetSize.FIT_CONTENT,
       detents: [SheetSize.FIT_CONTENT, SheetSize.LARGE],
       preferType: SheetType.BOTTOM,
-      title: { title: 'DeepSeek' },
+      title: { title: this.activeSheet === 'deepseek' ? 'DeepSeek' : 'MiniMax 语音' },
       dragBar: true,
       showClose: true,
       blurStyle: BlurStyle.COMPONENT_REGULAR,
       backgroundColor: $r('app.color.surface_raised'),
       maskColor: '#52000000',
-      onDisappear: () => this.deepSeekSheetOpen = false
+      onDisappear: () => this.sheetOpen = false
     })
   }
 
@@ -405,16 +446,24 @@ export struct SettingsPage {
           .fontColor([$r('app.color.accent')])
 
         Column({ space: 3 }) {
-          Text('本地日语合成')
+          Text('MiniMax 日语语音')
             .fontSize(17)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.ink'))
-          Text('sherpa-onnx + Piper，不走系统 TTS')
+          Text('云端合成，音质自然，需要联网')
             .fontSize(13)
             .fontColor($r('app.color.ink_muted'))
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
+
+        Text(this.hasSavedMinimaxApiKey() ? '已配置' : '未配置')
+          .fontSize(14)
+          .fontColor(this.hasSavedMinimaxApiKey() ? $r('app.color.success') : $r('app.color.ink_muted'))
+
+        SymbolGlyph($r('sys.symbol.chevron_right'))
+          .fontSize(16)
+          .fontColor([$r('app.color.ink_muted')])
       }
       .width('100%')
       .constraintSize({ minHeight: 72 })
@@ -422,9 +471,10 @@ export struct SettingsPage {
       .borderRadius(24)
       .backgroundColor($r('app.color.surface_raised'))
       .visualEffect(contentLightEffect())
-      .accessibilityText('本地日语合成，sherpa-onnx 与 Piper')
+      .accessibilityText(this.hasSavedMinimaxApiKey() ? 'MiniMax 语音，已配置' : 'MiniMax 语音，未配置')
+      .onClick(() => this.openMinimaxSheet())
 
-      Text('单词优先读假名。模型未放入 rawfile/tts 时，点朗读没有声音。拉取方式见 docs/TTS.md。')
+      Text('从 platform.minimaxi.com 获取 API Key。未配置时，点朗读没有声音。')
         .width('100%')
         .padding({ left: 8, right: 8, top: 2 })
         .fontSize(13)
@@ -433,5 +483,71 @@ export struct SettingsPage {
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
+  private minimaxSheet() {
+    Column({ space: 18 }) {
+      Row() {
+        Text('API Key')
+          .fontSize(16)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.ink'))
+        Blank()
+        Text(this.hasSavedMinimaxApiKey() ? '已配置' : '未配置')
+          .fontSize(14)
+          .fontColor(this.hasSavedMinimaxApiKey() ? $r('app.color.success') : $r('app.color.ink_muted'))
+      }
+      .width('100%')
+
+      TextInput({ text: this.minimaxApiKey, placeholder: '请输入 MiniMax API Key' })
+        .type(InputType.Password)
+        .showPasswordIcon(true)
+        .height(52)
+        .fontSize(16)
+        .fontColor($r('app.color.ink'))
+        .placeholderColor($r('app.color.ink_muted'))
+        .caretColor($r('app.color.accent'))
+        .backgroundColor($r('app.color.surface'))
+        .borderRadius(14)
+        .padding({ left: 14, right: 14 })
+        .maxLength(256)
+        .onChange((value: string) => this.minimaxApiKey = value)
+
+      Row({ space: 8 }) {
+        SymbolGlyph($r('sys.symbol.lock_fill'))
+          .fontSize(14)
+          .fontColor([$r('app.color.ink_muted')])
+        Text('仅保存在此设备，用于请求 MiniMax 语音合成服务。')
+          .layoutWeight(1)
+          .fontSize(13)
+          .lineHeight(19)
+          .fontColor($r('app.color.ink_muted'))
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Top)
+
+      Button('保存', { type: ButtonType.ROUNDED_RECTANGLE, stateEffect: true })
+        .width('100%')
+        .buttonStyle(ButtonStyleMode.EMPHASIZED)
+        .controlSize(ControlSize.NORMAL)
+        .enabled(this.canSaveMinimax())
+        .accessibilityText('保存 MiniMax API Key')
+        .onClick(() => this.saveMinimax())
+
+      if (this.hasSavedMinimaxApiKey()) {
+        Button('移除 API Key', { type: ButtonType.ROUNDED_RECTANGLE, stateEffect: true })
+          .width('100%')
+          .buttonStyle(ButtonStyleMode.TEXTUAL)
+          .controlSize(ControlSize.NORMAL)
+          .role(ButtonRole.ERROR)
+          .accessibilityText('移除本地 MiniMax API Key')
+          .onClick(() => this.removeMinimaxApiKey())
+      }
+    }
+    .width('100%')
+    .constraintSize({ maxWidth: 560 })
+    .alignItems(HorizontalAlign.Start)
+    .padding({ left: 20, right: 20, top: 8, bottom: 28 })
   }
 }

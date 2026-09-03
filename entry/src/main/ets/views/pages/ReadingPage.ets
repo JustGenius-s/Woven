@@ -79,6 +79,7 @@ export struct ReadingPage {
   @State private pinching: boolean = false;
   @State private pdfPath: string = '';
   @State private pdfFailed: boolean = false;
+  @State private pdfFailReason: string = '';
   @State private pdfJumpPage: number = 0;
   @State private narrationPlaying: boolean = false;
   @State private narrationReady: boolean = false;
@@ -141,6 +142,7 @@ export struct ReadingPage {
     const relative: string | undefined = this.reading.pdfFile;
     if (relative === undefined || relative.length === 0) {
       this.pdfFailed = true;
+      this.pdfFailReason = 'pdfFile 未定义';
       return;
     }
     try {
@@ -148,9 +150,11 @@ export struct ReadingPage {
         this.hostContext(), this.reading.id, relative);
       this.pdfJumpPage = this.currentPassageIndex;
       this.pdfFailed = false;
+      this.pdfFailReason = '';
     } catch (error) {
       this.pdfPath = '';
       this.pdfFailed = true;
+      this.pdfFailReason = error instanceof Error ? error.message : `${error}`;
     }
   }
 
@@ -630,6 +634,7 @@ export struct ReadingPage {
       title: { title: this.panelKind === 0 ? '目录' : '阅读设置' },
       dragBar: true,
       showClose: true,
+      radius: LengthMetrics.vp(28),
       blurStyle: BlurStyle.COMPONENT_REGULAR,
       backgroundColor: $r('app.color.surface_raised'),
       maskColor: '#33202124',
@@ -656,6 +661,13 @@ export struct ReadingPage {
         Text('这份官方电子书未能打开')
           .fontSize(15)
           .fontColor($r('app.color.ink_muted'))
+        if (this.pdfFailReason.length > 0) {
+          Text(this.pdfFailReason)
+            .fontSize(12)
+            .fontColor($r('app.color.ink_muted'))
+            .margin({ top: 4 })
+            .opacity(0.6)
+        }
       }
       .width('100%')
       .height('100%')
@@ -671,7 +683,8 @@ export struct ReadingPage {
         highlightPage: this.highlightPage,
         highlightRects: this.highlightRects,
         onPageChanged: (index: number) => this.onPdfPageChanged(index),
-        onFailed: () => {
+        onFailed: (reason: string) => {
+          this.pdfFailReason = reason;
           this.pdfFailed = true;
         }
       })

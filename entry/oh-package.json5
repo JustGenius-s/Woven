@@ -5,9 +5,7 @@
   "main": "",
   "author": "just-genius",
   "license": "MIT",
-  "dependencies": {
-    "sherpa_onnx": "^1.13.3"
-  },
+  "dependencies": {},
   "devDependencies": {},
   "dynamicDependencies": {}
 }

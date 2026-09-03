@@ -182,7 +182,7 @@ export struct ExplorePage {
         selectedIndex: this.exploreTabIndex,
         $selectedIndex: (index: number) => this.selectExploreTab(index),
         backgroundSystemMaterial: new uiMaterial.ImmersiveMaterial({
-          style: uiMaterial.ImmersiveStyle.ULTRA_THICK
+          style: uiMaterial.ImmersiveStyle.ULTRA_THIN
         })
       })
     }

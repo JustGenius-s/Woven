@@ -4,6 +4,7 @@ import { DEFAULT_COURSE_ID } from '../model/SyncModels';
 
 const STORE_NAME: string = 'kotoba_settings';
 const KEY_DEEPSEEK_API_KEY: string = 'deepseek_api_key';
+const KEY_MINIMAX_API_KEY: string = 'minimax_api_key';
 const KEY_GRAMMAR_INDEX: string = 'grammar_index';
 const KEY_SECTION: string = 'section';
 const KEY_JOURNEY_ID: string = 'journey_id';
@@ -82,6 +83,10 @@ export class LearningPreferences {
     return LearningPreferences.readString(context, KEY_DEEPSEEK_API_KEY, '');
   }
 
+  static minimaxApiKey(context: common.Context): string {
+    return LearningPreferences.readString(context, KEY_MINIMAX_API_KEY, '');
+  }
+
   static section(context: common.Context): number {
     return LearningPreferences.readNumber(context, KEY_SECTION, 0);
   }
@@ -158,6 +163,16 @@ export class LearningPreferences {
     try {
       const store: preferences.Preferences = LearningPreferences.store(context);
       store.putSync(KEY_DEEPSEEK_API_KEY, apiKey.trim());
+      store.flush();
+    } catch (error) {
+      return;
+    }
+  }
+
+  static saveMinimaxApiKey(context: common.Context, apiKey: string): void {
+    try {
+      const store: preferences.Preferences = LearningPreferences.store(context);
+      store.putSync(KEY_MINIMAX_API_KEY, apiKey.trim());
       store.flush();
     } catch (error) {
       return;
