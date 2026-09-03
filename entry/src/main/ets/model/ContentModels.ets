@@ -78,6 +78,26 @@ export interface ReadingPassage {
   note: string;
 }
 
+/**
+ * One spoken span on a PDF picture book. Coordinates use the PDF page's
+ * lower-left origin, in points, matching HMS `setHighlightRects`.
+ */
+export interface ReadingAudioRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+export interface ReadingAudioCue {
+  page: number;
+  startMs: number;
+  endMs: number;
+  text: string;
+  highlight: string[];
+  rects: ReadingAudioRect[];
+}
+
 export interface ReadingWork {
   id: string;
   title: string;
@@ -90,6 +110,11 @@ export interface ReadingWork {
   sourceUrl: string;
   rights: string;
   complete?: boolean;
+  format?: string;
+  pdfFile?: string;
+  audioFile?: string;
+  audioDurationMs?: number;
+  audioCues?: ReadingAudioCue[];
   passages: ReadingPassage[];
 }
 

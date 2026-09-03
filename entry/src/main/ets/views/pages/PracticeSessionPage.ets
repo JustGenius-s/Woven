@@ -14,6 +14,7 @@ import { VocabularyLearningStore } from '../../services/VocabularyLearningStore'
 import { ImmersiveAction } from '../components/ImmersiveAction';
 import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
 import { contentLightEffect, planeLightEffect } from '../components/ImmersiveCanvas';
+import { MarkdownText } from '../components/MarkdownText';
 
 const MAX_CONTEXT_MESSAGES: number = 16;
 const LOG_DOMAIN: number = 0x4b4f;
@@ -146,7 +147,7 @@ export struct PracticeSessionPage {
   }
 
   private instructions(): string {
-    return `你正在和日语学习者进行角色扮演。场景：${this.scenario.setting}。你扮演：${this.scenario.aiRole}。学习者扮演：${this.scenario.learnerRole}。难度：${this.scenario.level}。练习目标：${this.scenario.goal}。参考开场：${this.scenario.openingHint}。主要使用自然、简短的日语，每次只说一到两句，保持角色并给学习者回应空间。不要输出标题、列表或 Markdown。只有当学习者的日语明显影响理解时，才在日语回应后另起一行给出一句简短中文提示，格式为“自然表达：……”。`;
+    return `你正在和日语学习者进行角色扮演。场景：${this.scenario.setting}。你扮演：${this.scenario.aiRole}。学习者扮演：${this.scenario.learnerRole}。难度：${this.scenario.level}。练习目标：${this.scenario.goal}。参考开场：${this.scenario.openingHint}。主要使用自然、简短的日语，每次只说一到两句，保持角色并给学习者回应空间。不要输出标题、列表或 Markdown。只有当学习者的日语明显影响理解时，才在日语回应后另起一行给出一句简短中文提示，格式为“自然表达：……”，提示中的日语可用 **加粗** 或 \`行内代码\` 标出。`;
   }
 
   private appendMessage(role: string, text: string): string {
@@ -277,14 +278,14 @@ export struct PracticeSessionPage {
                     .fontColor(message.role === 'user' ? $r('app.color.accent') : $r('app.color.ink_muted'))
                     .letterSpacing(1)
                   if (message.text.length > 0) {
-                    Text(message.text)
-                      .width('100%')
-                      .fontSize(message.role === 'user' ? 22 : 27)
-                      .fontWeight(message.role === 'user' ? FontWeight.Medium : FontWeight.Bold)
-                      .fontColor($r('app.color.ink'))
-                      .lineHeight(message.role === 'user' ? 33 : 39)
-                      .textAlign(message.role === 'user' ? TextAlign.End : TextAlign.Start)
-                      .copyOption(CopyOptions.LocalDevice)
+                    MarkdownText({
+                      text: message.text,
+                      fontSize: message.role === 'user' ? 22 : 27,
+                      lineHeight: message.role === 'user' ? 33 : 39,
+                      textColor: $r('app.color.ink'),
+                      textAlign: message.role === 'user' ? TextAlign.End : TextAlign.Start,
+                      headingSize: 24
+                    })
                   } else {
                     Column({ space: 8 }) {
                       LoadingProgress()

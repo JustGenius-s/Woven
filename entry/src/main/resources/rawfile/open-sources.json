@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-09-02",
+  "reviewedAt": "2026-09-03",
   "sources": [
     {
       "id": "aozora-bunko",
@@ -11,6 +11,17 @@
       "licenseSummary": "仅打包作者著作权已消灭且作品卡明确公开的文本；保留作品卡、底本和输入校正信息。",
       "integrationStatus": "bundled",
       "bundledIds": ["spiders-thread", "i-am-a-cat", "many-orders", "gon-fox", "run-melos"]
+    },
+    {
+      "id": "tadoku-free-books",
+      "kind": "reading",
+      "name": "にほんごたどく 無料の読みもの",
+      "homepage": "https://tadoku.org/japanese/free-books/",
+      "rulesUrl": "https://tadoku.org/japanese/free-books/note/",
+      "licenseUrl": "https://creativecommons.org/licenses/by-nc-nd/4.0/",
+      "licenseSummary": "CC BY-NC-ND 4.0。打包官方电子书 PDF 和官方朗读 MP3，用系统阅读器按原页展示并对齐时间轴，不改写、不加解说、不生成衍生 EPUB。保留作品页、作者和许可说明。",
+      "integrationStatus": "bundled",
+      "bundledIds": ["tadoku-40280"]
     },
     {
       "id": "musicbrainz",

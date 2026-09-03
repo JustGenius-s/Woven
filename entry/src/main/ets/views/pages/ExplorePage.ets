@@ -112,6 +112,13 @@ export struct ExplorePage {
     return this.pageWidth >= 700 && index % 2 === 0 ? 14 : 0;
   }
 
+  private readingCoverRatio(readingId: string): number {
+    if (readingId === 'tadoku-40280') {
+      return 1259 / 1786;
+    }
+    return 1;
+  }
+
   private updatePageWidth(width: Length): void {
     const next: number = typeof width === 'number' ? width : Number.parseFloat(width as string);
     if (!Number.isNaN(next) && next > 0) {
@@ -144,6 +151,8 @@ export struct ExplorePage {
         return $r('app.media.reading_many_orders');
       case 'gon-fox':
         return $r('app.media.reading_gon_fox');
+      case 'tadoku-40280':
+        return $r('app.media.reading_two_frogs');
       default:
         return $r('app.media.reading_run_melos');
     }
@@ -444,7 +453,9 @@ export struct ExplorePage {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .margin({ top: 5 })
         Row() {
-          Text(reading.complete ? `${reading.passages.length} 阅读页 · 全文` : `${reading.passages.length} 段节选`)
+          Text(reading.format === 'pdf' ?
+            `${reading.passages.length} 页 · 绘本${reading.audioFile ? ' · 朗读' : ''}` :
+            (reading.complete ? `${reading.passages.length} 阅读页 · 全文` : `${reading.passages.length} 段节选`))
             .fontSize(12)
             .fontColor('#D9F7F8FA')
           Blank()
@@ -468,7 +479,8 @@ export struct ExplorePage {
       .padding(20)
     }
     .width('100%')
-    .height(284)
+    .aspectRatio(this.readingCoverRatio(reading.id))
+    .backgroundColor(Color.White)
     .borderRadius(28)
     .clip(true)
     .border({ width: this.readingIndex === index ? 1.5 : 0.5,

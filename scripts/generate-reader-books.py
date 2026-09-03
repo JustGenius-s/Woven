@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-CONTENT_FILE = PROJECT_ROOT / "entry/src/main/resources/rawfile/content/reading.json"
+CONTENT_FILE = PROJECT_ROOT / "entry/src/main/resources/rawfile/reading.json"
 OUTPUT_DIR = PROJECT_ROOT / "entry/src/main/resources/rawfile/reader"
 ZIP_DATE = (2025, 1, 1, 0, 0, 0)
 
@@ -155,6 +155,9 @@ def main() -> None:
     works = json.loads(CONTENT_FILE.read_text(encoding="utf-8"))
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     for work in works:
+        if work.get("format") == "pdf":
+            print(f"skipped PDF book {work['id']}")
+            continue
         output_path = OUTPUT_DIR / f"{work['id']}.epub"
         build_epub(work, output_path)
         print(f"generated {output_path.relative_to(PROJECT_ROOT)}")

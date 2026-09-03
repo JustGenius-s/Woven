@@ -14,6 +14,7 @@ import {
 import { DeepSeekClient } from '../../services/DeepSeekClient';
 import { VocabularyLearningStore } from '../../services/VocabularyLearningStore';
 import { ImmersiveAction } from './ImmersiveAction';
+import { MarkdownText } from './MarkdownText';
 
 const LOG_DOMAIN: number = 0x4b4f;
 const LOG_TAG: string = 'WovenInquiry';
@@ -142,7 +143,10 @@ export struct ContextAiPanel {
       '围绕这项内容回答，并根据问题解释读音、词义、语法、语气、使用场景或给出例句。' +
       '如果学习内容中带有用户的学习进度，造句时优先复用其中列出的语法和词汇，' +
       '同时保证日语自然，不需要为了复用而写出生硬句子。' +
-      '优先使用简洁中文说明，日语示例附上必要的读音或翻译。不要输出 Markdown 标题，回答控制在容易在手机上阅读的长度。';
+      '优先使用简洁中文说明，日语示例附上必要的读音或翻译。' +
+      '用 Markdown 组织回答：需要分点时用无序列表，需要对比时可用表格，关键日语词用 **加粗**，' +
+      '例句或读音用 `行内代码`。不要输出一级标题（#），二级标题（##）最多两个。' +
+      '回答控制在容易在手机上阅读的长度。';
   }
 
   private restoreConversation(): void {
@@ -317,13 +321,14 @@ export struct ContextAiPanel {
                   .fontWeight(FontWeight.Medium)
                   .fontColor(message.role === 'user' ? $r('app.color.accent') : $r('app.color.ink_muted'))
                 if (message.text.length > 0) {
-                  Text(message.text)
-                    .width('100%')
-                    .fontSize(message.role === 'user' ? 15 : 16)
-                    .fontColor($r('app.color.ink'))
-                    .lineHeight(message.role === 'user' ? 23 : 26)
-                    .textAlign(message.role === 'user' ? TextAlign.End : TextAlign.Start)
-                    .copyOption(CopyOptions.LocalDevice)
+                  MarkdownText({
+                    text: message.text,
+                    fontSize: message.role === 'user' ? 15 : 16,
+                    lineHeight: message.role === 'user' ? 23 : 26,
+                    textColor: $r('app.color.ink'),
+                    textAlign: message.role === 'user' ? TextAlign.End : TextAlign.Start,
+                    headingSize: 17
+                  })
                 } else {
                   LoadingProgress()
                     .width(20)

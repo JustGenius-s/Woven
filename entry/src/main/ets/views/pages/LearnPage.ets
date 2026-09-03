@@ -157,7 +157,7 @@ export struct LearnPage {
     const index: number = this.clampIndex(this.readingIndex, this.readingWorks.length);
     return this.readingIndex >= 0 && index >= 0 ?
       `${this.readingWorks[index].author} · ${this.readingWorks[index].level}` :
-      `${this.readingWorks.length} 篇开放文学阅读`;
+      `${this.readingWorks.length} 篇开放阅读`;
   }
 
   private scenarioHeadline(): string {

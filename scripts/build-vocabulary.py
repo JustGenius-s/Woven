@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Optional
 
 ROOT = Path(__file__).resolve().parents[1]
-CONTENT = ROOT / 'entry/src/main/resources/rawfile/content'
+CONTENT = ROOT / 'entry/src/main/resources/rawfile'
 VOCAB_DIR = CONTENT / 'vocabulary'
 CACHE = ROOT / '.cache/vocab'
 LEVELS = ('n5', 'n4', 'n3', 'n2', 'n1')
