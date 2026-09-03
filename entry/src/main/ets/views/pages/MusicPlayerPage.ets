@@ -19,7 +19,7 @@ const RESPONSIVE_SPLIT_BREAKPOINT: number = 600;
 export struct MusicPlayerPage {
   @Env(SystemProperties.WINDOW_AVOID_AREA) private avoidAreas: window.UIEnvWindowAvoidAreaInfoVP;
   @Prop tracks: MusicTrack[] = [];
-  @Prop snapshot: MusicPlaybackSnapshot = emptyMusicPlaybackSnapshot();
+  @Prop @Watch('onSnapshotChange') snapshot: MusicPlaybackSnapshot = emptyMusicPlaybackSnapshot();
   onBack: () => void = () => {};
   onToggle: () => void = () => {};
   onPrevious: () => void = () => {};
@@ -30,6 +30,10 @@ export struct MusicPlayerPage {
   @State private pageWidth: number = 360;
   @State private stage: number = 0;
   private lyricScroller: Scroller = new Scroller();
+  private lastLyricTrackId: string = '';
+  private lastLyricIndex: number = -1;
+  private lyricFollowPausedUntil: number = 0;
+  private lyricAutoScrolling: boolean = false;
 
   private track(): MusicTrack | undefined {
     if (this.snapshot.trackIndex < 0 || this.snapshot.trackIndex >= this.tracks.length) {
@@ -78,6 +82,34 @@ export struct MusicPlayerPage {
       }
     }
     return active;
+  }
+
+  onSnapshotChange(): void {
+    this.followActiveLyric(false);
+  }
+
+  private followActiveLyric(force: boolean): void {
+    const track: MusicTrack | undefined = this.track();
+    if (track === undefined || track.lines.length === 0) {
+      return;
+    }
+    const index: number = this.activeLineIndex(track);
+    const lineChanged: boolean = track.id !== this.lastLyricTrackId || index !== this.lastLyricIndex;
+    this.lastLyricTrackId = track.id;
+    this.lastLyricIndex = index;
+    if (this.stage !== 1 || (!force && !lineChanged)) {
+      return;
+    }
+    if (!force && Date.now() < this.lyricFollowPausedUntil) {
+      return;
+    }
+    this.lyricAutoScrolling = true;
+    setTimeout(() => {
+      this.lyricScroller.scrollToIndex(index, true, ScrollAlign.CENTER);
+      setTimeout(() => {
+        this.lyricAutoScrolling = false;
+      }, 360);
+    }, 16);
   }
 
   private formatTime(valueMs: number): string {
@@ -148,7 +180,12 @@ export struct MusicPlayerPage {
       .duration(MOTION_DURATION)
       .curve(curves.springMotion(0.42, 0.86, 0.16))
       .cachedCount(1)
-      .onChange((index: number) => this.stage = index)
+      .onChange((index: number) => {
+        this.stage = index;
+        if (index === 1) {
+          this.followActiveLyric(true);
+        }
+      })
 
       this.stageDots()
       this.trackIdentity(track)
@@ -192,6 +229,13 @@ export struct MusicPlayerPage {
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.Spring)
     .clip(false)
+    .onWillScroll((scrollOffset: number, scrollState: ScrollState, scrollSource: ScrollSource) => {
+      if (this.lyricAutoScrolling || scrollSource !== ScrollSource.DRAG ||
+        Math.abs(scrollOffset) < 1) {
+        return;
+      }
+      this.lyricFollowPausedUntil = Date.now() + 4000;
+    })
   }
 
   @Builder
@@ -406,15 +450,11 @@ export struct MusicPlayerPage {
     .width('100%')
     .alignItems(HorizontalAlign.Start)
     .padding({ left: 18, right: 18, top: 16, bottom: 16 })
-    .borderRadius(22)
-    .backgroundColor(this.activeLineIndex(track) === index ?
-      $r('app.color.accent_soft') : Color.Transparent)
-    .border({
-      width: this.activeLineIndex(track) === index ? 0.5 : 0,
-      color: $r('app.color.accent')
-    })
     .visualEffect(this.activeLineIndex(track) === index ? planeLightEffect() : undefined)
     .accessibilityText(`${line.text}，${line.meaning}`)
-    .onClick(() => this.onSeek(line.startMs))
+    .onClick(() => {
+      this.lyricFollowPausedUntil = 0;
+      this.onSeek(line.startMs);
+    })
   }
 }

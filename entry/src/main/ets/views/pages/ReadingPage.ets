@@ -89,7 +89,6 @@ export struct ReadingPage {
   private pageController: SwiperController = new SwiperController();
   private pinchStartFontSize: number = 22;
   private hasSavedStyle: boolean = false;
-  private restoreControlsTimer: number = -1;
   private ignorePageSyncUntil: number = 0;
   private lastNarrationPage: number = -1;
   private readonly onNarrationSnapshot: ReadingNarrationListener =
@@ -160,10 +159,6 @@ export struct ReadingPage {
   }
 
   aboutToDisappear(): void {
-    if (this.restoreControlsTimer >= 0) {
-      clearTimeout(this.restoreControlsTimer);
-      this.restoreControlsTimer = -1;
-    }
     if (this.hasNarration()) {
       ReadingNarrationService.unsubscribe(this.onNarrationSnapshot);
       void ReadingNarrationService.release();
@@ -450,21 +445,16 @@ export struct ReadingPage {
     }
   }
 
-  private handleReaderScroll(yOffset: number): void {
+  private handleReaderScroll(yOffset: number, scrollSource: ScrollSource): void {
     if (this.panelOpen || Math.abs(yOffset) < 1) {
       return;
     }
-    this.controlsVisible = yOffset < 0;
-  }
-
-  private restoreControlsSoon(): void {
-    if (this.restoreControlsTimer >= 0) {
-      clearTimeout(this.restoreControlsTimer);
+    // Spring bounce at the bottom looks like an upward scroll and would
+    // otherwise pull the chrome back immediately after a downward swipe.
+    if (scrollSource === ScrollSource.EDGE_EFFECT) {
+      return;
     }
-    this.restoreControlsTimer = setTimeout(() => {
-      this.controlsVisible = true;
-      this.restoreControlsTimer = -1;
-    }, 900);
+    this.controlsVisible = yOffset < 0;
   }
 
   private updateViewport(width: Length, height: Length): void {
@@ -790,22 +780,6 @@ export struct ReadingPage {
   private passagePage(index: number, compact: boolean) {
     Scroll() {
       Column() {
-        Text(`${this.reading.genre} · ${this.reading.level}`)
-          .width('100%')
-          .fontSize(12)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.ink_muted'))
-        Text(this.reading.title)
-          .width('100%')
-          .fontSize(compact ? 25 : 28)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.ink'))
-          .margin({ top: 8 })
-        Text(`${this.reading.author} · ${this.reading.titleReading}`)
-          .width('100%')
-          .fontSize(13)
-          .fontColor($r('app.color.ink_muted'))
-          .margin({ top: 6, bottom: compact ? 26 : 36 })
         Text(this.passageTitle(index))
           .width('100%')
           .fontSize(12)
@@ -874,7 +848,7 @@ export struct ReadingPage {
         // Adding the reclaimed height back as top padding keeps the first line
         // at the same screen position while the reading area gains the space
         // at the bottom instead.
-        top: (compact ? 94 : 112) + (this.controlsVisible ? 0 : READER_TITLE_BAR_HEIGHT),
+        top: 16 + (this.controlsVisible ? 0 : READER_TITLE_BAR_HEIGHT),
         bottom: 96
       })
     }
@@ -883,9 +857,8 @@ export struct ReadingPage {
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.Spring)
     .onWillScroll((xOffset: number, yOffset: number, scrollState: ScrollState, scrollSource: ScrollSource) => {
-      this.handleReaderScroll(yOffset);
+      this.handleReaderScroll(yOffset, scrollSource);
     })
-    .onScrollStop(() => this.restoreControlsSoon())
     .onClick(() => this.currentPassageIndex = index)
   }
 
