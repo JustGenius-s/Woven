@@ -1,6 +1,7 @@
 import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
+import { JapaneseTtsService } from '../services/JapaneseTtsService';
 import { MusicPlaybackService } from '../services/MusicPlaybackService';
 
 const DOMAIN: number = 0x4b4f;
@@ -45,6 +46,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onDestroy(): void {
+    JapaneseTtsService.release();
     MusicPlaybackService.release();
   }
 

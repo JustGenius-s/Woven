@@ -38,6 +38,7 @@ import {
 import { HuaweiAccountService } from '../services/HuaweiAccountService';
 import { LearningPreferences } from '../services/LearningPreferences';
 import { LearningSyncCoordinator } from '../services/LearningSyncCoordinator';
+import { JapaneseTtsService } from '../services/JapaneseTtsService';
 import { KanaLookupService } from '../services/KanaLookupService';
 import { MusicPlaybackService } from '../services/MusicPlaybackService';
 import { VocabularyLearningStore } from '../services/VocabularyLearningStore';
@@ -163,6 +164,7 @@ struct Index {
     } catch (error) {
       this.musicTracks = [];
     }
+    JapaneseTtsService.initialize(context);
     MusicPlaybackService.initialize(context, this.musicTracks);
     MusicPlaybackService.subscribe(this.musicPlaybackListener);
     this.initializeAccountAndSync(context);

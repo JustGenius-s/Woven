@@ -5,6 +5,7 @@ import { LearningJourney, VocabularyEntry } from '../../model/ContentModels';
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { AiInquiryFactory } from '../../services/AiInquiryFactory';
 import { ContentRepository } from '../../services/ContentRepository';
+import { JapaneseTtsService } from '../../services/JapaneseTtsService';
 import { PitchNotation } from '../../services/PitchNotation';
 import { VocabularyDataSource } from '../../services/VocabularyDataSource';
 import {
@@ -49,6 +50,7 @@ export struct VocabularyPage {
     this.onScrollerReady(this.homeScroller);
     this.onScrollerReady(this.searchScroller);
     const context: common.Context = this.getUIContext().getHostContext() as common.Context;
+    JapaneseTtsService.initialize(context);
     this.learnedWords = VocabularyLearningStore.loadLearnedWords(context);
     this.rebuildLearnedIndex(this.learnedWords);
     this.level = this.journey?.vocabularyLevel ?? 'N5';
@@ -721,6 +723,7 @@ export struct VocabularyPage {
         colors: [[$r('app.color.surface_raised'), 0], [this.wordTone(item), 1]]
       })
       .visualEffect(planeLightEffect())
+      .onClick(() => this.onStudy(this.level, item.id, this.entriesToIds(scope)))
 
       Column({ space: 3 }) {
         Text(item.word)
@@ -745,6 +748,21 @@ export struct VocabularyPage {
       }
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
+      .onClick(() => this.onStudy(this.level, item.id, this.entriesToIds(scope)))
+
+      Button({
+        type: ButtonType.Circle,
+        stateEffect: true
+      }) {
+        SymbolGlyph($r('sys.symbol.speaker_wave_2_fill'))
+          .fontSize(18)
+          .fontColor([$r('app.color.ink_muted')])
+      }
+      .width(40)
+      .height(40)
+      .buttonStyle(ButtonStyleMode.TEXTUAL)
+      .accessibilityText(`朗读 ${item.word}`)
+      .onClick(() => JapaneseTtsService.playEntry(item.word, item.reading))
 
       if (this.containsLearnedWord(item.id)) {
         SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
@@ -759,6 +777,5 @@ export struct VocabularyPage {
     .width('100%')
     .height(84)
     .alignItems(VerticalAlign.Center)
-    .onClick(() => this.onStudy(this.level, item.id, this.entriesToIds(scope)))
   }
 }

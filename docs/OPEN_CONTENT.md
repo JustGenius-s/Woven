@@ -33,6 +33,10 @@
 
 NPO 多言語多読的免费书采用 CC BY-NC-ND 4.0。课堂可以发放未改动的官方 PDF，但禁止改写后再分发。因此应用打包官方电子书 PDF 和官方朗读 MP3，用系统 PDF 阅读器按原页展示，时间轴只做对齐，不加学习提示、不生成衍生 EPUB。署名、作品页链接和许可说明必须保留。用法见 https://tadoku.org/japanese/free-books/note/ 。
 
+### Piper / sherpa-onnx
+
+适合在设备上合成任意日语文本。运行时是 sherpa-onnx（Apache-2.0）；默认声线是 Piper `ja_JA-hi_fi_captain-medium`（MIT）。模型由 `npm run fetch:tts` 写入 `rawfile/tts/`，不进安装包仓库。五十音仍用已打包录音。用法见 [`docs/TTS.md`](TTS.md)。
+
 ### Tatoeba
 
 适合扩充例句与发音。句子下载数据通常采用 CC BY 2.0 FR，部分贡献可选择 CC0；音频许可由每位贡献者逐条设定。因此接入时必须保存句子 ID、作者和许可，不能只下载文本或音频后丢掉归属信息。例句、音频和整句假名还没有写入词库，留给后期批量生成。

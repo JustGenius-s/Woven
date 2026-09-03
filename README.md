@@ -15,6 +15,7 @@
 - 沉浸光感：API 23 上由页面级动态光源统一驱动正文和内容平面，使用 HDS `pointLight`、`pressShadow` 与官方 `systemMaterialEffect`；系统不支持时由框架降级。
 - HDS 组件：导航、悬浮导航栏、核心动作和选择行使用官方 HDS 组件，并跟随系统深浅色。
 - 华为账号与云空间：使用系统标准账号按钮，并将学习进度、已学单词及对话按课程同步；未配置 AGC 时自动降级为本地模式。
+- 日语朗读：词汇、例句和对话用设备上的 sherpa-onnx + Piper 合成。系统 TTS 没有日语。五十音仍用打包录音。模型需另外拉取，见 [`docs/TTS.md`](docs/TTS.md)。
 
 ## 目录
 
@@ -32,6 +33,17 @@ scripts/                       内容校验与 HAP 构建脚本
 ## 华为账号与云空间
 
 端侧接入、Client ID 和多语言数据模型已完成。联调前仍需在 AGC 登记对应构建的证书指纹并创建云表；模拟器使用 `emulator + debug`，发布包使用 `default + release`。完整清单见 [`docs/HUAWEI_ACCOUNT_CLOUD_SYNC.md`](docs/HUAWEI_ACCOUNT_CLOUD_SYNC.md)。DeepSeek API Key 不参与云同步。
+
+## 日语朗读
+
+系统语音合成没有日语。本地朗读依赖 `sherpa_onnx` HAR 和 Piper 日语模型：
+
+```bash
+cd entry && ohpm install
+npm run fetch:tts
+```
+
+模型文件不进 Git。未安装时点朗读没有声音。细节见 [`docs/TTS.md`](docs/TTS.md)。
 
 ## 校验与构建
 

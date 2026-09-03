@@ -118,6 +118,7 @@ export struct SettingsPage {
             Column({ space: 24 }) {
               this.cloudSyncSection()
               this.deepSeekSection()
+              this.ttsSection()
             }
             .width('100%')
             .constraintSize({ maxWidth: 560 })
@@ -383,5 +384,51 @@ export struct SettingsPage {
     .constraintSize({ maxWidth: 560 })
     .alignItems(HorizontalAlign.Start)
     .padding({ left: 20, right: 20, top: 8, bottom: 28 })
+  }
+
+  @Builder
+  private ttsSection() {
+    Column({ space: 8 }) {
+      Text('朗读')
+        .width('100%')
+        .padding({ left: 8 })
+        .fontSize(14)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.ink_muted'))
+
+      Row({ space: 14 }) {
+        SymbolGlyph($r('sys.symbol.speaker_wave_2_fill'))
+          .fontSize(22)
+          .fontColor([$r('app.color.accent')])
+
+        Column({ space: 3 }) {
+          Text('本地日语合成')
+            .fontSize(17)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.ink'))
+          Text('sherpa-onnx + Piper，不走系统 TTS')
+            .fontSize(13)
+            .fontColor($r('app.color.ink_muted'))
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+      }
+      .width('100%')
+      .constraintSize({ minHeight: 72 })
+      .padding({ left: 18, right: 18, top: 10, bottom: 10 })
+      .borderRadius(24)
+      .backgroundColor($r('app.color.surface_raised'))
+      .visualEffect(contentLightEffect())
+      .accessibilityText('本地日语合成，sherpa-onnx 与 Piper')
+
+      Text('单词优先读假名。模型未放入 rawfile/tts 时，点朗读没有声音。拉取方式见 docs/TTS.md。')
+        .width('100%')
+        .padding({ left: 8, right: 8, top: 2 })
+        .fontSize(13)
+        .lineHeight(19)
+        .fontColor($r('app.color.ink_muted'))
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
   }
 }

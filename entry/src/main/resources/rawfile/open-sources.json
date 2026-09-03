@@ -58,6 +58,25 @@
       ]
     },
     {
+      "id": "sherpa-onnx",
+      "kind": "tts-runtime",
+      "name": "sherpa-onnx",
+      "homepage": "https://github.com/k2-fsa/sherpa-onnx",
+      "licenseUrl": "https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE",
+      "licenseSummary": "Apache-2.0。HarmonyOS 端侧 TTS 运行时，包名为 sherpa_onnx。",
+      "integrationStatus": "bundled"
+    },
+    {
+      "id": "piper-ja-hi-fi-captain",
+      "kind": "tts-voice",
+      "name": "Piper ja_JA-hi_fi_captain-medium",
+      "homepage": "https://huggingface.co/rhasspy/piper-voices",
+      "sourceUrl": "https://huggingface.co/rhasspy/piper-voices/tree/main/ja/ja_JA/hi_fi_captain/medium",
+      "licenseUrl": "https://huggingface.co/rhasspy/piper-voices",
+      "licenseSummary": "Piper 声线为 MIT。训练语料为 HI-FI-CAPTAIN，对外发布前应再核对该语料的使用范围。模型由 fetch:tts 写入 rawfile/tts，不进 Git。",
+      "integrationStatus": "optional-local"
+    },
+    {
       "id": "tatoeba",
       "kind": "example-sentences",
       "name": "Tatoeba",

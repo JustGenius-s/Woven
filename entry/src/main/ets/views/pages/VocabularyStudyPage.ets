@@ -5,6 +5,7 @@ import { GrammarIndexEntry, LearningJourney, VocabularyEntry } from '../../model
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { AiInquiryFactory } from '../../services/AiInquiryFactory';
 import { ContentRepository } from '../../services/ContentRepository';
+import { JapaneseTtsService } from '../../services/JapaneseTtsService';
 import { VocabularyDataSource } from '../../services/VocabularyDataSource';
 import {
   LearnedVocabularySnapshot,
@@ -46,6 +47,7 @@ export struct VocabularyStudyPage {
 
   aboutToAppear(): void {
     const context: common.Context = this.getUIContext().getHostContext() as common.Context;
+    JapaneseTtsService.initialize(context);
     this.learnedWords = VocabularyLearningStore.loadLearnedWords(context);
     this.rebuildLearnedIndex(this.learnedWords);
     try {
@@ -408,15 +410,32 @@ export struct VocabularyStudyPage {
             (selection: string) => this.askSelection(selection, item)))
 
         if (item.example !== undefined) {
-          Text(item.example?.japanese ?? '')
-            .width('100%')
-            .fontSize(16)
-            .lineHeight(25)
-            .fontColor($r('app.color.ink'))
-            .margin({ top: 16 })
-            .copyOption(CopyOptions.LocalDevice)
-            .editMenuOptions(aiTextSelectionMenu(item.example?.japanese ?? '',
-              (selection: string) => this.askSelection(selection, item)))
+          Row({ space: 8 }) {
+            Text(item.example?.japanese ?? '')
+              .layoutWeight(1)
+              .fontSize(16)
+              .lineHeight(25)
+              .fontColor($r('app.color.ink'))
+              .copyOption(CopyOptions.LocalDevice)
+              .editMenuOptions(aiTextSelectionMenu(item.example?.japanese ?? '',
+                (selection: string) => this.askSelection(selection, item)))
+            Button({
+              type: ButtonType.Circle,
+              stateEffect: true
+            }) {
+              SymbolGlyph($r('sys.symbol.speaker_wave_2_fill'))
+                .fontSize(16)
+                .fontColor([$r('app.color.ink_muted')])
+            }
+            .width(36)
+            .height(36)
+            .buttonStyle(ButtonStyleMode.TEXTUAL)
+            .accessibilityText('朗读例句')
+            .onClick(() => JapaneseTtsService.play(item.example?.japanese ?? ''))
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Top)
+          .margin({ top: 16 })
           Text(item.example?.english ?? '')
             .width('100%')
             .fontSize(13)
@@ -525,7 +544,8 @@ export struct VocabularyStudyPage {
     })
     .visualEffect(planeLightEffect())
     .accessibilityText(`${item.word}，${item.reading}${PitchNotation.summary(item).length > 0 ?
-      `，${PitchNotation.summary(item)}` : ''}`)
+      `，${PitchNotation.summary(item)}` : ''}，点按朗读`)
+    .onClick(() => JapaneseTtsService.playEntry(item.word, item.reading))
   }
 
   @Builder

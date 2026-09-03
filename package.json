@@ -9,6 +9,7 @@
     "check:content": "node scripts/check-content.mjs",
     "build:vocabulary": "python3 scripts/build-vocabulary.py",
     "generate:reader": "python3 scripts/generate-reader-books.py",
-    "generate:music": "python3 scripts/generate-demo-music.py"
+    "generate:music": "python3 scripts/generate-demo-music.py",
+    "fetch:tts": "sh scripts/fetch-tts-model.sh"
   }
 }

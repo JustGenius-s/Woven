@@ -15,6 +15,7 @@ import {
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { AiInquiryFactory } from '../../services/AiInquiryFactory';
 import { ContentRepository } from '../../services/ContentRepository';
+import { JapaneseTtsService } from '../../services/JapaneseTtsService';
 import { PitchNotation } from '../../services/PitchNotation';
 import { aiTextSelectionMenu } from '../components/AiTextSelection';
 import { PitchAccentMark } from '../components/PitchAccentMark';
@@ -96,6 +97,7 @@ export struct JourneyPage {
     this.completedMask = this.initialCompletedMask;
     try {
       const context: common.Context = this.getUIContext().getHostContext() as common.Context;
+      JapaneseTtsService.initialize(context);
       this.catalog = ContentRepository.loadCatalog(context);
       this.grammarEntries = ContentRepository.loadGrammarIndex(context);
       this.words = this.selectWords(ContentRepository.loadVocabulary(context, this.journey.vocabularyLevel));
@@ -190,6 +192,10 @@ export struct JourneyPage {
       return;
     }
     this.askSelection(selection, `${this.journey.title} · ${this.words[index].word}`, this.wordContext(index));
+  }
+
+  private playDialogueLine(line: DialogueLine): void {
+    JapaneseTtsService.play(line.reading.length > 0 ? line.reading : line.text);
   }
 
   private askDialogueSelection(selection: string, line: DialogueLine): void {
@@ -454,6 +460,7 @@ export struct JourneyPage {
           .alignItems(VerticalAlign.Top)
           .padding({ top: 12, bottom: 12 })
           .border({ width: { bottom: 0.5 }, color: $r('app.color.line') })
+          .onClick(() => this.playDialogueLine(line))
         })
       }
       .width('100%')
@@ -721,6 +728,10 @@ export struct JourneyPage {
               Math.min(this.selectedWordIndex, this.words.length - 1))))
       }
       .width('100%')
+      .onClick(() => {
+        const item: VocabularyEntry = this.words[Math.min(this.selectedWordIndex, this.words.length - 1)];
+        JapaneseTtsService.playEntry(item.word, item.reading);
+      })
       if (this.words[Math.min(this.selectedWordIndex, this.words.length - 1)].pitches !== undefined &&
         this.words[Math.min(this.selectedWordIndex, this.words.length - 1)].pitches.length > 0) {
         PitchAccentMark({
@@ -926,6 +937,7 @@ export struct JourneyPage {
         .borderRadius(14)
         .border({ width: { bottom: index + 1 < (this.dialogue?.lines.length ?? 0) ? 0.5 : 0 },
           color: $r('app.color.line') })
+        .onClick(() => this.playDialogueLine(line))
       })
     }
     .width('100%')
