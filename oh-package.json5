@@ -1,6 +1,6 @@
 {
   "modelVersion": "6.0.2",
-  "description": "言葉 HarmonyOS native application",
+  "description": "Woven HarmonyOS native application",
   "dependencies": {},
   "devDependencies": {
     "@ohos/hypium": "1.0.25",

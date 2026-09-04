@@ -1,7 +1,7 @@
 {
   "name": "entry",
   "version": "1.0.0",
-  "description": "言葉 HarmonyOS native client",
+  "description": "Woven HarmonyOS native client",
   "main": "",
   "author": "just-genius",
   "license": "MIT",
