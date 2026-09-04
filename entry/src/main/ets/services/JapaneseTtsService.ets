@@ -6,6 +6,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { http } from '@kit.NetworkKit';
 import { promptAction } from '@kit.ArkUI';
 import { MusicPlaybackService } from './MusicPlaybackService';
+import { VideoPlaybackService } from './VideoPlaybackService';
 import { LearningPreferences } from './LearningPreferences';
 
 interface VoiceSetting {
@@ -100,6 +101,7 @@ export class JapaneseTtsService {
     hilog.info(LOG_DOMAIN, LOG_TAG, 'play request: %{public}s', spoken);
     try {
       await MusicPlaybackService.pause();
+      await VideoPlaybackService.pause();
     } catch (error) {
       // Music may not have a prepared source.
     }

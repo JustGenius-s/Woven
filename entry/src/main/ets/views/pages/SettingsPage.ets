@@ -1,13 +1,21 @@
+import { common } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { systemGestureInset } from '../../common/AppTheme';
 import { showImmersiveNotice } from '../../common/ImmersiveNotice';
+import { ReadingWork } from '../../model/ContentModels';
 import {
   CloudSyncPhase,
   CloudSyncSnapshot,
   HuaweiAccountPhase,
   HuaweiAccountSnapshot
 } from '../../model/SyncModels';
+import { ContentRepository } from '../../services/ContentRepository';
 import { DISTRIBUTED_SYNC_PERMISSION_REQUIRED } from '../../services/DistributedSyncPermission';
+import {
+  ReadingBookService,
+  ReadingDownloadResult,
+  ReadingLibraryStats
+} from '../../services/ReadingBookService';
 import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
 import { contentLightEffect } from '../components/ImmersiveCanvas';
 
@@ -39,11 +47,24 @@ export struct SettingsPage {
   @State private minimaxApiKey: string = '';
   @State private sheetOpen: boolean = false;
   @State private activeSheet: 'deepseek' | 'minimax' = 'deepseek';
+  @State private downloadBusy: boolean = false;
+  @State private downloadLabel: string = '';
+  @State private pendingCount: number = 0;
+  @State private pendingBytes: number = 0;
+  @State private readyCount: number = 0;
+  @State private totalCount: number = 0;
   private pageScroller: Scroller = new Scroller();
+  private cancelDownload: boolean = false;
+  private cloudWorks: ReadingWork[] = [];
 
   aboutToAppear(): void {
     this.apiKey = this.initialApiKey;
     this.minimaxApiKey = this.initialMinimaxApiKey;
+    void this.refreshLibrary();
+  }
+
+  aboutToDisappear(): void {
+    this.cancelDownload = true;
   }
 
   private normalizedApiKey(): string {
@@ -126,6 +147,114 @@ export struct SettingsPage {
       new Date(this.syncState.lastSyncedAt).toLocaleString() : '';
   }
 
+  private hostContext(): common.Context {
+    return this.getUIContext().getHostContext() as common.Context;
+  }
+
+  private applyLibraryStats(stats: ReadingLibraryStats): void {
+    this.totalCount = stats.total;
+    this.readyCount = stats.ready;
+    this.pendingCount = stats.pending;
+    this.pendingBytes = stats.pendingBytes;
+  }
+
+  private collectCloudWorks(works: ReadingWork[]): ReadingWork[] {
+    const cloud: ReadingWork[] = [];
+    for (let index: number = 0; index < works.length; index++) {
+      if (ReadingBookService.isCloudBook(works[index])) {
+        cloud.push(works[index]);
+      }
+    }
+    return cloud;
+  }
+
+  private async refreshLibrary(): Promise<void> {
+    const context: common.Context = this.hostContext();
+    try {
+      this.cloudWorks = this.collectCloudWorks(
+        await ContentRepository.prefetchReadings(context));
+    } catch (error) {
+      this.cloudWorks = this.collectCloudWorks(
+        ContentRepository.loadReadingWorks(context));
+    }
+    this.applyLibraryStats(ReadingBookService.libraryStats(context, this.cloudWorks));
+  }
+
+  private libraryStatus(): string {
+    if (this.downloadBusy) {
+      return this.downloadLabel.length > 0 ? this.downloadLabel : '正在下载…';
+    }
+    if (this.totalCount === 0) {
+      return '还没有拉到绘本书目';
+    }
+    if (this.pendingCount === 0) {
+      return `已全部下载 · ${this.readyCount} 本`;
+    }
+    return `未下载 ${this.pendingCount} 本 · ${this.formatBytes(this.pendingBytes)}`;
+  }
+
+  private formatBytes(bytes: number): string {
+    if (bytes <= 0) {
+      return '体积未知';
+    }
+    const mega: number = Math.round(bytes / (1024 * 1024));
+    if (mega < 1) {
+      return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    }
+    return `约 ${mega} MB`;
+  }
+
+  private async toggleLibraryDownload(): Promise<void> {
+    if (this.downloadBusy) {
+      this.cancelDownload = true;
+      this.downloadLabel = '正在取消…';
+      return;
+    }
+    const context: common.Context = this.hostContext();
+    if (this.cloudWorks.length === 0) {
+      await this.refreshLibrary();
+    }
+    if (this.cloudWorks.length === 0) {
+      showImmersiveNotice(this.getUIContext(), '还不能下载', '书目加载失败，请联网后再试');
+      return;
+    }
+    if (this.pendingCount === 0) {
+      showImmersiveNotice(this.getUIContext(), '已经下完', '绘本都在这台设备上');
+      return;
+    }
+    this.cancelDownload = false;
+    this.downloadBusy = true;
+    this.downloadLabel = '正在准备…';
+    try {
+      const result: ReadingDownloadResult = await ReadingBookService.downloadAll(
+        context,
+        this.cloudWorks,
+        (done: number, total: number, title: string) => {
+          this.downloadLabel = `${done}/${total}  ${title}`;
+        },
+        () => !this.cancelDownload
+      );
+      this.applyLibraryStats(ReadingBookService.libraryStats(context, this.cloudWorks));
+      if (this.cancelDownload) {
+        showImmersiveNotice(this.getUIContext(), '已停止',
+          `这次下了 ${result.downloaded} 本，还可继续`);
+      } else if (result.failed > 0) {
+        showImmersiveNotice(this.getUIContext(), '下载未完成',
+          `成功 ${result.downloaded} 本，失败 ${result.failed} 本`);
+      } else {
+        showImmersiveNotice(this.getUIContext(), '下载完成',
+          result.downloaded > 0 ? `新下了 ${result.downloaded} 本` : '没有需要新下的书');
+      }
+    } catch (error) {
+      const detail: string = error instanceof Error ? error.message : '网络异常';
+      showImmersiveNotice(this.getUIContext(), '下载失败', detail);
+    } finally {
+      this.downloadBusy = false;
+      this.downloadLabel = '';
+      this.applyLibraryStats(ReadingBookService.libraryStats(context, this.cloudWorks));
+    }
+  }
+
   build() {
     Column() {
       ImmersiveBackChrome({
@@ -161,6 +290,7 @@ export struct SettingsPage {
           Row() {
             Column({ space: 24 }) {
               this.cloudSyncSection()
+              this.readingLibrarySection()
               this.deepSeekSection()
               this.ttsSection()
             }
@@ -314,6 +444,74 @@ export struct SettingsPage {
         .fontSize(13)
         .fontColor($r('app.color.ink_muted'))
     }
+  }
+
+  @Builder
+  private readingLibrarySection() {
+    Column({ space: 8 }) {
+      Text('阅读资料')
+        .width('100%')
+        .padding({ left: 8 })
+        .fontSize(14)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.ink_muted'))
+
+      Row({ space: 14 }) {
+        SymbolGlyph($r('sys.symbol.book_pages_fill'))
+          .fontSize(22)
+          .fontColor([$r('app.color.accent')])
+
+        Column({ space: 3 }) {
+          Text('下载全部绘本')
+            .fontSize(17)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.ink'))
+          Text(this.libraryStatus())
+            .fontSize(13)
+            .fontColor(this.downloadBusy ? $r('app.color.accent') : $r('app.color.ink_muted'))
+            .maxLines(2)
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+
+        if (this.downloadBusy) {
+          LoadingProgress()
+            .width(22)
+            .height(22)
+            .color($r('app.color.accent'))
+        } else if (this.pendingCount === 0 && this.totalCount > 0) {
+          Text('已完成')
+            .fontSize(14)
+            .fontColor($r('app.color.success'))
+        } else {
+          Text('下载')
+            .fontSize(14)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.accent'))
+        }
+      }
+      .width('100%')
+      .constraintSize({ minHeight: 76 })
+      .padding({ left: 18, right: 18, top: 12, bottom: 12 })
+      .borderRadius(24)
+      .backgroundColor($r('app.color.surface_raised'))
+      .visualEffect(contentLightEffect())
+      .accessibilityText(this.downloadBusy ? '取消下载绘本' : '下载全部绘本')
+      .onClick(() => {
+        void this.toggleLibraryDownload();
+      })
+
+      Text(this.downloadBusy ?
+        '再点一次可以停止。已下好的书会保留。' :
+        '把官方电子书和朗读存到这台设备，已下载的会跳过。大约占用 1 GB。')
+        .width('100%')
+        .padding({ left: 8, right: 8, top: 2 })
+        .fontSize(13)
+        .lineHeight(19)
+        .fontColor($r('app.color.ink_muted'))
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
   }
 
   @Builder

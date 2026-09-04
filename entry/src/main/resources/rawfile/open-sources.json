@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-09-03",
+  "reviewedAt": "2026-09-04",
   "sources": [
     {
       "id": "aozora-bunko",
@@ -8,9 +8,8 @@
       "name": "青空文庫",
       "homepage": "https://www.aozora.gr.jp/",
       "rulesUrl": "https://www.aozora.gr.jp/guide/kijyunn.html",
-      "licenseSummary": "仅打包作者著作权已消灭且作品卡明确公开的文本；保留作品卡、底本和输入校正信息。",
-      "integrationStatus": "bundled",
-      "bundledIds": ["spiders-thread", "i-am-a-cat", "many-orders", "gon-fox", "run-melos"]
+      "licenseSummary": "仅收录作者著作权已消灭且作品卡明确公开的文本。当前阅读页不再展示青空文库。",
+      "integrationStatus": "retired"
     },
     {
       "id": "tadoku-free-books",
@@ -19,9 +18,8 @@
       "homepage": "https://tadoku.org/japanese/free-books/",
       "rulesUrl": "https://tadoku.org/japanese/free-books/note/",
       "licenseUrl": "https://creativecommons.org/licenses/by-nc-nd/4.0/",
-      "licenseSummary": "CC BY-NC-ND 4.0。打包官方电子书 PDF 和官方朗读 MP3，用系统阅读器按原页展示并对齐时间轴，不改写、不加解说、不生成衍生 EPUB。保留作品页、作者和许可说明。",
-      "integrationStatus": "bundled",
-      "bundledIds": ["tadoku-40280"]
+      "licenseSummary": "CC BY-NC-ND 4.0。官方电子书 PDF 和朗读 MP3 按需从云端下载到本机沙箱，用系统阅读器按原页展示，不改写、不加解说、不生成衍生 EPUB。保留作品页、作者和许可说明。",
+      "integrationStatus": "cloud"
     },
     {
       "id": "musicbrainz",
@@ -32,7 +30,11 @@
       "licenseUrl": "https://musicbrainz.org/doc/About/Data_License",
       "licenseSummary": "核心数据为 CC0；补充数据为 CC BY-NC-SA 3.0。MusicBrainz 提供元数据，不提供歌曲音频。",
       "integrationStatus": "candidate",
-      "requirements": ["发送可识别的 User-Agent", "请求频率不超过每秒一次", "商业版本不得混入补充数据"]
+      "requirements": [
+        "发送可识别的 User-Agent",
+        "请求频率不超过每秒一次",
+        "商业版本不得混入补充数据"
+      ]
     },
     {
       "id": "wikimedia-commons-audio",
@@ -84,7 +86,11 @@
       "downloadsUrl": "https://tatoeba.org/en/downloads",
       "licenseSummary": "句子下载集通常为 CC BY 2.0 FR，部分贡献为 CC0；音频许可由贡献者逐项选择。",
       "integrationStatus": "candidate",
-      "requirements": ["保存句子 ID 与作者归属", "逐条检查音频许可", "提供应用内署名入口"]
+      "requirements": [
+        "保存句子 ID 与作者归属",
+        "逐条检查音频许可",
+        "提供应用内署名入口"
+      ]
     },
     {
       "id": "wadoku",

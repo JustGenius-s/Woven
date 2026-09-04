@@ -1,6 +1,7 @@
 /.hvigor/
 /.idea/
 /build/
+/entry/.preview/
 **/.DS_Store
 /node_modules/
 /oh_modules/
@@ -9,8 +10,15 @@
 /gateway/dist/
 /gateway/node_modules/
 /gateway/.env
+/.env
+/.env.local
 local.properties
 /.codegenie/
 /.cache/
-# Piper 日语模型由 npm run fetch:tts 生成本地文件，不进仓库。
+# Piper 日语模型本地文件，不进仓库。
 /entry/src/main/resources/rawfile/tts/vits-piper-ja/
+# Tadoku 官方 PDF / MP3 / 封面已上云，不再打进安装包。
+/entry/src/main/resources/rawfile/reader/tadoku-*.pdf
+/entry/src/main/resources/rawfile/audio/tadoku-*.mp3
+/entry/src/main/resources/rawfile/covers/
+/entry/src/main/resources/rawfile/reading-tadoku.json

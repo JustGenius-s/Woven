@@ -7,7 +7,6 @@ import {
   KanaCell,
   KanaRow,
   LearningCatalog,
-  MusicTrack,
   ReadingWork
 } from '../../model/ContentModels';
 import { AiInquiryContext } from '../../model/DeepSeekModels';
@@ -22,7 +21,8 @@ export struct LearnPage {
   savedLessonIndex: number = 0;
   kanaKey: string = 'あ';
   learnedWordCount: number = 0;
-  musicIndex: number = -1;
+  videoCount: number = 0;
+  lastVideoTitle: string = '';
   readingIndex: number = -1;
   scenarioIndex: number = -1;
   onScrollerReady: (scroller: Scroller) => void = (scroller: Scroller) => {};
@@ -36,7 +36,6 @@ export struct LearnPage {
   @State private mode: number = 0;
   @State private grammarIndex: GrammarIndexEntry[] = [];
   @State private catalog: LearningCatalog | undefined = undefined;
-  @State private musicTracks: MusicTrack[] = [];
   @State private readingWorks: ReadingWork[] = [];
   @State private manifest: ContentManifest | undefined = undefined;
   @State private loadError: string = '';
@@ -50,12 +49,20 @@ export struct LearnPage {
       const context: common.Context = this.getUIContext().getHostContext() as common.Context;
       this.grammarIndex = ContentRepository.loadGrammarIndex(context);
       this.catalog = ContentRepository.loadCatalog(context);
-      this.musicTracks = ContentRepository.loadMusicTracks(context);
       this.readingWorks = ContentRepository.loadReadingWorks(context);
       this.manifest = ContentRepository.loadManifest(context);
       this.loadError = '';
+      void this.refreshReadings(context);
     } catch (error) {
       this.loadError = '学习进度没有正确载入';
+    }
+  }
+
+  private async refreshReadings(context: common.Context): Promise<void> {
+    try {
+      this.readingWorks = await ContentRepository.prefetchReadings(context);
+    } catch (error) {
+      // Keep the bundled Aozora list if the catalog is offline.
     }
   }
 
@@ -136,16 +143,12 @@ export struct LearnPage {
     return index >= 0 ? `${this.grammarIndex[index].level} · 第 ${index + 1} 课` : '尚未开始';
   }
 
-  private musicHeadline(): string {
-    const index: number = this.clampIndex(this.musicIndex, this.musicTracks.length);
-    return this.musicIndex >= 0 && index >= 0 ? this.musicTracks[index].title : '尚未开始';
+  private videoHeadline(): string {
+    return this.lastVideoTitle.length > 0 ? this.lastVideoTitle : '尚未添加';
   }
 
-  private musicCaption(): string {
-    const index: number = this.clampIndex(this.musicIndex, this.musicTracks.length);
-    return this.musicIndex >= 0 && index >= 0 ?
-      `${this.musicTracks[index].chineseTitle} · ${this.musicTracks[index].artist}` :
-      `${this.musicTracks.length} 首日语学习音乐`;
+  private videoCaption(): string {
+    return this.videoCount > 0 ? `${this.videoCount} 个视频` : '用链接或本地文件添加';
   }
 
   private readingHeadline(): string {
@@ -274,14 +277,14 @@ export struct LearnPage {
           ListItem() {
             this.journeyCard(
               3,
-              '音乐',
-              this.musicHeadline(),
-              this.musicCaption(),
-              `${this.musicIndex < 0 ? 0 : Math.min(this.musicIndex + 1, this.musicTracks.length)} / ${this.musicTracks.length}`,
+              '视频',
+              this.videoHeadline(),
+              this.videoCaption(),
+              `${this.videoCount}`,
               $r('app.media.journey_music'),
-              $r('sys.symbol.music_note_circle_fill'),
+              $r('sys.symbol.play_circle_fill'),
               $r('app.color.word_card_amber'),
-              this.progress(this.musicIndex + 1, this.musicTracks.length),
+              this.progress(this.videoCount, Math.max(1, this.videoCount)),
               () => this.onOpenExplore(0))
           }
 

@@ -1,14 +1,18 @@
 import { common } from '@kit.AbilityKit';
-import { SegmentButtonV2Items, TabSegmentButtonV2, uiMaterial } from '@kit.ArkUI';
+import { promptAction, SegmentButtonV2Items, TabSegmentButtonV2, uiMaterial } from '@kit.ArkUI';
+import { picker } from '@kit.CoreFileKit';
 import { FLOATING_TAB_CONTENT_INSET } from '../../common/AppTheme';
+import { showImmersiveNotice } from '../../common/ImmersiveNotice';
 import {
   LearningCatalog,
-  MusicTrack,
   PracticeScenario,
   ReadingWork
 } from '../../model/ContentModels';
 import { AiInquiryContext } from '../../model/DeepSeekModels';
+import { VideoItem, videoSourceLabel } from '../../model/VideoModels';
 import { ContentRepository } from '../../services/ContentRepository';
+import { ReadingBookService } from '../../services/ReadingBookService';
+import { VideoLibraryStore } from '../../services/VideoLibraryStore';
 import { FloatingBarScrollTracker } from '../components/FloatingBarScrollTracker';
 import { CoverCard } from '../components/CoverCard';
 import { PageChrome } from '../components/PageChrome';
@@ -16,15 +20,15 @@ import { PageChrome } from '../components/PageChrome';
 @Component
 export struct ExplorePage {
   @Prop selectedTab: number = 0;
-  @Prop musicIndex: number = -1;
+  @Prop videoId: string = '';
   @Prop readingIndex: number = -1;
+  @Prop @Watch('onReadingOpenChange') readingOpen: boolean = false;
   @Prop scenarioIndex: number = -1;
   apiKeyConfigured: boolean = false;
   onScrollerReady: (scroller: Scroller) => void = (scroller: Scroller) => {};
   onFloatingBarCompactChange: (compact: boolean) => void = (compact: boolean) => {};
   onTabChange: (index: number) => void = (index: number) => {};
-  onOpenMusic: (track: MusicTrack, index: number) => void =
-    (track: MusicTrack, index: number) => {};
+  onOpenVideo: (video: VideoItem) => void = (video: VideoItem) => {};
   onOpenReading: (reading: ReadingWork, index: number) => void =
     (reading: ReadingWork, index: number) => {};
   onScenarioChange: (index: number) => void = (index: number) => {};
@@ -32,39 +36,71 @@ export struct ExplorePage {
   onAsk: (context: AiInquiryContext) => void = (context: AiInquiryContext) => {};
 
   @State private catalog: LearningCatalog | undefined = undefined;
-  @State private musicTracks: MusicTrack[] = [];
+  @State private videos: VideoItem[] = [];
   @State private readingWorks: ReadingWork[] = [];
+  @State private readingCategory: string = '全部';
+  @State private coverReady: number = 0;
+  @State private bookReadyTick: number = 0;
   @State private loadError: string = '';
+  @State private readingsLoading: boolean = true;
   @State private pageWidth: number = 360;
   @State private exploreTabIndex: number = 0;
+  @State private urlSheetOpen: boolean = false;
+  @State private urlDraft: string = '';
+  @State private titleDraft: string = '';
   private exploreTabItems: SegmentButtonV2Items = new SegmentButtonV2Items([
-    { text: '音乐' },
+    { text: '视频' },
     { text: '阅读' },
     { text: '场景' }
   ]);
-  private musicScroller: Scroller = new Scroller();
+  private videoScroller: Scroller = new Scroller();
   private readingScroller: Scroller = new Scroller();
   private scenarioScroller: Scroller = new Scroller();
-  private musicFloatingBarTracker: FloatingBarScrollTracker = new FloatingBarScrollTracker('explore-music');
+  private videoFloatingBarTracker: FloatingBarScrollTracker = new FloatingBarScrollTracker('explore-video');
   private readingFloatingBarTracker: FloatingBarScrollTracker = new FloatingBarScrollTracker('explore-reading');
   private scenarioFloatingBarTracker: FloatingBarScrollTracker = new FloatingBarScrollTracker('explore-scenario');
+  private coverPaths: Map<string, string> = new Map();
+  private readonly readingCategories: string[] =
+    ['全部', 'L0入门', 'L0', 'L1', 'L2', 'L3', 'L4', 'L5'];
 
   aboutToAppear(): void {
-    this.onScrollerReady(this.musicScroller);
+    this.onScrollerReady(this.videoScroller);
     this.onScrollerReady(this.readingScroller);
     this.onScrollerReady(this.scenarioScroller);
     this.exploreTabIndex = this.selectedTab;
     try {
       const context: common.Context = this.getUIContext().getHostContext() as common.Context;
       this.catalog = ContentRepository.loadCatalog(context);
-      this.musicTracks = ContentRepository.loadMusicTracks(context);
+      this.videos = VideoLibraryStore.load(context);
       this.readingWorks = ContentRepository.loadReadingWorks(context);
+      this.loadCovers(context);
       this.loadError = '';
+      void this.refreshReadings(context);
     } catch (error) {
       this.catalog = undefined;
-      this.musicTracks = [];
+      this.videos = [];
       this.readingWorks = [];
       this.loadError = '探索内容没有正确载入';
+    }
+  }
+
+  private async refreshReadings(context: common.Context): Promise<void> {
+    this.readingsLoading = this.readingWorks.length === 0;
+    try {
+      this.readingWorks = await ContentRepository.prefetchReadings(context);
+      this.loadCovers(context);
+      this.bookReadyTick += 1;
+      void this.downloadCovers(context);
+      if (this.readingWorks.length > 0) {
+        this.loadError = '';
+      }
+    } catch (error) {
+      if (this.readingWorks.length === 0) {
+        const detail: string = error instanceof Error ? error.message : '';
+        this.loadError = detail.length > 0 ? `阅读书目加载失败：${detail}` : '阅读书目加载失败';
+      }
+    } finally {
+      this.readingsLoading = false;
     }
   }
 
@@ -79,11 +115,105 @@ export struct ExplorePage {
     return this.pageWidth >= 700 && index % 2 === 0 ? 14 : 0;
   }
 
-  private readingCoverRatio(readingId: string): number {
-    if (readingId === 'tadoku-40280') {
+  private readingCoverRatio(reading: ReadingWork): number {
+    if (reading.coverRatio !== undefined && reading.coverRatio > 0) {
+      return reading.coverRatio;
+    }
+    if (reading.id === 'tadoku-40280') {
       return 1259 / 1786;
     }
-    return 1;
+    return 0;
+  }
+
+  private loadCovers(context: common.Context): void {
+    const next: Map<string, string> = new Map();
+    for (let index: number = 0; index < this.readingWorks.length; index++) {
+      const reading: ReadingWork = this.readingWorks[index];
+      const ready: string = ReadingBookService.coverReady(context, reading);
+      if (ready.length > 0) {
+        next.set(reading.id, ready);
+        continue;
+      }
+      const relative: string | undefined = reading.coverFile;
+      if (relative === undefined || relative.length === 0) {
+        continue;
+      }
+      try {
+        next.set(reading.id, ReadingBookService.materializeCover(context, reading.id, relative));
+      } catch (error) {
+        // Official cover is optional; the card falls back to a plate image.
+      }
+    }
+    this.coverPaths = next;
+    this.coverReady += 1;
+  }
+
+  private async downloadCovers(context: common.Context): Promise<void> {
+    for (let index: number = 0; index < this.readingWorks.length; index++) {
+      const reading: ReadingWork = this.readingWorks[index];
+      if (reading.coverKey === undefined || reading.coverKey.length === 0) {
+        continue;
+      }
+      if ((this.coverPaths.get(reading.id) ?? '').length > 0) {
+        continue;
+      }
+      try {
+        const path: string = await ReadingBookService.ensureCover(context, reading);
+        if (path.length > 0) {
+          this.coverPaths.set(reading.id, path);
+          this.coverReady += 1;
+        }
+      } catch (error) {
+        // Cover download is optional.
+      }
+    }
+  }
+
+  private coverPath(readingId: string): string {
+    return this.coverReady >= 0 ? (this.coverPaths.get(readingId) ?? '') : '';
+  }
+
+  private matchesCategory(reading: ReadingWork, category: string): boolean {
+    if (category === '全部') {
+      return true;
+    }
+    return reading.level === category || reading.category === category;
+  }
+
+  private filteredReadings(): ReadingWork[] {
+    const selected: string = this.readingCategory;
+    const matched: ReadingWork[] = [];
+    for (let index: number = 0; index < this.readingWorks.length; index++) {
+      const reading: ReadingWork = this.readingWorks[index];
+      if (this.matchesCategory(reading, selected)) {
+        matched.push(reading);
+      }
+    }
+    return matched;
+  }
+
+  private categoryCount(category: string): number {
+    let count: number = 0;
+    for (let index: number = 0; index < this.readingWorks.length; index++) {
+      if (this.matchesCategory(this.readingWorks[index], category)) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  private selectReadingCategory(category: string): void {
+    if (this.readingCategory === category) {
+      return;
+    }
+    this.readingCategory = category;
+  }
+
+  private isReadingSelected(reading: ReadingWork): boolean {
+    if (this.readingIndex < 0 || this.readingIndex >= this.readingWorks.length) {
+      return false;
+    }
+    return this.readingWorks[this.readingIndex].id === reading.id;
   }
 
   private updatePageWidth(width: Length): void {
@@ -93,36 +223,8 @@ export struct ExplorePage {
     }
   }
 
-  private musicArtwork(trackId: string): Resource {
-    switch (trackId) {
-      case 'morning-train':
-        return $r('app.media.music_morning_train');
-      case 'rain-cafe':
-        return $r('app.media.music_rain_cafe');
-      case 'small-trip':
-        return $r('app.media.music_small_trip');
-      case 'seaside-letter':
-        return $r('app.media.music_seaside_letter');
-      default:
-        return $r('app.media.music_look_at_stars');
-    }
-  }
-
-  private readingArtwork(readingId: string): Resource {
-    switch (readingId) {
-      case 'spiders-thread':
-        return $r('app.media.reading_spiders_thread');
-      case 'i-am-a-cat':
-        return $r('app.media.reading_i_am_a_cat');
-      case 'many-orders':
-        return $r('app.media.reading_many_orders');
-      case 'gon-fox':
-        return $r('app.media.reading_gon_fox');
-      case 'tadoku-40280':
-        return $r('app.media.reading_two_frogs');
-      default:
-        return $r('app.media.reading_run_melos');
-    }
+  private readingArtwork(): Resource {
+    return $r('app.media.reading_default');
   }
 
   private scenarioArtwork(scenarioId: string): Resource {
@@ -140,18 +242,102 @@ export struct ExplorePage {
     }
   }
 
-  private openMusic(index: number): void {
-    if (index < 0 || index >= this.musicTracks.length) {
-      return;
-    }
-    this.onOpenMusic(this.musicTracks[index], index);
+  private hostContext(): common.UIAbilityContext {
+    return this.getUIContext().getHostContext() as common.UIAbilityContext;
   }
 
-  private openReading(index: number): void {
-    if (index < 0 || index >= this.readingWorks.length) {
+  private openAddMenu(): void {
+    this.getUIContext().getPromptAction().showActionMenu({
+      title: '添加视频',
+      buttons: [
+        { text: '添加网络视频', color: '#2E5BF4' },
+        { text: '导入本地视频', color: '#6B7078' }
+      ]
+    }).then((result: promptAction.ActionMenuSuccessResponse) => {
+      if (result.index === 0) {
+        this.openUrlSheet();
+      } else if (result.index === 1) {
+        void this.importLocalVideo();
+      }
+    }).catch(() => {
+      // The user dismissed the menu.
+    });
+  }
+
+  private openUrlSheet(): void {
+    this.urlDraft = '';
+    this.titleDraft = '';
+    this.urlSheetOpen = true;
+  }
+
+  private confirmUrl(): void {
+    try {
+      const item: VideoItem = VideoLibraryStore.addUrl(this.hostContext(), this.urlDraft, this.titleDraft);
+      this.videos = VideoLibraryStore.load(this.hostContext());
+      this.urlSheetOpen = false;
+      this.onOpenVideo(item);
+    } catch (error) {
+      const detail: string = error instanceof Error ? error.message : '无法添加视频';
+      showImmersiveNotice(this.getUIContext(), '还不能添加', detail);
+    }
+  }
+
+  private async importLocalVideo(): Promise<void> {
+    try {
+      const documentPicker: picker.DocumentViewPicker = new picker.DocumentViewPicker(this.hostContext());
+      const options: picker.DocumentSelectOptions = new picker.DocumentSelectOptions();
+      options.maxSelectNumber = 1;
+      options.fileSuffixFilters = ['.mp4,.mkv,.mov,.webm,.m4v'];
+      const uris: Array<string> = await documentPicker.select(options);
+      if (uris.length === 0) {
+        return;
+      }
+      const item: VideoItem = await VideoLibraryStore.importFromUri(this.hostContext(), uris[0], uris[0]);
+      this.videos = VideoLibraryStore.load(this.hostContext());
+      this.onOpenVideo(item);
+    } catch (error) {
+      const detail: string = error instanceof Error ? error.message : '无法导入视频';
+      showImmersiveNotice(this.getUIContext(), '导入失败', detail);
+    }
+  }
+
+  private removeVideo(videoId: string): void {
+    this.videos = VideoLibraryStore.remove(this.hostContext(), videoId);
+  }
+
+  private formatDuration(durationMs: number): string {
+    if (durationMs <= 0) {
+      return '';
+    }
+    const totalSeconds: number = Math.floor(durationMs / 1000);
+    const minutes: number = Math.floor(totalSeconds / 60);
+    const seconds: number = totalSeconds % 60;
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  }
+
+  private onReadingOpenChange(): void {
+    if (!this.readingOpen) {
+      this.bookReadyTick += 1;
+    }
+  }
+
+  private isReadingDownloaded(reading: ReadingWork): boolean {
+    return this.bookReadyTick >= 0 &&
+      ReadingBookService.isBookReady(this.hostContext(), reading);
+  }
+
+  private openReading(reading: ReadingWork): void {
+    let index: number = -1;
+    for (let cursor: number = 0; cursor < this.readingWorks.length; cursor++) {
+      if (this.readingWorks[cursor].id === reading.id) {
+        index = cursor;
+        break;
+      }
+    }
+    if (index < 0) {
       return;
     }
-    this.onOpenReading(this.readingWorks[index], index);
+    this.onOpenReading(reading, index);
   }
 
   private startScenario(scenario: PracticeScenario, index: number): void {
@@ -195,8 +381,13 @@ export struct ExplorePage {
     Column() {
       PageChrome({
         title: '探索',
+        largeTitle: false,
         bottomHeight: 60,
-        scrollers: [this.musicScroller, this.readingScroller, this.scenarioScroller],
+        showMenuAction: this.activeExploreTab() === 0,
+        menuIcon: $r('sys.symbol.plus'),
+        menuLabel: '添加视频',
+        onMenu: () => this.openAddMenu(),
+        scrollers: [this.videoScroller, this.readingScroller, this.scenarioScroller],
         bottomContent: () => {
           this.exploreTabSelector()
         },
@@ -208,7 +399,39 @@ export struct ExplorePage {
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Transparent)
+    .bindSheet($$this.urlSheetOpen, this.urlSheet(), {
+      height: SheetSize.FIT_CONTENT,
+      preferType: SheetType.BOTTOM,
+      title: { title: '添加网络视频' },
+      dragBar: true,
+      showClose: true,
+      blurStyle: BlurStyle.COMPONENT_REGULAR,
+      backgroundColor: $r('app.color.surface_raised'),
+      maskColor: '#52000000',
+      onDisappear: () => this.urlSheetOpen = false
+    })
     .onAreaChange((oldArea: Area, newArea: Area) => this.updatePageWidth(newArea.width))
+  }
+
+  @Builder
+  private urlSheet() {
+    Column({ space: 14 }) {
+      TextInput({ text: this.urlDraft, placeholder: 'https://' })
+        .width('100%')
+        .height(48)
+        .onChange((value: string) => this.urlDraft = value)
+      TextInput({ text: this.titleDraft, placeholder: '标题（可选）' })
+        .width('100%')
+        .height(48)
+        .onChange((value: string) => this.titleDraft = value)
+      Button('添加并播放', { type: ButtonType.ROUNDED_RECTANGLE, stateEffect: true })
+        .width('100%')
+        .buttonStyle(ButtonStyleMode.EMPHASIZED)
+        .enabled(VideoLibraryStore.normalizedUrl(this.urlDraft).length > 0)
+        .onClick(() => this.confirmUrl())
+    }
+    .width('100%')
+    .padding({ left: 20, right: 20, top: 8, bottom: 28 })
   }
 
   @Builder
@@ -222,7 +445,7 @@ export struct ExplorePage {
         .textAlign(TextAlign.Center)
         .padding(28)
     } else if (this.activeExploreTab() === 0) {
-      this.musicPage()
+      this.videoPage()
     } else if (this.activeExploreTab() === 1) {
       this.readingPage()
     } else {
@@ -231,84 +454,191 @@ export struct ExplorePage {
   }
 
   @Builder
-  private musicPage() {
-    Scroll(this.musicScroller) {
-      Flex({ direction: FlexDirection.Row, wrap: FlexWrap.Wrap }) {
-        ForEach(this.musicTracks, (track: MusicTrack, index: number) => {
-          Column() {
-            this.musicCard(track, index)
-          }
-          .width(this.cardFlowWidth())
-          .margin({ right: this.cardRightMargin(index), bottom: 14 })
-        }, (track: MusicTrack) => track.id)
+  private videoPage() {
+    if (this.videos.length === 0) {
+      Column({ space: 8 }) {
+        Text('还没有视频')
+          .fontSize(18)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.ink'))
+        Text('点右上角添加网络链接，或导入手机里的视频。')
+          .fontSize(14)
+          .fontColor($r('app.color.ink_muted'))
       }
       .width('100%')
+      .height('100%')
+      .justifyContent(FlexAlign.Center)
+      .padding({ left: 28, right: 28, bottom: FLOATING_TAB_CONTENT_INSET })
+    } else {
+      Scroll(this.videoScroller) {
+        Flex({ direction: FlexDirection.Row, wrap: FlexWrap.Wrap }) {
+          ForEach(this.videos, (video: VideoItem, index: number) => {
+            Column() {
+              this.videoCard(video)
+            }
+            .width(this.cardFlowWidth())
+            .margin({ right: this.cardRightMargin(index), bottom: 14 })
+          }, (video: VideoItem) => video.id)
+        }
+        .width('100%')
+      }
+      .width('100%')
+      .height('100%')
+      .padding({ left: 18, right: 18, top: 16, bottom: FLOATING_TAB_CONTENT_INSET })
+      .scrollBar(BarState.Off)
+      .edgeEffect(EdgeEffect.Spring)
+      .clip(false)
+      .onDidScroll((_xOffset: number, _yOffset: number, _scrollState: ScrollState) =>
+        this.videoFloatingBarTracker.update(this.videoScroller, this.onFloatingBarCompactChange))
     }
-    .width('100%')
-    .height('100%')
-    .padding({ left: 18, right: 18, top: 16, bottom: FLOATING_TAB_CONTENT_INSET })
-    .scrollBar(BarState.Off)
-    .edgeEffect(EdgeEffect.Spring)
-    .clip(false)
-    .onDidScroll((_xOffset: number, _yOffset: number, _scrollState: ScrollState) =>
-      this.musicFloatingBarTracker.update(this.musicScroller, this.onFloatingBarCompactChange))
   }
 
   @Builder
-  private musicCard(track: MusicTrack, index: number) {
-    CoverCard({
-      artwork: this.musicArtwork(track.id),
-      badge: track.level,
-      meta: `${track.lines.length} 句`,
-      title: track.title,
-      subtitle: `${track.chineseTitle} · ${track.artist}`,
-      footer: track.focus,
-      actionIcon: $r('sys.symbol.music_note_circle_fill'),
-      selected: this.musicIndex === index,
-      onOpen: () => this.openMusic(index)
+  private videoCard(video: VideoItem) {
+    Column({ space: 10 }) {
+      Row() {
+        Text(videoSourceLabel(video))
+          .fontSize(11)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.immersive_light'))
+          .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+          .borderRadius(13)
+          .backgroundColor('#6617181A')
+        Blank()
+        if (this.formatDuration(video.durationMs).length > 0) {
+          Text(this.formatDuration(video.durationMs))
+            .fontSize(12)
+            .fontColor('#D9F7F8FA')
+        }
+      }
+      .width('100%')
+
+      Blank()
+
+      SymbolGlyph($r('sys.symbol.play_circle_fill'))
+        .fontSize(36)
+        .fontColor([$r('app.color.immersive_light')])
+        .opacity(0.92)
+
+      Blank()
+
+      Text(video.title)
+        .width('100%')
+        .fontSize(22)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.immersive_light'))
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .width('100%')
+    .height(220)
+    .alignItems(HorizontalAlign.Start)
+    .padding(20)
+    .borderRadius(28)
+    .linearGradient({
+      angle: 135,
+      colors: [['#FF2A3340', 0], ['#FF17181A', 1]]
     })
+    .border({
+      width: this.videoId === video.id ? 1.5 : 0.5,
+      color: this.videoId === video.id ? $r('app.color.accent') : $r('app.color.line')
+    })
+    .clip(true)
+    .accessibilityText(video.title)
+    .onClick(() => this.onOpenVideo(video))
+    .bindContextMenu(this.videoCardMenu(video), ResponseType.LongPress)
+  }
+
+  @Builder
+  private videoCardMenu(video: VideoItem) {
+    Menu() {
+      MenuItem({ content: '删除' })
+        .onChange(() => this.removeVideo(video.id))
+    }
   }
 
   @Builder
   private readingPage() {
-    Scroll(this.readingScroller) {
-      Flex({ direction: FlexDirection.Row, wrap: FlexWrap.Wrap }) {
-        ForEach(this.readingWorks, (reading: ReadingWork, index: number) => {
-          Column() {
-            this.readingCard(reading, index)
-          }
-          .width(this.cardFlowWidth())
-          .margin({ right: this.cardRightMargin(index), bottom: 14 })
-        }, (reading: ReadingWork) => reading.id)
+    if (this.readingsLoading && this.readingWorks.length === 0) {
+      Column({ space: 8 }) {
+        LoadingProgress()
+          .width(28)
+          .height(28)
+          .color($r('app.color.ink'))
+        Text('正在拉取绘本…')
+          .fontSize(15)
+          .fontColor($r('app.color.ink_muted'))
       }
       .width('100%')
+      .height('100%')
+      .justifyContent(FlexAlign.Center)
+      .padding({ bottom: FLOATING_TAB_CONTENT_INSET })
+    } else {
+    Column() {
+      this.readingCategoryRow()
+      Scroll(this.readingScroller) {
+        Flex({ direction: FlexDirection.Row, wrap: FlexWrap.Wrap }) {
+          ForEach(this.filteredReadings(), (reading: ReadingWork, index: number) => {
+            Column() {
+              this.readingCard(reading)
+            }
+            .width(this.cardFlowWidth())
+            .margin({ right: this.cardRightMargin(index), bottom: 14 })
+          }, (reading: ReadingWork) =>
+            `${reading.id}:${this.coverPath(reading.id)}:${this.isReadingDownloaded(reading) ? '1' : '0'}`)
+        }
+        .width('100%')
+      }
+      .width('100%')
+      .layoutWeight(1)
+      .padding({ left: 18, right: 18, top: 10, bottom: FLOATING_TAB_CONTENT_INSET })
+      .scrollBar(BarState.Off)
+      .edgeEffect(EdgeEffect.Spring)
+      .clip(false)
+      .onDidScroll((_xOffset: number, _yOffset: number, _scrollState: ScrollState) =>
+        this.readingFloatingBarTracker.update(this.readingScroller, this.onFloatingBarCompactChange))
     }
     .width('100%')
     .height('100%')
-    .padding({ left: 18, right: 18, top: 16, bottom: FLOATING_TAB_CONTENT_INSET })
-    .scrollBar(BarState.Off)
-    .edgeEffect(EdgeEffect.Spring)
-    .clip(false)
-    .onDidScroll((_xOffset: number, _yOffset: number, _scrollState: ScrollState) =>
-      this.readingFloatingBarTracker.update(this.readingScroller, this.onFloatingBarCompactChange))
+    }
   }
 
   @Builder
-  private readingCard(reading: ReadingWork, index: number) {
+  private readingCategoryRow() {
+    Scroll() {
+      Row({ space: 8 }) {
+        ForEach(this.readingCategories, (category: string) => {
+          Text(`${category} ${this.categoryCount(category)}`)
+            .fontSize(12)
+            .fontWeight(this.readingCategory === category ? FontWeight.Medium : FontWeight.Regular)
+            .fontColor(this.readingCategory === category ? $r('app.color.ink') : $r('app.color.ink_muted'))
+            .padding({ left: 12, right: 12, top: 7, bottom: 7 })
+            .borderRadius(16)
+            .backgroundColor(this.readingCategory === category ?
+              $r('app.color.accent_soft') : $r('app.color.surface_raised'))
+            .onClick(() => this.selectReadingCategory(category))
+        }, (category: string) => category)
+      }
+      .padding({ left: 18, right: 18, top: 14, bottom: 2 })
+    }
+    .scrollable(ScrollDirection.Horizontal)
+    .scrollBar(BarState.Off)
+    .edgeEffect(EdgeEffect.Spring)
+    .width('100%')
+  }
+
+  @Builder
+  private readingCard(reading: ReadingWork) {
     CoverCard({
-      artwork: this.readingArtwork(reading.id),
-      badge: reading.genre,
-      meta: reading.level,
+      artwork: this.readingArtwork(),
+      artworkPath: this.coverPath(reading.id),
       title: reading.title,
-      subtitle: `${reading.author} · ${reading.titleReading}`,
-      caption: reading.summary,
-      footer: reading.format === 'pdf' ?
-        `${reading.passages.length} 页 · 绘本${reading.audioFile ? ' · 朗读' : ''}` :
-        (reading.complete ? `${reading.passages.length} 阅读页 · 全文` : `${reading.passages.length} 段节选`),
       actionIcon: $r('sys.symbol.book_pages_fill'),
-      selected: this.readingIndex === index,
-      coverRatio: this.readingCoverRatio(reading.id),
-      onOpen: () => this.openReading(index)
+      selected: this.isReadingSelected(reading),
+      coverRatio: this.readingCoverRatio(reading),
+      coverOnly: true,
+      downloaded: this.isReadingDownloaded(reading),
+      onOpen: () => this.openReading(reading)
     })
   }
 

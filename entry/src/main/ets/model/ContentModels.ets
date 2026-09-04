@@ -105,6 +105,7 @@ export interface ReadingWork {
   author: string;
   level: string;
   genre: string;
+  category?: string;
   summary: string;
   sourceName: string;
   sourceUrl: string;
@@ -112,9 +113,17 @@ export interface ReadingWork {
   complete?: boolean;
   format?: string;
   pdfFile?: string;
+  coverFile?: string;
+  coverRatio?: number;
   audioFile?: string;
   audioDurationMs?: number;
   audioCues?: ReadingAudioCue[];
+  pdfKey?: string;
+  audioKey?: string;
+  coverKey?: string;
+  pdfBytes?: number;
+  audioBytes?: number;
+  coverBytes?: number;
   passages: ReadingPassage[];
 }
 

@@ -48,3 +48,16 @@ export const FLOATING_CHROME_MATERIAL: uiMaterial.Material = new uiMaterial.Imme
     color: Color.White
   }
 });
+
+/**
+ * Most transparent immersive light grade. Title-bar menus sit on this so the
+ * chrome stays visible without a plate.
+ */
+export const FLOATING_ULTRA_THIN_MATERIAL: uiMaterial.Material = new uiMaterial.ImmersiveMaterial({
+  style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
+  colorInvert: true,
+  interactive: true,
+  lightEffect: {
+    color: Color.White
+  }
+});

@@ -23,7 +23,7 @@
 entry/                         HarmonyOS 应用模块
   src/main/ets/                ArkTS 模型、服务和 ArkUI 页面
   src/main/resources/rawfile/  打包在应用内的离线学习内容
-scripts/                       内容校验与 HAP 构建脚本
+scripts/                       HAP 构建脚本
 ```
 
 ## DeepSeek 对练
@@ -38,20 +38,9 @@ scripts/                       内容校验与 HAP 构建脚本
 
 系统语音合成没有日语。本地朗读依赖 `sherpa_onnx` HAR 和 Piper 日语模型：
 
-```bash
-cd entry && ohpm install
-npm run fetch:tts
-```
+模型文件不进 Git，需自行放到 `entry/src/main/resources/rawfile/tts/`。未安装时点朗读没有声音。细节见 [`docs/TTS.md`](docs/TTS.md)。
 
-模型文件不进 Git。未安装时点朗读没有声音。细节见 [`docs/TTS.md`](docs/TTS.md)。
-
-## 校验与构建
-
-内容完整性：
-
-```bash
-npm run check:content
-```
+## 构建
 
 macOS + DevEco Studio 默认安装路径下构建 HAP：
 

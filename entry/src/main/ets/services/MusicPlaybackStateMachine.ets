@@ -150,3 +150,10 @@ export function musicRendererInfo(): audio.AudioRendererInfo {
     rendererFlags: 0
   };
 }
+
+export function movieRendererInfo(): audio.AudioRendererInfo {
+  return {
+    usage: audio.StreamUsage.STREAM_USAGE_MOVIE,
+    rendererFlags: 0
+  };
+}

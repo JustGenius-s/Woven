@@ -1,16 +1,19 @@
 # NOTICE — Tadoku free books
 
-The official electronic PDFs bundled under `reader/tadoku-*` come from
+The official electronic PDFs opened from the reading library come from
 [にほんごたどく 無料の読みもの](https://tadoku.org/japanese/free-books/).
 NPO 多言語多読 publishes them under
 [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/).
 
-This app opens the official electronic PDF in the system PDF viewer
-without rewriting the story, adding translations, study notes,
-or a derived EPUB. Official narration MP3 files are bundled unaltered
-and aligned with a locally authored timeline (page and sentence timings
-only — not a rewrite of the story). Attribution stays on the work card
-and in the official files.
+This app downloads the official electronic PDF (and official narration MP3
+when available) into the device sandbox on first open. It opens the official
+page as-is, without rewriting the story, adding translations, study notes,
+or a derived EPUB. Attribution stays on the work card and in the official
+files.
+
+Catalog, page text, and optional sentence timelines live in the Woven
+Supabase project. Files are stored at `reading/{id}/book.pdf` and
+`reading/{id}/audio.mp3`. SRT files stay on the authoring machine only.
 
 ## 2匹のカエル (`tadoku-40280`)
 
@@ -21,7 +24,8 @@ and in the official files.
 | Adaptation and art | 山田 明日香 |
 | Supervision | NPO 多言語多読 |
 | Source | https://tadoku.org/japanese/book/40280/ |
-| Audio | Official MP3 from the work page, bundled as `audio/tadoku-40280.mp3` |
+| Audio | Official MP3 from the work page |
 | License | CC BY-NC-ND 4.0 |
 
+The remaining titles keep their work-page URL as `https://tadoku.org/japanese/book/<id>/`.
 See also `https://tadoku.org/japanese/free-books/note/`.

@@ -3,6 +3,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import { JapaneseTtsService } from '../services/JapaneseTtsService';
 import { MusicPlaybackService } from '../services/MusicPlaybackService';
+import { VideoPlaybackService } from '../services/VideoPlaybackService';
 
 const DOMAIN: number = 0x4b4f;
 
@@ -48,6 +49,7 @@ export default class EntryAbility extends UIAbility {
   onDestroy(): void {
     JapaneseTtsService.release();
     MusicPlaybackService.release();
+    void VideoPlaybackService.release();
   }
 
   onConfigurationUpdate(newConfig: Configuration): void {

@@ -10,6 +10,7 @@ import {
   ReadingWork,
   VocabularyEntry
 } from '../model/ContentModels';
+import { ReadingCloudStore } from './ReadingCloudStore';
 
 export class ContentRepository {
   static loadCatalog(context: common.Context): LearningCatalog {
@@ -29,7 +30,11 @@ export class ContentRepository {
   }
 
   static loadReadingWorks(context: common.Context): ReadingWork[] {
-    return JSON.parse(ContentRepository.readText(context, 'reading.json')) as ReadingWork[];
+    return ReadingCloudStore.cached(context);
+  }
+
+  static async prefetchReadings(context: common.Context): Promise<ReadingWork[]> {
+    return await ReadingCloudStore.refresh(context);
   }
 
   static loadGrammarIndex(context: common.Context): GrammarIndexEntry[] {

@@ -1,10 +1,12 @@
 import { common } from '@kit.AbilityKit';
 import { audio } from '@kit.AudioKit';
 import { BusinessError } from '@kit.BasicServicesKit';
+import { fileIo } from '@kit.CoreFileKit';
 import { media } from '@kit.MediaKit';
 import { ReadingAudioCue } from '../model/ContentModels';
 import { musicRendererInfo, PlayerStateMachine } from './MusicPlaybackStateMachine';
 import { MusicPlaybackService } from './MusicPlaybackService';
+import { VideoPlaybackService } from './VideoPlaybackService';
 
 export interface ReadingNarrationSnapshot {
   playing: boolean;
@@ -33,6 +35,7 @@ export class ReadingNarrationService {
   private static playing: boolean = false;
   private static ready: boolean = false;
   private static preparing: boolean = false;
+  private static sandboxFd: number = -1;
 
   static subscribe(listener: ReadingNarrationListener): void {
     if (ReadingNarrationService.listeners.indexOf(listener) < 0) {
@@ -133,8 +136,9 @@ export class ReadingNarrationService {
     }
     try {
       await MusicPlaybackService.pause();
+      await VideoPlaybackService.pause();
     } catch (error) {
-      // Music may not have a prepared source.
+      // Other media may not have a prepared source.
     }
     const state: string = ReadingNarrationService.machine.state;
     if (state === 'completed') {
@@ -193,13 +197,7 @@ export class ReadingNarrationService {
       }
       ReadingNarrationService.player = undefined;
     }
-    if (ReadingNarrationService.context !== undefined && path.length > 0) {
-      try {
-        await ReadingNarrationService.context.resourceManager.closeRawFd(path);
-      } catch (error) {
-        // Already closed.
-      }
-    }
+    await ReadingNarrationService.closeAudioSource(path);
     ReadingNarrationService.notify();
   }
 
@@ -224,27 +222,29 @@ export class ReadingNarrationService {
           }
           ReadingNarrationService.player = undefined;
         }
-        if (ReadingNarrationService.audioFile.length > 0 &&
-          ReadingNarrationService.context !== undefined) {
-          try {
-            await ReadingNarrationService.context.resourceManager.closeRawFd(
-              ReadingNarrationService.audioFile);
-          } catch (error) {
-            // Already closed.
-          }
+        if (ReadingNarrationService.audioFile.length > 0) {
+          await ReadingNarrationService.closeAudioSource(ReadingNarrationService.audioFile);
         }
       }
       const player: media.AVPlayer = await ReadingNarrationService.ensurePlayer();
       if (ReadingNarrationService.context === undefined) {
         return;
       }
-      const descriptor = await ReadingNarrationService.context.resourceManager.getRawFd(audioFile);
       ReadingNarrationService.audioFile = audioFile;
-      player.fdSrc = {
-        fd: descriptor.fd,
-        offset: descriptor.offset,
-        length: descriptor.length
-      };
+      if (ReadingNarrationService.isSandboxPath(audioFile)) {
+        const file: fileIo.File = fileIo.openSync(audioFile, fileIo.OpenMode.READ_ONLY);
+        ReadingNarrationService.sandboxFd = file.fd;
+        player.fdSrc = {
+          fd: file.fd
+        };
+      } else {
+        const descriptor = await ReadingNarrationService.context.resourceManager.getRawFd(audioFile);
+        player.fdSrc = {
+          fd: descriptor.fd,
+          offset: descriptor.offset,
+          length: descriptor.length
+        };
+      }
       const initialized: boolean = await ReadingNarrationService.machine.waitFor('initialized', () => false);
       if (!initialized) {
         return;
@@ -305,6 +305,30 @@ export class ReadingNarrationService {
       ReadingNarrationService.notify();
     });
     return player;
+  }
+
+  private static isSandboxPath(path: string): boolean {
+    return path.indexOf('/') === 0;
+  }
+
+  private static async closeAudioSource(path: string): Promise<void> {
+    if (ReadingNarrationService.sandboxFd >= 0) {
+      try {
+        fileIo.closeSync(ReadingNarrationService.sandboxFd);
+      } catch (error) {
+        // Already closed.
+      }
+      ReadingNarrationService.sandboxFd = -1;
+      return;
+    }
+    if (ReadingNarrationService.context !== undefined && path.length > 0 &&
+      !ReadingNarrationService.isSandboxPath(path)) {
+      try {
+        await ReadingNarrationService.context.resourceManager.closeRawFd(path);
+      } catch (error) {
+        // Already closed.
+      }
+    }
   }
 
   private static notify(): void {

@@ -25,6 +25,7 @@ import { ReadingAudioCue, ReadingAudioRect, ReadingPassage, ReadingWork } from '
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { AiInquiryFactory } from '../../services/AiInquiryFactory';
 import { ReadingBookService } from '../../services/ReadingBookService';
+import { ReadingCloudStore } from '../../services/ReadingCloudStore';
 import {
   ReadingNarrationListener,
   ReadingNarrationService,
@@ -81,12 +82,16 @@ export struct ReadingPage {
   @State private pdfFailed: boolean = false;
   @State private pdfFailReason: string = '';
   @State private pdfJumpPage: number = 0;
+  @State private downloading: boolean = false;
+  @State private downloadLabel: string = '';
+  @State private localAudioPath: string = '';
   @State private narrationPlaying: boolean = false;
   @State private narrationReady: boolean = false;
   @State private highlightKey: string = '';
   @State private highlightPage: number = 0;
   @State private highlightRects: ReadingAudioRect[] = [];
 
+  private leaving: boolean = false;
   private pageController: SwiperController = new SwiperController();
   private pinchStartFontSize: number = 22;
   private hasSavedStyle: boolean = false;
@@ -125,20 +130,49 @@ export struct ReadingPage {
     this.currentPassageIndex = this.safePassageIndex(progress.resourceIndex);
     this.displayPageIndex = this.currentPassageIndex;
     if (this.isPdfBook()) {
-      this.openPdfBook();
-    }
-    if (this.hasNarration()) {
-      ReadingNarrationService.subscribe(this.onNarrationSnapshot);
-      void ReadingNarrationService.prepare(
-        this.hostContext(), this.reading.audioFile ?? '', this.reading.audioDurationMs ?? 0);
+      void this.openPdfBook();
+    } else if (this.hasBundledAudio()) {
+      this.bindNarration(this.reading.audioFile ?? '');
     }
   }
 
   private isPdfBook(): boolean {
-    return this.reading.format === 'pdf';
+    return this.reading.format === 'pdf' || ReadingBookService.isCloudBook(this.reading);
   }
 
-  private openPdfBook(): void {
+  private async openPdfBook(): Promise<void> {
+    if (ReadingBookService.isCloudBook(this.reading)) {
+      this.downloading = true;
+      this.downloadLabel = '正在准备绘本…';
+      this.pdfFailed = false;
+      this.pdfFailReason = '';
+      try {
+        await ReadingCloudStore.hydrate(this.reading);
+        if (this.leaving) {
+          return;
+        }
+        const files = await ReadingBookService.ensureBook(
+          this.hostContext(), this.reading, (label: string) => {
+            this.downloadLabel = label;
+          });
+        if (this.leaving) {
+          return;
+        }
+        this.pdfPath = files.pdfPath;
+        this.localAudioPath = files.audioPath;
+        this.pdfJumpPage = this.currentPassageIndex;
+        this.downloading = false;
+        if (this.localAudioPath.length > 0) {
+          this.bindNarration(this.localAudioPath);
+        }
+      } catch (error) {
+        this.pdfPath = '';
+        this.pdfFailed = true;
+        this.downloading = false;
+        this.pdfFailReason = error instanceof Error ? error.message : `${error}`;
+      }
+      return;
+    }
     const relative: string | undefined = this.reading.pdfFile;
     if (relative === undefined || relative.length === 0) {
       this.pdfFailed = true;
@@ -158,20 +192,55 @@ export struct ReadingPage {
     }
   }
 
+  private bindNarration(audioPath: string): void {
+    if (audioPath.length === 0) {
+      return;
+    }
+    ReadingNarrationService.subscribe(this.onNarrationSnapshot);
+    void ReadingNarrationService.prepare(
+      this.hostContext(), audioPath, this.reading.audioDurationMs ?? 0);
+  }
+
+  private hasBundledAudio(): boolean {
+    return this.reading.audioFile !== undefined && this.reading.audioFile.length > 0 &&
+      !ReadingBookService.isCloudBook(this.reading);
+  }
+
   private readingLength(): number {
     return this.reading.passages.length;
   }
 
   aboutToDisappear(): void {
-    if (this.hasNarration()) {
+    this.leaving = true;
+    if (this.hasAudio()) {
       ReadingNarrationService.unsubscribe(this.onNarrationSnapshot);
       void ReadingNarrationService.release();
     }
   }
 
+  private hasAudio(): boolean {
+    if (this.localAudioPath.length > 0) {
+      return true;
+    }
+    if (this.reading.audioKey !== undefined && this.reading.audioKey.length > 0) {
+      return true;
+    }
+    return this.reading.audioFile !== undefined && this.reading.audioFile.length > 0;
+  }
+
+  private narrationAudioPath(): string {
+    if (this.localAudioPath.length > 0) {
+      return this.localAudioPath;
+    }
+    return this.reading.audioFile ?? '';
+  }
+
+  private hasNarrationCues(): boolean {
+    return this.hasAudio() && this.reading.audioCues !== undefined && this.reading.audioCues.length > 0;
+  }
+
   private hasNarration(): boolean {
-    return this.reading.audioFile !== undefined && this.reading.audioFile.length > 0 &&
-      this.reading.audioCues !== undefined && this.reading.audioCues.length > 0;
+    return this.hasAudio();
   }
 
   private narrationCues(): ReadingAudioCue[] {
@@ -182,6 +251,9 @@ export struct ReadingPage {
     this.narrationPlaying = snapshot.playing;
     this.narrationReady = snapshot.ready;
     if (!snapshot.playing) {
+      return;
+    }
+    if (!this.hasNarrationCues()) {
       return;
     }
     const cue: ReadingAudioCue | undefined =
@@ -225,9 +297,9 @@ export struct ReadingPage {
     }
     if (!this.narrationReady) {
       await ReadingNarrationService.prepare(
-        this.hostContext(), this.reading.audioFile ?? '', this.reading.audioDurationMs ?? 0);
+        this.hostContext(), this.narrationAudioPath(), this.reading.audioDurationMs ?? 0);
     }
-    if (!this.narrationPlaying) {
+    if (!this.narrationPlaying && this.hasNarrationCues()) {
       const snapshot: ReadingNarrationSnapshot = ReadingNarrationService.snapshot();
       const current: ReadingAudioCue | undefined =
         ReadingNarrationService.cueAt(this.narrationCues(), snapshot.positionMs);
@@ -422,7 +494,7 @@ export struct ReadingPage {
     }
     this.saveProgress();
     this.panelOpen = false;
-    if (this.narrationPlaying && Date.now() >= this.ignorePageSyncUntil) {
+    if (this.hasNarrationCues() && this.narrationPlaying && Date.now() >= this.ignorePageSyncUntil) {
       void this.seekNarrationToPage(next);
     }
   }
@@ -431,7 +503,7 @@ export struct ReadingPage {
     this.currentPassageIndex = this.safePassageIndex(index);
     this.displayPageIndex = this.currentPassageIndex;
     this.saveProgress();
-    if (this.narrationPlaying && Date.now() >= this.ignorePageSyncUntil &&
+    if (this.hasNarrationCues() && this.narrationPlaying && Date.now() >= this.ignorePageSyncUntil &&
       index !== this.lastNarrationPage) {
       void this.seekNarrationToPage(index);
     }
@@ -653,7 +725,20 @@ export struct ReadingPage {
 
   @Builder
   private pdfCanvas() {
-    if (this.pdfFailed || this.pdfPath.length === 0) {
+    if (this.downloading) {
+      Column({ space: 10 }) {
+        LoadingProgress()
+          .width(36)
+          .height(36)
+          .color($r('app.color.ink'))
+        Text(this.downloadLabel.length > 0 ? this.downloadLabel : '正在下载…')
+          .fontSize(15)
+          .fontColor($r('app.color.ink_muted'))
+      }
+      .width('100%')
+      .height('100%')
+      .justifyContent(FlexAlign.Center)
+    } else if (this.pdfFailed || this.pdfPath.length === 0) {
       Column({ space: 8 }) {
         SymbolGlyph($r('sys.symbol.book_pages'))
           .fontSize(34)
@@ -1032,9 +1117,11 @@ export struct ReadingPage {
         .alignItems(HorizontalAlign.Start)
 
         if (this.isPdfBook()) {
-          Text(this.hasNarration() ?
+          Text(this.hasNarrationCues() ?
             '绘本按官方电子书原页显示。朗读是官方未改动的音频，读到哪一句就翻到那一页并标出那一句。' :
-            '绘本按官方电子书原页显示，字号和行高跟随原版。')
+            (this.hasAudio() ?
+              '绘本按官方电子书原页显示。朗读是官方未改动的音频；句子时间轴还没有对齐时，只播放、不自动翻页。' :
+              '绘本按官方电子书原页显示，字号和行高跟随原版。'))
             .width('100%')
             .fontSize(12)
             .lineHeight(18)

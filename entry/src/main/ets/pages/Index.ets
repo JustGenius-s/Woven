@@ -3,11 +3,9 @@ import { curves, window } from '@kit.ArkUI';
 import {
   BlurStrategy,
   DividerMode,
-  HdsBarLayoutMode,
   HdsBarStyle,
   HdsTabs,
-  HdsTabsController,
-  HdsTabsMiniBar
+  HdsTabsController
 } from '@kit.UIDesignKit';
 import { SymbolGlyphModifier } from '@ohos.arkui.modifier';
 import {
@@ -18,13 +16,9 @@ import {
   systemGestureInset
 } from '../common/AppTheme';
 import { bottomBarImmersiveMaterial } from '../common/ImmersiveMaterial';
-import { AppSection, LearningJourney, MusicTrack, PracticeScenario, ReadingWork } from '../model/ContentModels';
+import { AppSection, LearningJourney, PracticeScenario, ReadingWork } from '../model/ContentModels';
 import { AiInquiryContext } from '../model/DeepSeekModels';
-import {
-  emptyMusicPlaybackSnapshot,
-  MusicPlaybackListener,
-  MusicPlaybackSnapshot
-} from '../model/MusicPlaybackModels';
+import { VideoItem } from '../model/VideoModels';
 import {
   CloudSyncPhase,
   CloudSyncSnapshot,
@@ -42,21 +36,22 @@ import { LearningSyncCoordinator } from '../services/LearningSyncCoordinator';
 import { JapaneseTtsService } from '../services/JapaneseTtsService';
 import { KanaLookupService } from '../services/KanaLookupService';
 import { MusicPlaybackService } from '../services/MusicPlaybackService';
+import { VideoLibraryStore } from '../services/VideoLibraryStore';
+import { VideoPlaybackService } from '../services/VideoPlaybackService';
 import { VocabularyLearningStore } from '../services/VocabularyLearningStore';
 import { ExplorePage } from '../views/pages/ExplorePage';
 import { KanaPage } from '../views/pages/KanaPage';
 import { LearnPage } from '../views/pages/LearnPage';
 import { MePage } from '../views/pages/MePage';
-import { MusicPlayerPage } from '../views/pages/MusicPlayerPage';
 import { PracticeSessionPage } from '../views/pages/PracticeSessionPage';
 import { ReadingPage } from '../views/pages/ReadingPage';
 import { SettingsPage } from '../views/pages/SettingsPage';
 import { VocabularyPage } from '../views/pages/VocabularyPage';
 import { VocabularyStudyPage } from '../views/pages/VocabularyStudyPage';
+import { VideoPlayerPage } from '../views/pages/VideoPlayerPage';
 import { ImmersiveBackdrop } from '../views/components/ImmersiveCanvas';
 import { ContextAiPanel } from '../views/components/ContextAiPanel';
 import { KanaLookupSheet } from '../views/components/KanaLookupSheet';
-import { MusicMiniPlayer } from '../views/components/MusicMiniPlayer';
 
 @Entry
 @Component
@@ -69,9 +64,7 @@ struct Index {
   @State private settingsOpen: boolean = false;
   @State private activeScenario: PracticeScenario | undefined = undefined;
   @State private activeReading: ReadingWork | undefined = undefined;
-  @State private musicPlayerOpen: boolean = false;
-  @State private musicTracks: MusicTrack[] = [];
-  @State private musicPlayback: MusicPlaybackSnapshot = emptyMusicPlaybackSnapshot();
+  @State private activeVideo: VideoItem | undefined = undefined;
   @State private journeys: LearningJourney[] = [];
   @State private currentJourney: LearningJourney | undefined = undefined;
   @State private journeyStage: number = 0;
@@ -90,7 +83,9 @@ struct Index {
   @State private vocabularySearchOpen: boolean = false;
   @State private kanaKey: string = 'あ';
   @State private exploreTab: number = 0;
-  @State private musicIndex: number = -1;
+  @State private videoId: string = '';
+  @State private videoCount: number = 0;
+  @State private lastVideoTitle: string = '';
   @State private readingIndex: number = -1;
   @State private scenarioIndex: number = -1;
   @State private learnedWordCount: number = 0;
@@ -113,28 +108,6 @@ struct Index {
     lastSyncedAt: 0,
     detail: ''
   };
-  private musicPlaybackListener: MusicPlaybackListener = (snapshot: MusicPlaybackSnapshot) => {
-    if (snapshot.trackIndex >= 0) {
-      this.musicIndex = snapshot.trackIndex;
-    }
-    // timeUpdate fires roughly every 100ms. Index only reads trackIndex and
-    // trackId from the snapshot, but replacing this @State on every tick
-    // rebuilds the whole shell — which makes HdsTabs rebuild its miniBar
-    // content, so taps on the mini bar land on an instance that is about to be
-    // discarded and are lost. Only structural changes belong here; the bar
-    // keeps its live position through its own subscription.
-    if (this.musicPlayerOpen ||
-      this.musicPlayback.trackIndex !== snapshot.trackIndex ||
-      this.musicPlayback.trackId !== snapshot.trackId ||
-      this.musicPlayback.phase !== snapshot.phase ||
-      this.musicPlayback.durationMs !== snapshot.durationMs ||
-      this.musicPlayback.error !== snapshot.error) {
-      // While the full player is open the mini bar is hidden, so frequent
-      // rebuilds cost nothing and the player's progress bar stays live.
-      this.musicPlayback = snapshot;
-    }
-  };
-
   aboutToAppear(): void {
     KanaLookupService.subscribe(this.kanaLookupListener);
     const context: common.Context = this.getUIContext().getHostContext() as common.Context;
@@ -148,7 +121,7 @@ struct Index {
     this.journeyCompletedMask = LearningPreferences.journeyCompletedMask(context);
     this.kanaKey = LearningPreferences.kanaKey(context);
     this.exploreTab = LearningPreferences.exploreTab(context);
-    this.musicIndex = LearningPreferences.musicIndex(context);
+    this.refreshVideoLibrary(context);
     this.readingIndex = LearningPreferences.readingIndex(context);
     this.scenarioIndex = LearningPreferences.scenarioIndex(context);
     this.learnedWordCount = VocabularyLearningStore.loadLearnedWords(context).length;
@@ -166,20 +139,21 @@ struct Index {
       this.journeys = [];
       this.currentJourney = undefined;
     }
-    try {
-      this.musicTracks = ContentRepository.loadMusicTracks(context);
-    } catch (error) {
-      this.musicTracks = [];
-    }
     JapaneseTtsService.initialize(context);
-    MusicPlaybackService.initialize(context, this.musicTracks);
-    MusicPlaybackService.subscribe(this.musicPlaybackListener);
+    MusicPlaybackService.initialize(context, []);
+    VideoPlaybackService.initialize(context);
     this.initializeAccountAndSync(context);
+    void ContentRepository.prefetchReadings(context);
   }
 
   aboutToDisappear(): void {
     KanaLookupService.unsubscribe(this.kanaLookupListener);
-    MusicPlaybackService.unsubscribe(this.musicPlaybackListener);
+  }
+
+  private refreshVideoLibrary(context: common.Context): void {
+    const videos: VideoItem[] = VideoLibraryStore.load(context);
+    this.videoCount = videos.length;
+    this.lastVideoTitle = videos.length > 0 ? videos[0].title : '';
   }
 
   private kanaLookupListener: (query: string) => void = (query: string) => {
@@ -235,8 +209,7 @@ struct Index {
     this.journeyStage = LearningPreferences.journeyStage(context);
     this.journeyCompletedMask = LearningPreferences.journeyCompletedMask(context);
     this.kanaKey = LearningPreferences.kanaKey(context);
-    this.musicIndex = LearningPreferences.musicIndex(context);
-    MusicPlaybackService.initialize(context, this.musicTracks);
+    this.refreshVideoLibrary(context);
     this.readingIndex = LearningPreferences.readingIndex(context);
     this.scenarioIndex = LearningPreferences.scenarioIndex(context);
     this.learnedWordCount = VocabularyLearningStore.loadLearnedWords(context).length;
@@ -282,31 +255,18 @@ struct Index {
     this.selectSection(AppSection.EXPLORE);
   }
 
-  private saveMusicIndex(index: number): void {
-    this.musicIndex = index;
-    const context: common.Context = this.getUIContext().getHostContext() as common.Context;
-    LearningPreferences.saveMusicIndex(context, index);
-    LearningSyncCoordinator.saveMusicProgress(context, index);
-  }
-
-  private openMusic(index: number, autoplay: boolean): void {
-    if (index < 0 || index >= this.musicTracks.length) {
-      return;
-    }
-    this.saveMusicIndex(index);
+  private openVideo(video: VideoItem): void {
+    this.videoId = video.id;
+    this.refreshVideoLibrary(this.getUIContext().getHostContext() as common.Context);
     this.getUIContext().animateTo({ curve: curves.springMotion(0.42, 0.84, 0.18) }, () => {
-      this.musicPlayerOpen = true;
+      this.activeVideo = video;
     });
-    if (autoplay) {
-      MusicPlaybackService.playTrack(index);
-    } else {
-      MusicPlaybackService.prepareTrack(index);
-    }
   }
 
-  private closeMusicPlayer(): void {
+  private closeVideoPlayer(): void {
+    this.refreshVideoLibrary(this.getUIContext().getHostContext() as common.Context);
     this.getUIContext().animateTo({ curve: curves.springMotion(0.38, 0.88, 0.16) }, () => {
-      this.musicPlayerOpen = false;
+      this.activeVideo = undefined;
     });
   }
 
@@ -401,12 +361,6 @@ struct Index {
     return systemGestureInset(this.avoidAreas);
   }
 
-  private miniPlayerVisible(): boolean {
-    return !this.musicPlayerOpen && this.activeReading === undefined && this.activeScenario === undefined &&
-      !this.settingsOpen && !this.vocabularyStudyOpen && this.musicPlayback.trackIndex >= 0 &&
-      this.musicPlayback.trackIndex < this.musicTracks.length;
-  }
-
   private tabsController: HdsTabsController = new HdsTabsController();
 
   private bindTabScroller(section: AppSection, scroller: Scroller): void {
@@ -428,42 +382,6 @@ struct Index {
     });
   }
 
-  private musicMiniBarOptions(): HdsTabsMiniBar | undefined {
-    if (!this.miniPlayerVisible()) {
-      return undefined;
-    }
-    return {
-      // HdsTabs invokes CustomBuilder from its native component context. Keep
-      // the owning Index instance captured instead of passing an unbound
-      // member builder, otherwise generated ArkUI code receives `this` as
-      // undefined at runtime.
-      miniBarBuilder: () => {
-        this.musicMiniBar()
-      },
-      // Follow the last requested style, not just the layout mode. Horizontal
-      // mode starts with an expanded mini bar (tab icon only). If this stayed
-      // pinned to EXPAND, a tap that opens the tab bar would rebuild with
-      // EXPAND again and snap the tabs shut.
-      miniBarStyle: this.requestedMiniBarStyle,
-      barLayoutMode: this.floatingBarsVertical ? HdsBarLayoutMode.VERTICAL : HdsBarLayoutMode.HORIZONTAL,
-      enableMiniBarBackground: true,
-      enableMiniBarClip: true,
-      onBarStyleChange: (miniBarStyle: HdsBarStyle) => {
-        this.requestedMiniBarStyle = miniBarStyle;
-        const collapsed: boolean = miniBarStyle === HdsBarStyle.COLLAPSE;
-        if (this.miniBarCollapsed === collapsed) {
-          return;
-        }
-        // HdsTabs reports the new style during its own layout. Writing @State
-        // here rebuilds Index while the bar is still settling.
-        setTimeout(() => {
-          if (this.miniBarCollapsed !== collapsed) {
-            this.miniBarCollapsed = collapsed;
-          }
-        }, 0);
-      }
-    };
-  }
 
   private leftSafeInset(): number {
     return Math.max(this.avoidAreas.cutout.leftRect.width, this.avoidAreas.navigationIndicator.leftRect.width,
@@ -505,16 +423,10 @@ struct Index {
   private appShell() {
     Stack({ alignContent: Alignment.Bottom }) {
       Stack({ alignContent: Alignment.Center }) {
-        if (this.musicPlayerOpen) {
-          MusicPlayerPage({
-            tracks: this.musicTracks,
-            snapshot: this.musicPlayback,
-            onBack: () => this.closeMusicPlayer(),
-            onToggle: () => MusicPlaybackService.toggle(),
-            onPrevious: () => MusicPlaybackService.previous(),
-            onNext: () => MusicPlaybackService.next(),
-            onSeek: (positionMs: number) => MusicPlaybackService.seek(positionMs),
-            onAsk: (context: AiInquiryContext) => this.openInquiry(context)
+        if (this.activeVideo !== undefined) {
+          VideoPlayerPage({
+            video: this.activeVideo,
+            onBack: () => this.closeVideoPlayer()
           })
           .width('100%')
           .height('100%')
@@ -588,7 +500,8 @@ struct Index {
               savedLessonIndex: this.grammarIndex,
               kanaKey: this.kanaKey,
               learnedWordCount: this.learnedWordCount,
-              musicIndex: this.musicIndex,
+              videoCount: this.videoCount,
+              lastVideoTitle: this.lastVideoTitle,
               readingIndex: this.readingIndex,
               scenarioIndex: this.scenarioIndex,
               onScrollerReady: (scroller: Scroller) => this.bindTabScroller(AppSection.LEARN, scroller),
@@ -632,14 +545,15 @@ struct Index {
           TabContent() {
             ExplorePage({
               selectedTab: this.exploreTab,
-              musicIndex: this.musicIndex,
+              videoId: this.videoId,
               readingIndex: this.readingIndex,
+              readingOpen: this.activeReading !== undefined,
               scenarioIndex: this.scenarioIndex,
               apiKeyConfigured: this.deepSeekApiKey.length > 0,
               onScrollerReady: (scroller: Scroller) => this.bindTabScroller(AppSection.EXPLORE, scroller),
               onFloatingBarCompactChange: (compact: boolean) => this.setFloatingBarsCompact(compact),
               onTabChange: (index: number) => this.saveExploreTab(index),
-              onOpenMusic: (track: MusicTrack, index: number) => this.openMusic(index, true),
+              onOpenVideo: (video: VideoItem) => this.openVideo(video),
               onOpenReading: (reading: ReadingWork, index: number) => this.openReading(reading, index),
               onScenarioChange: (index: number) => this.saveScenarioIndex(index),
               onStartScenario: (scenario: PracticeScenario) => this.startPractice(scenario),
@@ -688,7 +602,7 @@ struct Index {
           },
           adaptToHandedness: true,
           lightColor: $r('app.color.accent'),
-          miniBar: this.musicMiniBarOptions(),
+          miniBar: undefined,
           systemMaterialEffect: bottomBarImmersiveMaterial(),
           thermoCtrl: true
         })
@@ -743,25 +657,11 @@ struct Index {
       onDisappear: () => this.kanaLookupOpen = false
     })
     .padding({
-      left: this.activeReading === undefined && !this.musicPlayerOpen ? this.leftSafeInset() : 0,
-      right: this.activeReading === undefined && !this.musicPlayerOpen ? this.rightSafeInset() : 0
+      left: this.activeReading === undefined && this.activeVideo === undefined ? this.leftSafeInset() : 0,
+      right: this.activeReading === undefined && this.activeVideo === undefined ? this.rightSafeInset() : 0
     })
     .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
     .backgroundColor(Color.Transparent)
-  }
-
-  @Builder
-  private musicMiniBar() {
-    MusicMiniPlayer({
-      tracks: this.musicTracks,
-      snapshot: this.musicPlayback,
-      // The collapsed mini bar is the shorter of the two styles, so its content
-      // steps down to fit; the expanded one keeps the regular sizes.
-      compact: this.miniBarCollapsed,
-      onOpen: () => this.openMusic(this.musicPlayback.trackIndex, false),
-      onToggle: () => MusicPlaybackService.toggle(),
-      onNext: () => MusicPlaybackService.next()
-    })
   }
 
   @Builder
@@ -797,8 +697,8 @@ struct Index {
       this.closeReading();
       return true;
     }
-    if (this.musicPlayerOpen) {
-      this.closeMusicPlayer();
+    if (this.activeVideo !== undefined) {
+      this.closeVideoPlayer();
       return true;
     }
     if (this.activeScenario !== undefined) {

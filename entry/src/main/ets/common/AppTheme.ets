@@ -17,6 +17,10 @@ export function systemGestureInset(avoidAreas: window.UIEnvWindowAvoidAreaInfoVP
     avoidAreas.statusBar.bottomRect.height);
 }
 
+export function statusBarInset(avoidAreas: window.UIEnvWindowAvoidAreaInfoVP): number {
+  return Math.max(avoidAreas.statusBar.topRect.height, avoidAreas.cutout.topRect.height);
+}
+
 export function levelAccent(level: string): ResourceColor {
   if (level === 'N5' || level === '入门') {
     return $r('app.color.accent');

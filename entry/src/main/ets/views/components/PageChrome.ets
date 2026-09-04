@@ -3,6 +3,7 @@ import {
   BlurStrategy,
   DividerShowType,
   HdsNavigation,
+  HdsNavigationMenuContentOptions,
   HdsNavigationTitleMode,
   ScrollEffectType,
   TitleSize
@@ -18,9 +19,13 @@ export struct PageChrome {
   largeTitle: boolean = true;
   customTitle: boolean = false;
   showSearchAction: boolean = false;
+  showMenuAction: boolean = false;
+  menuIcon: Resource = $r('sys.symbol.plus');
+  menuLabel: string = '菜单';
   bottomHeight: number = 0;
   scrollers: Scroller[] = [];
   onSearch: () => void = () => {};
+  onMenu: () => void = () => {};
   @BuilderParam pageContent: () => void = this.emptyPageContent;
   @BuilderParam bottomContent: () => void = this.emptyBottomContent;
   @BuilderParam customTitleContent: () => void = this.emptyCustomTitleContent;
@@ -89,16 +94,7 @@ export struct PageChrome {
           mainTitleAccessibilityText: this.title,
           mainTitleSize: this.largeTitle ? TitleSize.TITLE_ML : TitleSize.TITLE_S
         },
-        menu: !this.customTitle && this.showSearchAction ? {
-          value: [{
-            content: {
-              icon: $r('sys.symbol.magnifyingglass'),
-              label: '搜索',
-              action: () => this.onSearch()
-            }
-          }],
-          maxCount: 1
-        } : undefined,
+        menu: this.titleMenu(),
         stackBuilder: this.customTitle ? this.customTitleContent : undefined,
         bottomBuilder: this.bottomHeight > 0 ? {
           builder: this.bottomContent,
@@ -122,5 +118,36 @@ export struct PageChrome {
     .height('100%')
     .clip(false)
     .backgroundColor(Color.Transparent)
+  }
+
+  private titleMenu(): HdsNavigationMenuContentOptions | undefined {
+    if (this.customTitle) {
+      return undefined;
+    }
+    if (this.showSearchAction) {
+      return {
+        value: [{
+          content: {
+            icon: $r('sys.symbol.magnifyingglass'),
+            label: '搜索',
+            action: () => this.onSearch()
+          }
+        }],
+        maxCount: 1
+      };
+    }
+    if (this.showMenuAction) {
+      return {
+        value: [{
+          content: {
+            icon: this.menuIcon,
+            label: this.menuLabel,
+            action: () => this.onMenu()
+          }
+        }],
+        maxCount: 1
+      };
+    }
+    return undefined;
   }
 }

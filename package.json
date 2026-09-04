@@ -5,11 +5,6 @@
   "type": "module",
   "packageManager": "pnpm@11.21.0",
   "scripts": {
-    "build:hap": "sh scripts/build-hap.sh",
-    "check:content": "node scripts/check-content.mjs",
-    "build:vocabulary": "python3 scripts/build-vocabulary.py",
-    "generate:reader": "python3 scripts/generate-reader-books.py",
-    "generate:music": "python3 scripts/generate-demo-music.py",
-    "fetch:tts": "sh scripts/fetch-tts-model.sh"
+    "build:hap": "sh scripts/build-hap.sh"
   }
 }
