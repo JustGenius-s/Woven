@@ -664,7 +664,7 @@ export struct SettingsPage {
 
       Text(this.grammarBusy ?
         '再点一次可以停止。已下好的课会保留。' :
-        '把 Irodori 分课教材和音频存到这台设备，大约占用 850 MB。')
+        '把 Irodori 分课教材和音频存到这台设备，大约占用 1.3 GB。')
         .width('100%')
         .padding({ left: 8, right: 8, top: 2 })
         .fontSize(13)

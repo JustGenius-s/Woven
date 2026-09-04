@@ -44,7 +44,7 @@ export struct BasicsPage {
   private grammarFloatingBarTracker: FloatingBarScrollTracker =
     new FloatingBarScrollTracker('basics-grammar');
   private coverPaths: Map<string, string> = new Map();
-  private readonly lessonCategories: string[] = ['入门', '初级1', '初级2'];
+  private readonly lessonCategories: string[] = ['入门', '初级1', '初级2', '初中级'];
 
   aboutToAppear(): void {
     this.onScrollerReady(this.grammarScroller);

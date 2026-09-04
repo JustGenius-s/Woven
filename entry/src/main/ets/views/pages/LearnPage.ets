@@ -152,7 +152,7 @@ export struct LearnPage {
   private grammarCaption(): string {
     const lesson: GrammarWork | undefined = this.currentGrammar();
     if (lesson === undefined) {
-      return '入门 · 初级1 · 初级2';
+      return '入门 · 初级1 · 初级2 · 初中级';
     }
     return lesson.lessonNo === 0 ? lesson.level : `${lesson.level} · 第 ${lesson.lessonNo} 课`;
   }
