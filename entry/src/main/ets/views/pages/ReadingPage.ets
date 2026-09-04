@@ -19,7 +19,7 @@ import {
   TitleSize
 } from '@kit.UIDesignKit';
 import { SymbolGlyphModifier } from '@ohos.arkui.modifier';
-import { systemGestureInset } from '../../common/AppTheme';
+import { applyReaderPaper, systemGestureInset } from '../../common/AppTheme';
 import { FLOATING_CHROME_MATERIAL, preferredImmersiveMaterial } from '../../common/ImmersiveMaterial';
 import { ReadingAudioCue, ReadingAudioRect, ReadingPassage, ReadingWork } from '../../model/ContentModels';
 import { AiInquiryContext } from '../../model/DeepSeekModels';
@@ -120,6 +120,7 @@ export struct ReadingPage {
   });
 
   aboutToAppear(): void {
+    applyReaderPaper(true);
     const style: ReaderStyleSnapshot = ReaderPreferences.style(this.hostContext());
     this.hasSavedStyle = ReaderPreferences.hasStyle(this.hostContext());
     this.fontSize = Math.max(18, Math.min(style.fontSize, 28));
@@ -212,6 +213,7 @@ export struct ReadingPage {
 
   aboutToDisappear(): void {
     this.leaving = true;
+    applyReaderPaper(false);
     if (this.hasAudio()) {
       ReadingNarrationService.unsubscribe(this.onNarrationSnapshot);
       void ReadingNarrationService.release();
@@ -369,6 +371,22 @@ export struct ReadingPage {
       return `${start}–${start + 1} / ${total}`;
     }
     return `${start} / ${total}`;
+  }
+
+  private readingProgressTotal(): number {
+    return Math.max(1, this.readingLength());
+  }
+
+  private readingProgressValue(): number {
+    const total: number = this.readingProgressTotal();
+    if (this.isPdfBook()) {
+      return Math.min(this.currentPassageIndex + 1, total);
+    }
+    const current: number = this.displayPageIndex * this.pageStride() + 1;
+    if (this.dualPage && current < total) {
+      return Math.min(current + 1, total);
+    }
+    return Math.min(current, total);
   }
 
   private passageTitle(index: number): string {
@@ -631,6 +649,7 @@ export struct ReadingPage {
       }
       .width('100%')
       .height('100%')
+      .backgroundColor(Color.White)
       .onClick(() => this.toggleControls())
       .gesture(
         PinchGesture({ fingers: 2 })
@@ -698,7 +717,7 @@ export struct ReadingPage {
     .width('100%')
     .height('100%')
     .clip(false)
-    .backgroundColor(Color.Transparent)
+    .backgroundColor(Color.White)
     .onAreaChange((oldArea: Area, newArea: Area) => this.updateViewport(newArea.width, newArea.height))
     .bindSheet($$this.panelOpen, this.readerPanel(), {
       height: this.panelKind === 0 ? SheetSize.LARGE : SheetSize.MEDIUM,
@@ -983,19 +1002,30 @@ export struct ReadingPage {
   @Builder
   private bottomControls() {
     Column({ space: 10 }) {
-      Row({ space: 8 }) {
-        Text(this.pageLabel())
-          .fontSize(12)
-          .fontColor($r('sys.color.font_secondary'))
-          .padding({ left: 13, right: 13, top: 6, bottom: 6 })
-          .borderRadius(16)
-          .backgroundColor(Color.Transparent)
-          .systemMaterial(FLOATING_CHROME_MATERIAL)
-        if (this.hasNarration()) {
+      if (this.hasNarration()) {
+        Row() {
           this.narrationChip()
         }
       }
-      Column() {
+      Column({ space: 12 }) {
+        Row({ space: 10 }) {
+          Progress({
+            value: this.readingProgressValue(),
+            total: this.readingProgressTotal(),
+            type: ProgressType.Linear
+          })
+            .layoutWeight(1)
+            .height(6)
+            .color($r('app.color.accent'))
+            .backgroundColor($r('app.color.line'))
+            .style({ strokeWidth: 6 })
+            .accessibilityText(`阅读进度 ${this.pageLabel()}`)
+          Text(this.pageLabel())
+            .fontSize(12)
+            .fontColor($r('sys.color.font_secondary'))
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Center)
         HdsActionBar({
           startButtons: [
             this.readerAction($r('sys.symbol.book_pages_fill'), '目录', () => this.openCatalog())
@@ -1006,6 +1036,7 @@ export struct ReadingPage {
         })
       }
       .width('100%')
+      .padding({ left: 14, right: 14, top: 12, bottom: 4 })
       .borderRadius(28)
       .systemMaterial(FLOATING_CHROME_MATERIAL)
     }

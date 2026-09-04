@@ -14,6 +14,7 @@ export struct ImmersiveBackChrome {
   title: string = '';
   subtitle: string = '';
   closeIcon: boolean = false;
+  paper: boolean = false;
   scrollers: Scroller[] = [];
   onBack: () => void = () => {};
   @BuilderParam pageContent: () => void = this.emptyPageContent;
@@ -90,6 +91,6 @@ export struct ImmersiveBackChrome {
     .width('100%')
     .height('100%')
     .clip(false)
-    .backgroundColor(Color.Transparent)
+    .backgroundColor(this.paper ? Color.White : Color.Transparent)
   }
 }

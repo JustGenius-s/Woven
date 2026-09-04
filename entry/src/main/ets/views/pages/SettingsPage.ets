@@ -3,6 +3,7 @@ import { window } from '@kit.ArkUI';
 import { systemGestureInset } from '../../common/AppTheme';
 import { showImmersiveNotice } from '../../common/ImmersiveNotice';
 import { ReadingWork } from '../../model/ContentModels';
+import { GrammarWork } from '../../model/GrammarModels';
 import {
   CloudSyncPhase,
   CloudSyncSnapshot,
@@ -11,6 +12,11 @@ import {
 } from '../../model/SyncModels';
 import { ContentRepository } from '../../services/ContentRepository';
 import { DISTRIBUTED_SYNC_PERMISSION_REQUIRED } from '../../services/DistributedSyncPermission';
+import {
+  GrammarBookService,
+  GrammarDownloadResult,
+  GrammarLibraryStats
+} from '../../services/GrammarBookService';
 import {
   ReadingBookService,
   ReadingDownloadResult,
@@ -53,9 +59,17 @@ export struct SettingsPage {
   @State private pendingBytes: number = 0;
   @State private readyCount: number = 0;
   @State private totalCount: number = 0;
+  @State private grammarBusy: boolean = false;
+  @State private grammarLabel: string = '';
+  @State private grammarPending: number = 0;
+  @State private grammarPendingBytes: number = 0;
+  @State private grammarReady: number = 0;
+  @State private grammarTotal: number = 0;
   private pageScroller: Scroller = new Scroller();
   private cancelDownload: boolean = false;
+  private cancelGrammar: boolean = false;
   private cloudWorks: ReadingWork[] = [];
+  private grammarWorks: GrammarWork[] = [];
 
   aboutToAppear(): void {
     this.apiKey = this.initialApiKey;
@@ -65,6 +79,7 @@ export struct SettingsPage {
 
   aboutToDisappear(): void {
     this.cancelDownload = true;
+    this.cancelGrammar = true;
   }
 
   private normalizedApiKey(): string {
@@ -178,6 +193,19 @@ export struct SettingsPage {
         ContentRepository.loadReadingWorks(context));
     }
     this.applyLibraryStats(ReadingBookService.libraryStats(context, this.cloudWorks));
+    try {
+      this.grammarWorks = await ContentRepository.prefetchGrammar(context);
+    } catch (error) {
+      this.grammarWorks = ContentRepository.loadGrammarWorks(context);
+    }
+    this.applyGrammarStats(GrammarBookService.libraryStats(context, this.grammarWorks));
+  }
+
+  private applyGrammarStats(stats: GrammarLibraryStats): void {
+    this.grammarTotal = stats.total;
+    this.grammarReady = stats.ready;
+    this.grammarPending = stats.pending;
+    this.grammarPendingBytes = stats.pendingBytes;
   }
 
   private libraryStatus(): string {
@@ -255,6 +283,70 @@ export struct SettingsPage {
     }
   }
 
+  private grammarStatus(): string {
+    if (this.grammarBusy) {
+      return this.grammarLabel.length > 0 ? this.grammarLabel : '正在下载…';
+    }
+    if (this.grammarTotal === 0) {
+      return '还没有拉到文法课表';
+    }
+    if (this.grammarPending === 0) {
+      return `已全部下载 · ${this.grammarReady} 课`;
+    }
+    return `未下载 ${this.grammarPending} 课 · ${this.formatBytes(this.grammarPendingBytes)}`;
+  }
+
+  private async toggleGrammarDownload(): Promise<void> {
+    if (this.grammarBusy) {
+      this.cancelGrammar = true;
+      this.grammarLabel = '正在取消…';
+      return;
+    }
+    const context: common.Context = this.hostContext();
+    if (this.grammarWorks.length === 0) {
+      await this.refreshLibrary();
+    }
+    if (this.grammarWorks.length === 0) {
+      showImmersiveNotice(this.getUIContext(), '还不能下载', '文法课表加载失败，请联网后再试');
+      return;
+    }
+    if (this.grammarPending === 0) {
+      showImmersiveNotice(this.getUIContext(), '已经下完', '文法课都在这台设备上');
+      return;
+    }
+    this.cancelGrammar = false;
+    this.grammarBusy = true;
+    this.grammarLabel = '正在准备…';
+    try {
+      const result: GrammarDownloadResult = await GrammarBookService.downloadAll(
+        context,
+        this.grammarWorks,
+        (done: number, total: number, title: string) => {
+          this.grammarLabel = `${done}/${total}  ${title}`;
+        },
+        () => !this.cancelGrammar
+      );
+      this.applyGrammarStats(GrammarBookService.libraryStats(context, this.grammarWorks));
+      if (this.cancelGrammar) {
+        showImmersiveNotice(this.getUIContext(), '已停止',
+          `这次下了 ${result.downloaded} 课，还可继续`);
+      } else if (result.failed > 0) {
+        showImmersiveNotice(this.getUIContext(), '下载未完成',
+          `成功 ${result.downloaded} 课，失败 ${result.failed} 课`);
+      } else {
+        showImmersiveNotice(this.getUIContext(), '下载完成',
+          result.downloaded > 0 ? `新下了 ${result.downloaded} 课` : '没有需要新下的课');
+      }
+    } catch (error) {
+      const detail: string = error instanceof Error ? error.message : '网络异常';
+      showImmersiveNotice(this.getUIContext(), '下载失败', detail);
+    } finally {
+      this.grammarBusy = false;
+      this.grammarLabel = '';
+      this.applyGrammarStats(GrammarBookService.libraryStats(context, this.grammarWorks));
+    }
+  }
+
   build() {
     Column() {
       ImmersiveBackChrome({
@@ -291,6 +383,7 @@ export struct SettingsPage {
             Column({ space: 24 }) {
               this.cloudSyncSection()
               this.readingLibrarySection()
+              this.grammarLibrarySection()
               this.deepSeekSection()
               this.ttsSection()
             }
@@ -504,6 +597,74 @@ export struct SettingsPage {
       Text(this.downloadBusy ?
         '再点一次可以停止。已下好的书会保留。' :
         '把官方电子书和朗读存到这台设备，已下载的会跳过。大约占用 1 GB。')
+        .width('100%')
+        .padding({ left: 8, right: 8, top: 2 })
+        .fontSize(13)
+        .lineHeight(19)
+        .fontColor($r('app.color.ink_muted'))
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
+  private grammarLibrarySection() {
+    Column({ space: 8 }) {
+      Text('文法资料')
+        .width('100%')
+        .padding({ left: 8 })
+        .fontSize(14)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.ink_muted'))
+
+      Row({ space: 14 }) {
+        SymbolGlyph($r('sys.symbol.character_square_fill'))
+          .fontSize(22)
+          .fontColor([$r('app.color.accent')])
+
+        Column({ space: 3 }) {
+          Text('下载全部文法课')
+            .fontSize(17)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.ink'))
+          Text(this.grammarStatus())
+            .fontSize(13)
+            .fontColor(this.grammarBusy ? $r('app.color.accent') : $r('app.color.ink_muted'))
+            .maxLines(2)
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+
+        if (this.grammarBusy) {
+          LoadingProgress()
+            .width(22)
+            .height(22)
+            .color($r('app.color.accent'))
+        } else if (this.grammarPending === 0 && this.grammarTotal > 0) {
+          Text('已完成')
+            .fontSize(14)
+            .fontColor($r('app.color.success'))
+        } else {
+          Text('下载')
+            .fontSize(14)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.accent'))
+        }
+      }
+      .width('100%')
+      .constraintSize({ minHeight: 76 })
+      .padding({ left: 18, right: 18, top: 12, bottom: 12 })
+      .borderRadius(24)
+      .backgroundColor($r('app.color.surface_raised'))
+      .visualEffect(contentLightEffect())
+      .accessibilityText(this.grammarBusy ? '取消下载文法课' : '下载全部文法课')
+      .onClick(() => {
+        void this.toggleGrammarDownload();
+      })
+
+      Text(this.grammarBusy ?
+        '再点一次可以停止。已下好的课会保留。' :
+        '把 Irodori 分课教材和音频存到这台设备，大约占用 850 MB。')
         .width('100%')
         .padding({ left: 8, right: 8, top: 2 })
         .fontSize(13)

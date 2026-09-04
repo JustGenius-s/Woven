@@ -107,6 +107,7 @@ export struct PdfReadingCanvas {
     this.controller.setDisplayDirection(this.flipMode === 1 ?
       pdfViewManager.DisplayDirection.VERTICAL :
       pdfViewManager.DisplayDirection.HORIZONTAL);
+    this.controller.setPageSpacing(0, 0);
   }
 
   onJumpPage(_propertyName?: string): void {
@@ -160,17 +161,28 @@ export struct PdfReadingCanvas {
       .width('100%')
       .height('100%')
       .justifyContent(FlexAlign.Center)
+      .backgroundColor(Color.White)
     } else {
-      PdfView({
-        controller: this.controller,
-        pageLayout: this.dualPage ?
-          pdfService.PageLayout.LAYOUT_DOUBLE : pdfService.PageLayout.LAYOUT_SINGLE,
-        isContinuous: this.flipMode === 1,
-        showScroll: false,
-        pageFit: pdfService.PageFit.FIT_PAGE
-      })
-        .width('100%')
-        .height('100%')
+      Stack() {
+        Column()
+          .width('100%')
+          .height('100%')
+          .backgroundColor(Color.White)
+        PdfView({
+          controller: this.controller,
+          pageLayout: this.dualPage ?
+            pdfService.PageLayout.LAYOUT_DOUBLE : pdfService.PageLayout.LAYOUT_SINGLE,
+          isContinuous: this.flipMode === 1,
+          showScroll: false,
+          pageFit: pdfService.PageFit.FIT_PAGE
+        })
+          .width('100%')
+          .height('100%')
+          .backgroundColor(Color.White)
+      }
+      .width('100%')
+      .height('100%')
+      .backgroundColor(Color.White)
     }
   }
 }

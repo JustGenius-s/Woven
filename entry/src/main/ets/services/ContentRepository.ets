@@ -2,14 +2,14 @@ import { common } from '@kit.AbilityKit';
 import { util } from '@kit.ArkTS';
 import {
   ContentManifest,
-  GrammarIndexEntry,
-  GrammarLesson,
   LearningJourney,
   LearningCatalog,
   MusicTrack,
   ReadingWork,
   VocabularyEntry
 } from '../model/ContentModels';
+import { GrammarWork } from '../model/GrammarModels';
+import { GrammarCloudStore } from './GrammarCloudStore';
 import { ReadingCloudStore } from './ReadingCloudStore';
 
 export class ContentRepository {
@@ -37,12 +37,12 @@ export class ContentRepository {
     return await ReadingCloudStore.refresh(context);
   }
 
-  static loadGrammarIndex(context: common.Context): GrammarIndexEntry[] {
-    return JSON.parse(ContentRepository.readText(context, 'grammar/index.json')) as GrammarIndexEntry[];
+  static loadGrammarWorks(context: common.Context): GrammarWork[] {
+    return GrammarCloudStore.cached(context);
   }
 
-  static loadGrammarLesson(context: common.Context, id: string): GrammarLesson {
-    return JSON.parse(ContentRepository.readText(context, `grammar/${id}.json`)) as GrammarLesson;
+  static async prefetchGrammar(context: common.Context): Promise<GrammarWork[]> {
+    return await GrammarCloudStore.refresh(context);
   }
 
   static loadVocabulary(context: common.Context, level: string): VocabularyEntry[] {

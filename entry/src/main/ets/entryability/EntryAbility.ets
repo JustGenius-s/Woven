@@ -1,6 +1,7 @@
 import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
+import { bindMainWindow, isReaderPaperActive, rememberSurfaceColor } from '../common/AppTheme';
 import { JapaneseTtsService } from '../services/JapaneseTtsService';
 import { MusicPlaybackService } from '../services/MusicPlaybackService';
 import { VideoPlaybackService } from '../services/VideoPlaybackService';
@@ -22,6 +23,7 @@ export default class EntryAbility extends UIAbility {
   onWindowStageCreate(windowStage: window.WindowStage): void {
     try {
       this.mainWindow = windowStage.getMainWindowSync();
+      bindMainWindow(this.mainWindow);
       this.applyWindowAppearance();
       this.mainWindow.setWindowLayoutFullScreen(true)
         .then(() => this.applyWindowAppearance())
@@ -64,10 +66,12 @@ export default class EntryAbility extends UIAbility {
     const darkMode: boolean = darkFallback ??
       this.context.config.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK;
     const surfaceColor: string = this.resourceColor('surface', darkMode ? '#17181A' : '#F2F4F7');
+    rememberSurfaceColor(surfaceColor);
+    const windowColor: string = isReaderPaperActive() ? '#FFFFFF' : surfaceColor;
     const contentColor: string = this.resourceColor('ink', darkMode ? '#F4F6FA' : '#202124');
 
     try {
-      this.mainWindow.setWindowBackgroundColor(surfaceColor);
+      this.mainWindow.setWindowBackgroundColor(windowColor);
       this.mainWindow.setWindowSystemBarProperties({
         statusBarColor: '#00000000',
         statusBarContentColor: contentColor,

@@ -1,7 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import {
-  GrammarIndexEntry,
   LearningCatalog,
   MusicTrack,
   PracticeScenario,
@@ -76,20 +75,6 @@ export class LearningSyncCoordinator {
       LearningSyncCoordinator.progressRecord('kana.current', key, 0, ''));
   }
 
-  static saveGrammarProgress(context: common.Context, index: number): void {
-    let itemId: string = '';
-    try {
-      const entries: GrammarIndexEntry[] = ContentRepository.loadGrammarIndex(context);
-      if (index >= 0 && index < entries.length) {
-        itemId = entries[index].id;
-      }
-    } catch (error) {
-      itemId = '';
-    }
-    LearningSyncStore.upsertProgress(context,
-      LearningSyncCoordinator.progressRecord('grammar.current', itemId, index, ''));
-  }
-
   static saveMusicProgress(context: common.Context, index: number): void {
     let itemId: string = '';
     try {
@@ -158,7 +143,6 @@ export class LearningSyncCoordinator {
       'journey.completed', journeyId, LearningPreferences.journeyCompletedMask(context), '', now));
     progress.push(LearningSyncCoordinator.progressRecord(
       'kana.current', LearningPreferences.kanaKey(context), 0, '', now));
-    progress.push(LearningSyncCoordinator.grammarSeed(context, now));
     progress.push(LearningSyncCoordinator.musicSeed(context, now));
     const musicPosition: SyncProgressRecord | undefined = LearningSyncCoordinator.musicPositionSeed(context, now);
     if (musicPosition !== undefined) {
@@ -189,20 +173,6 @@ export class LearningSyncCoordinator {
       learnedItems: learnedItems,
       conversations: LearningSyncCoordinator.conversationSeeds(context, now)
     };
-  }
-
-  private static grammarSeed(context: common.Context, updatedAt: number): SyncProgressRecord {
-    const index: number = LearningPreferences.grammarIndex(context);
-    let itemId: string = '';
-    try {
-      const entries: GrammarIndexEntry[] = ContentRepository.loadGrammarIndex(context);
-      if (index >= 0 && index < entries.length) {
-        itemId = entries[index].id;
-      }
-    } catch (error) {
-      itemId = '';
-    }
-    return LearningSyncCoordinator.progressRecord('grammar.current', itemId, index, '', updatedAt);
   }
 
   private static musicSeed(context: common.Context, updatedAt: number): SyncProgressRecord {
@@ -316,13 +286,6 @@ export class LearningSyncCoordinator {
       LearningPreferences.saveKanaKey(context, kana.itemId);
     }
 
-    const grammar: SyncProgressRecord | undefined = LearningSyncCoordinator.latest(records, 'grammar.current');
-    if (grammar !== undefined) {
-      const entries: GrammarIndexEntry[] = ContentRepository.loadGrammarIndex(context);
-      LearningPreferences.saveGrammarIndex(context,
-        LearningSyncCoordinator.indexForGrammar(grammar, entries));
-    }
-
     const music: SyncProgressRecord | undefined = LearningSyncCoordinator.latest(records, 'music.current');
     if (music !== undefined) {
       const tracks: MusicTrack[] = ContentRepository.loadMusicTracks(context);
@@ -425,15 +388,6 @@ export class LearningSyncCoordinator {
     latestByTrack.forEach((record: SyncProgressRecord, trackId: string) => {
       LearningPreferences.saveMusicPosition(context, trackId, record.numericValue);
     });
-  }
-
-  private static indexForGrammar(record: SyncProgressRecord, entries: GrammarIndexEntry[]): number {
-    for (let index: number = 0; index < entries.length; index++) {
-      if (entries[index].id === record.itemId) {
-        return index;
-      }
-    }
-    return LearningSyncCoordinator.fallbackIndex(record.numericValue, entries.length);
   }
 
   private static indexForMusic(record: SyncProgressRecord, entries: MusicTrack[]): number {

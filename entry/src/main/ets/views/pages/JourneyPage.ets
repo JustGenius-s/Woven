@@ -4,7 +4,6 @@ import { MOTION_DURATION } from '../../common/AppTheme';
 import {
   Dialogue,
   DialogueLine,
-  GrammarIndexEntry,
   JourneyKanaFocus,
   KanaCell,
   KanaRow,
@@ -23,8 +22,6 @@ import { ImmersiveAction } from '../components/ImmersiveAction';
 import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
 import { contentLightEffect, HdsInteractiveSurface, planeLightEffect } from '../components/ImmersiveCanvas';
 import { GravityMark } from '../components/GravityMark';
-import { GrammarPage } from './GrammarPage';
-
 const JOURNEY_STAGE_LABELS: string[] = ['入景', '识音', '记词', '懂句', '会话', '开口'];
 const JOURNEY_STAGE_INDEXES: number[] = [0, 1, 2, 3, 4, 5];
 const ANSWER_LABELS: string[] = ['A', 'B', 'C', 'D'];
@@ -41,7 +38,6 @@ const EMPTY_JOURNEY: LearningJourney = {
   kana: [],
   vocabularyLevel: 'N5',
   wordIds: [],
-  grammarLessonId: '',
   grammarPattern: '',
   grammarMeaning: '',
   grammarExamples: [],
@@ -80,12 +76,10 @@ export struct JourneyPage {
   @State private dialogue: Dialogue | undefined = undefined;
   @State private kanaCells: KanaCell[] = [];
   @State private words: VocabularyEntry[] = [];
-  @State private grammarEntries: GrammarIndexEntry[] = [];
   @State private selectedKanaIndex: number = 0;
   @State private selectedWordIndex: number = 0;
   @State private showDialogueNotes: boolean = false;
   @State private selectedAnswerIndex: number = -1;
-  @State private showFullGrammar: boolean = false;
   @State private loadError: string = '';
   private stageScrollers: Scroller[] = [
     new Scroller(), new Scroller(), new Scroller(),
@@ -99,7 +93,6 @@ export struct JourneyPage {
       const context: common.Context = this.getUIContext().getHostContext() as common.Context;
       JapaneseTtsService.initialize(context);
       this.catalog = ContentRepository.loadCatalog(context);
-      this.grammarEntries = ContentRepository.loadGrammarIndex(context);
       this.words = this.selectWords(ContentRepository.loadVocabulary(context, this.journey.vocabularyLevel));
       this.dialogue = this.selectDialogue(this.catalog.dialogues);
       this.kanaCells = this.selectKana(this.catalog);
@@ -149,15 +142,6 @@ export struct JourneyPage {
       }
     }
     return selected;
-  }
-
-  private grammarIndex(): number {
-    for (let index: number = 0; index < this.grammarEntries.length; index++) {
-      if (this.grammarEntries[index].id === this.journey.grammarLessonId) {
-        return index;
-      }
-    }
-    return 0;
   }
 
   private askSelection(selection: string, source: string, context: string): void {
@@ -262,26 +246,8 @@ export struct JourneyPage {
     return count;
   }
 
-  private setFullGrammar(show: boolean): void {
-    this.getUIContext().animateTo({ curve: curves.springMotion(0.4, 0.86, 0.16) }, () => {
-      this.showFullGrammar = show;
-    });
-  }
-
   build() {
-    if (this.showFullGrammar) {
-      GrammarPage({
-        entries: this.grammarEntries,
-        initialIndex: this.grammarIndex(),
-        onIndexChange: (index: number) => {},
-        onAsk: this.onAsk,
-        onBack: () => this.setFullGrammar(false)
-      })
-      .transition(TransitionEffect.OPACITY
-        .combine(TransitionEffect.translate({ x: 20 }))
-        .animation({ curve: curves.springMotion(0.4, 0.86, 0.16) }))
-    } else {
-      Column() {
+    Column() {
         ImmersiveBackChrome({
           title: this.journey.title,
           subtitle: this.journey.setting,
@@ -298,7 +264,6 @@ export struct JourneyPage {
       .transition(TransitionEffect.OPACITY
         .combine(TransitionEffect.scale({ x: 0.985, y: 0.985 }))
         .animation({ curve: curves.springMotion(0.4, 0.88, 0.14) }))
-    }
   }
 
   @Builder
@@ -804,12 +769,6 @@ export struct JourneyPage {
     .padding({ left: 8, right: 8 })
     .visualEffect(contentLightEffect())
     Row() {
-      ImmersiveAction({
-        label: '完整语法课',
-        actionAccessibilityText: '打开完整语法课',
-        icon: $r('sys.symbol.bookmark'),
-        onAction: () => this.setFullGrammar(true)
-      })
       Blank()
       ImmersiveAction({
         label: '进入会话',

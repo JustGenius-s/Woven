@@ -5,7 +5,6 @@ import { DEFAULT_COURSE_ID } from '../model/SyncModels';
 const STORE_NAME: string = 'kotoba_settings';
 const KEY_DEEPSEEK_API_KEY: string = 'deepseek_api_key';
 const KEY_MINIMAX_API_KEY: string = 'minimax_api_key';
-const KEY_GRAMMAR_INDEX: string = 'grammar_index';
 const KEY_SECTION: string = 'section';
 const KEY_JOURNEY_ID: string = 'journey_id';
 const KEY_JOURNEY_STAGE: string = 'journey_stage';
@@ -13,6 +12,8 @@ const KEY_JOURNEY_COMPLETED_MASK: string = 'journey_completed_mask';
 const KEY_HOME_GUIDE_SEEN: string = 'home_guide_seen';
 const KEY_KANA_KEY: string = 'kana_key';
 const KEY_EXPLORE_TAB: string = 'explore_tab';
+const KEY_BASICS_TAB: string = 'basics_tab';
+const KEY_GRAMMAR_LESSON_ID: string = 'grammar_lesson_id';
 const KEY_MUSIC_INDEX: string = 'music_index';
 const KEY_MUSIC_POSITION_PREFIX: string = 'music_position_';
 const KEY_READING_INDEX: string = 'reading_index';
@@ -75,10 +76,6 @@ export class LearningPreferences {
     }
   }
 
-  static grammarIndex(context: common.Context, courseId: string = DEFAULT_COURSE_ID): number {
-    return LearningPreferences.readCourseNumber(context, KEY_GRAMMAR_INDEX, 0, courseId);
-  }
-
   static deepSeekApiKey(context: common.Context): string {
     return LearningPreferences.readString(context, KEY_DEEPSEEK_API_KEY, '');
   }
@@ -111,6 +108,14 @@ export class LearningPreferences {
     return LearningPreferences.readCourseNumber(context, KEY_EXPLORE_TAB, 0, courseId);
   }
 
+  static basicsTab(context: common.Context, courseId: string = DEFAULT_COURSE_ID): number {
+    return LearningPreferences.readCourseNumber(context, KEY_BASICS_TAB, 0, courseId);
+  }
+
+  static grammarLessonId(context: common.Context, courseId: string = DEFAULT_COURSE_ID): string {
+    return LearningPreferences.readCourseString(context, KEY_GRAMMAR_LESSON_ID, '', courseId);
+  }
+
   static musicIndex(context: common.Context, courseId: string = DEFAULT_COURSE_ID): number {
     return LearningPreferences.readCourseNumber(context, KEY_MUSIC_INDEX, -1, courseId);
   }
@@ -136,7 +141,6 @@ export class LearningPreferences {
         return false;
       }
       const historyKeys: string[] = [
-        KEY_GRAMMAR_INDEX,
         KEY_SECTION,
         KEY_JOURNEY_ID,
         KEY_JOURNEY_STAGE,
@@ -152,11 +156,6 @@ export class LearningPreferences {
     } catch (error) {
       return false;
     }
-  }
-
-  static saveGrammarIndex(context: common.Context, index: number,
-    courseId: string = DEFAULT_COURSE_ID): void {
-    LearningPreferences.saveCourseNumber(context, KEY_GRAMMAR_INDEX, index, courseId);
   }
 
   static saveDeepSeekApiKey(context: common.Context, apiKey: string): void {
@@ -196,6 +195,16 @@ export class LearningPreferences {
   static saveExploreTab(context: common.Context, index: number,
     courseId: string = DEFAULT_COURSE_ID): void {
     LearningPreferences.saveCourseNumber(context, KEY_EXPLORE_TAB, index, courseId);
+  }
+
+  static saveBasicsTab(context: common.Context, index: number,
+    courseId: string = DEFAULT_COURSE_ID): void {
+    LearningPreferences.saveCourseNumber(context, KEY_BASICS_TAB, index, courseId);
+  }
+
+  static saveGrammarLessonId(context: common.Context, lessonId: string,
+    courseId: string = DEFAULT_COURSE_ID): void {
+    LearningPreferences.saveCourseString(context, KEY_GRAMMAR_LESSON_ID, lessonId, courseId);
   }
 
   static saveMusicIndex(context: common.Context, index: number,

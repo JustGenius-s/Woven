@@ -17,6 +17,7 @@ import {
 } from '../common/AppTheme';
 import { bottomBarImmersiveMaterial } from '../common/ImmersiveMaterial';
 import { AppSection, LearningJourney, PracticeScenario, ReadingWork } from '../model/ContentModels';
+import { GrammarWork } from '../model/GrammarModels';
 import { AiInquiryContext } from '../model/DeepSeekModels';
 import { VideoItem } from '../model/VideoModels';
 import {
@@ -39,8 +40,9 @@ import { MusicPlaybackService } from '../services/MusicPlaybackService';
 import { VideoLibraryStore } from '../services/VideoLibraryStore';
 import { VideoPlaybackService } from '../services/VideoPlaybackService';
 import { VocabularyLearningStore } from '../services/VocabularyLearningStore';
+import { BasicsPage } from '../views/pages/BasicsPage';
 import { ExplorePage } from '../views/pages/ExplorePage';
-import { KanaPage } from '../views/pages/KanaPage';
+import { GrammarLessonPage } from '../views/pages/GrammarLessonPage';
 import { LearnPage } from '../views/pages/LearnPage';
 import { MePage } from '../views/pages/MePage';
 import { PracticeSessionPage } from '../views/pages/PracticeSessionPage';
@@ -58,12 +60,12 @@ import { KanaLookupSheet } from '../views/components/KanaLookupSheet';
 struct Index {
   @Env(SystemProperties.WINDOW_AVOID_AREA) private avoidAreas: window.UIEnvWindowAvoidAreaInfoVP;
   @State private section: number = AppSection.LEARN;
-  @State private grammarIndex: number = 0;
   @State private deepSeekApiKey: string = '';
   @State private minimaxApiKey: string = '';
   @State private settingsOpen: boolean = false;
   @State private activeScenario: PracticeScenario | undefined = undefined;
   @State private activeReading: ReadingWork | undefined = undefined;
+  @State private activeGrammar: GrammarWork | undefined = undefined;
   @State private activeVideo: VideoItem | undefined = undefined;
   @State private journeys: LearningJourney[] = [];
   @State private currentJourney: LearningJourney | undefined = undefined;
@@ -83,6 +85,8 @@ struct Index {
   @State private vocabularySearchOpen: boolean = false;
   @State private kanaKey: string = 'あ';
   @State private exploreTab: number = 0;
+  @State private basicsTab: number = 0;
+  @State private grammarId: string = '';
   @State private videoId: string = '';
   @State private videoCount: number = 0;
   @State private lastVideoTitle: string = '';
@@ -114,13 +118,14 @@ struct Index {
     const storedSection: number = LearningPreferences.section(context);
     this.section = storedSection >= AppSection.LEARN && storedSection <= AppSection.ME ?
       storedSection : AppSection.LEARN;
-    this.grammarIndex = LearningPreferences.grammarIndex(context);
     this.deepSeekApiKey = LearningPreferences.deepSeekApiKey(context);
     this.minimaxApiKey = LearningPreferences.minimaxApiKey(context);
     this.journeyStage = LearningPreferences.journeyStage(context);
     this.journeyCompletedMask = LearningPreferences.journeyCompletedMask(context);
     this.kanaKey = LearningPreferences.kanaKey(context);
     this.exploreTab = LearningPreferences.exploreTab(context);
+    this.basicsTab = LearningPreferences.basicsTab(context);
+    this.grammarId = LearningPreferences.grammarLessonId(context);
     this.refreshVideoLibrary(context);
     this.readingIndex = LearningPreferences.readingIndex(context);
     this.scenarioIndex = LearningPreferences.scenarioIndex(context);
@@ -144,6 +149,7 @@ struct Index {
     VideoPlaybackService.initialize(context);
     this.initializeAccountAndSync(context);
     void ContentRepository.prefetchReadings(context);
+    void ContentRepository.prefetchGrammar(context);
   }
 
   aboutToDisappear(): void {
@@ -205,7 +211,6 @@ struct Index {
   }
 
   private reloadSyncedLearningState(context: common.Context): void {
-    this.grammarIndex = LearningPreferences.grammarIndex(context);
     this.journeyStage = LearningPreferences.journeyStage(context);
     this.journeyCompletedMask = LearningPreferences.journeyCompletedMask(context);
     this.kanaKey = LearningPreferences.kanaKey(context);
@@ -230,18 +235,41 @@ struct Index {
     LearningPreferences.saveSection(this.getUIContext().getHostContext() as common.Context, section);
   }
 
-  private saveGrammarIndex(index: number): void {
-    this.grammarIndex = index;
-    const context: common.Context = this.getUIContext().getHostContext() as common.Context;
-    LearningPreferences.saveGrammarIndex(context, index);
-    LearningSyncCoordinator.saveGrammarProgress(context, index);
-  }
-
   private saveKanaKey(key: string): void {
     this.kanaKey = key;
     const context: common.Context = this.getUIContext().getHostContext() as common.Context;
     LearningPreferences.saveKanaKey(context, key);
     LearningSyncCoordinator.saveKanaProgress(context, key);
+  }
+
+  private saveBasicsTab(index: number): void {
+    this.basicsTab = Math.max(0, Math.min(index, 1));
+    LearningPreferences.saveBasicsTab(
+      this.getUIContext().getHostContext() as common.Context, this.basicsTab);
+  }
+
+  private openBasicsGrammar(): void {
+    this.saveBasicsTab(1);
+    this.selectSection(AppSection.KANA);
+  }
+
+  private saveGrammarLesson(lesson: GrammarWork): void {
+    this.grammarId = lesson.id;
+    LearningPreferences.saveGrammarLessonId(
+      this.getUIContext().getHostContext() as common.Context, lesson.id);
+  }
+
+  private openGrammar(lesson: GrammarWork): void {
+    this.saveGrammarLesson(lesson);
+    this.getUIContext().animateTo({ curve: curves.springMotion(0.42, 0.84, 0.18) }, () => {
+      this.activeGrammar = lesson;
+    });
+  }
+
+  private closeGrammar(): void {
+    this.getUIContext().animateTo({ curve: curves.springMotion(0.38, 0.88, 0.16) }, () => {
+      this.activeGrammar = undefined;
+    });
   }
 
   private saveExploreTab(index: number): void {
@@ -404,6 +432,7 @@ struct Index {
     Stack() {
       ImmersiveBackdrop({
         sceneToneIndex: this.vocabularyStudyOpen && !this.settingsOpen ? this.vocabularySceneTone : -1,
+        paper: this.activeReading !== undefined || this.activeGrammar !== undefined,
         canvasContent: () => {
           this.appShell()
         }
@@ -432,6 +461,16 @@ struct Index {
           .height('100%')
           .transition(TransitionEffect.OPACITY
             .combine(TransitionEffect.translate({ y: 18 }))
+            .animation({ curve: curves.springMotion(0.42, 0.84, 0.18) }))
+        } else if (this.activeGrammar !== undefined) {
+          GrammarLessonPage({
+            lesson: this.activeGrammar,
+            onBack: () => this.closeGrammar()
+          })
+          .width('100%')
+          .height('100%')
+          .transition(TransitionEffect.OPACITY
+            .combine(TransitionEffect.translate({ x: 24 }))
             .animation({ curve: curves.springMotion(0.42, 0.84, 0.18) }))
         } else if (this.activeReading !== undefined) {
           ReadingPage({
@@ -480,7 +519,6 @@ struct Index {
             wordIds: this.vocabularyStudyWordIds,
             initialWordId: this.vocabularyStudyWordId,
             journey: this.currentJourney,
-            learnedGrammarIndex: this.grammarIndex,
             journeyCompletedMask: this.journeyCompletedMask,
             onAsk: (context: AiInquiryContext) => this.openInquiry(context),
             onBack: () => this.closeVocabularyStudy(),
@@ -497,36 +535,40 @@ struct Index {
         HdsTabs({ barPosition: BarPosition.End, index: this.section, controller: this.tabsController }) {
           TabContent() {
             LearnPage({
-              savedLessonIndex: this.grammarIndex,
               kanaKey: this.kanaKey,
               learnedWordCount: this.learnedWordCount,
               videoCount: this.videoCount,
               lastVideoTitle: this.lastVideoTitle,
               readingIndex: this.readingIndex,
               scenarioIndex: this.scenarioIndex,
+              grammarId: this.grammarId,
               onScrollerReady: (scroller: Scroller) => this.bindTabScroller(AppSection.LEARN, scroller),
               onFloatingBarCompactChange: (compact: boolean) => this.setFloatingBarsCompact(compact),
-              onLessonChange: (index: number) => this.saveGrammarIndex(index),
               onOpenKana: () => this.selectSection(AppSection.KANA),
               onOpenVocabulary: () => this.selectSection(AppSection.VOCABULARY),
               onOpenExplore: (tab: number) => this.openExplore(tab),
-              onAsk: (context: AiInquiryContext) => this.openInquiry(context)
+              onOpenGrammar: () => this.openBasicsGrammar()
             })
           }
           .tabBar(BottomTabBarStyle.of(this.tabSymbol(
             $r('sys.symbol.book_pages'), $r('sys.symbol.book_pages_fill')), '旅程'))
 
           TabContent() {
-            KanaPage({
+            BasicsPage({
+              selectedTab: this.basicsTab,
+              grammarId: this.grammarId,
+              grammarOpen: this.activeGrammar !== undefined,
               initialKanaKey: this.kanaKey,
               onScrollerReady: (scroller: Scroller) => this.bindTabScroller(AppSection.KANA, scroller),
               onFloatingBarCompactChange: (compact: boolean) => this.setFloatingBarsCompact(compact),
+              onTabChange: (index: number) => this.saveBasicsTab(index),
               onAsk: (context: AiInquiryContext) => this.openInquiry(context),
-              onKanaChange: (key: string) => this.saveKanaKey(key)
+              onKanaChange: (key: string) => this.saveKanaKey(key),
+              onOpenGrammar: (lesson: GrammarWork) => this.openGrammar(lesson)
             })
           }
           .tabBar(BottomTabBarStyle.of(this.tabSymbol(
-            $r('sys.symbol.character_square'), $r('sys.symbol.character_square_fill')), '五十音'))
+            $r('sys.symbol.character_square'), $r('sys.symbol.character_square_fill')), '基础'))
 
           TabContent() {
             VocabularyPage({
@@ -657,8 +699,10 @@ struct Index {
       onDisappear: () => this.kanaLookupOpen = false
     })
     .padding({
-      left: this.activeReading === undefined && this.activeVideo === undefined ? this.leftSafeInset() : 0,
-      right: this.activeReading === undefined && this.activeVideo === undefined ? this.rightSafeInset() : 0
+      left: this.activeReading === undefined && this.activeVideo === undefined &&
+        this.activeGrammar === undefined ? this.leftSafeInset() : 0,
+      right: this.activeReading === undefined && this.activeVideo === undefined &&
+        this.activeGrammar === undefined ? this.rightSafeInset() : 0
     })
     .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
     .backgroundColor(Color.Transparent)
@@ -691,6 +735,10 @@ struct Index {
   onBackPress(): boolean {
     if (this.inquiryPopupOpen) {
       this.closeInquiry();
+      return true;
+    }
+    if (this.activeGrammar !== undefined) {
+      this.closeGrammar();
       return true;
     }
     if (this.activeReading !== undefined) {

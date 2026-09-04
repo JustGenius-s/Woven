@@ -14,6 +14,13 @@ import { ContentRepository } from '../../services/ContentRepository';
 import { ReadingBookService } from '../../services/ReadingBookService';
 import { VideoLibraryStore } from '../../services/VideoLibraryStore';
 import { FloatingBarScrollTracker } from '../components/FloatingBarScrollTracker';
+import {
+  ContentShelf,
+  SHELF_COVER_HEIGHT,
+  SHELF_COVER_WIDTH,
+  SHELF_VIDEO_HEIGHT,
+  SHELF_VIDEO_WIDTH
+} from '../components/ContentShelf';
 import { CoverCard } from '../components/CoverCard';
 import { PageChrome } from '../components/PageChrome';
 
@@ -38,7 +45,6 @@ export struct ExplorePage {
   @State private catalog: LearningCatalog | undefined = undefined;
   @State private videos: VideoItem[] = [];
   @State private readingWorks: ReadingWork[] = [];
-  @State private readingCategory: string = '全部';
   @State private coverReady: number = 0;
   @State private bookReadyTick: number = 0;
   @State private loadError: string = '';
@@ -61,7 +67,9 @@ export struct ExplorePage {
   private scenarioFloatingBarTracker: FloatingBarScrollTracker = new FloatingBarScrollTracker('explore-scenario');
   private coverPaths: Map<string, string> = new Map();
   private readonly readingCategories: string[] =
-    ['全部', 'L0入门', 'L0', 'L1', 'L2', 'L3', 'L4', 'L5'];
+    ['L0入门', 'L0', 'L1', 'L2', 'L3', 'L4', 'L5'];
+  private readonly videoGroupOrder: string[] =
+    ['哔哩哔哩', 'YouTube', '网络视频', '网页视频', '本地视频'];
 
   aboutToAppear(): void {
     this.onScrollerReady(this.videoScroller);
@@ -113,16 +121,6 @@ export struct ExplorePage {
 
   private cardRightMargin(index: number): number {
     return this.pageWidth >= 700 && index % 2 === 0 ? 14 : 0;
-  }
-
-  private readingCoverRatio(reading: ReadingWork): number {
-    if (reading.coverRatio !== undefined && reading.coverRatio > 0) {
-      return reading.coverRatio;
-    }
-    if (reading.id === 'tadoku-40280') {
-      return 1259 / 1786;
-    }
-    return 0;
   }
 
   private loadCovers(context: common.Context): void {
@@ -180,16 +178,26 @@ export struct ExplorePage {
     return reading.level === category || reading.category === category;
   }
 
-  private filteredReadings(): ReadingWork[] {
-    const selected: string = this.readingCategory;
+  private readingsForCategory(category: string): ReadingWork[] {
     const matched: ReadingWork[] = [];
     for (let index: number = 0; index < this.readingWorks.length; index++) {
       const reading: ReadingWork = this.readingWorks[index];
-      if (this.matchesCategory(reading, selected)) {
+      if (this.matchesCategory(reading, category)) {
         matched.push(reading);
       }
     }
     return matched;
+  }
+
+  private visibleReadingCategories(): string[] {
+    const visible: string[] = [];
+    for (let index: number = 0; index < this.readingCategories.length; index++) {
+      const category: string = this.readingCategories[index];
+      if (this.categoryCount(category) > 0) {
+        visible.push(category);
+      }
+    }
+    return visible;
   }
 
   private categoryCount(category: string): number {
@@ -202,11 +210,25 @@ export struct ExplorePage {
     return count;
   }
 
-  private selectReadingCategory(category: string): void {
-    if (this.readingCategory === category) {
-      return;
+  private videosForGroup(label: string): VideoItem[] {
+    const matched: VideoItem[] = [];
+    for (let index: number = 0; index < this.videos.length; index++) {
+      if (videoSourceLabel(this.videos[index]) === label) {
+        matched.push(this.videos[index]);
+      }
     }
-    this.readingCategory = category;
+    return matched;
+  }
+
+  private visibleVideoGroups(): string[] {
+    const visible: string[] = [];
+    for (let index: number = 0; index < this.videoGroupOrder.length; index++) {
+      const label: string = this.videoGroupOrder[index];
+      if (this.videosForGroup(label).length > 0) {
+        visible.push(label);
+      }
+    }
+    return visible;
   }
 
   private isReadingSelected(reading: ReadingWork): boolean {
@@ -470,71 +492,86 @@ export struct ExplorePage {
       .justifyContent(FlexAlign.Center)
       .padding({ left: 28, right: 28, bottom: FLOATING_TAB_CONTENT_INSET })
     } else {
-      Scroll(this.videoScroller) {
-        Flex({ direction: FlexDirection.Row, wrap: FlexWrap.Wrap }) {
-          ForEach(this.videos, (video: VideoItem, index: number) => {
-            Column() {
-              this.videoCard(video)
-            }
-            .width(this.cardFlowWidth())
-            .margin({ right: this.cardRightMargin(index), bottom: 14 })
-          }, (video: VideoItem) => video.id)
+      List({ space: 8, scroller: this.videoScroller }) {
+        ForEach(this.visibleVideoGroups(), (label: string) => {
+          ListItem() {
+            this.videoShelf(label)
+          }
+        }, (label: string) => label)
+        ListItem() {
+          Column()
+            .height(FLOATING_TAB_CONTENT_INSET)
         }
-        .width('100%')
       }
       .width('100%')
       .height('100%')
-      .padding({ left: 18, right: 18, top: 16, bottom: FLOATING_TAB_CONTENT_INSET })
       .scrollBar(BarState.Off)
       .edgeEffect(EdgeEffect.Spring)
       .clip(false)
-      .onDidScroll((_xOffset: number, _yOffset: number, _scrollState: ScrollState) =>
+      .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) =>
         this.videoFloatingBarTracker.update(this.videoScroller, this.onFloatingBarCompactChange))
     }
   }
 
   @Builder
+  private videoShelf(label: string) {
+    Column() {
+      ContentShelf({
+        title: label,
+        meta: `${this.videosForGroup(label).length} 个`
+      })
+      Scroll() {
+        Row({ space: 10 }) {
+          ForEach(this.videosForGroup(label), (video: VideoItem) => {
+            this.videoCard(video)
+          }, (video: VideoItem) => video.id)
+        }
+        .height(SHELF_VIDEO_HEIGHT)
+        .alignItems(VerticalAlign.Top)
+      }
+      .scrollable(ScrollDirection.Horizontal)
+      .width('100%')
+      .height(SHELF_VIDEO_HEIGHT)
+      .padding({ left: 16, right: 16 })
+      .scrollBar(BarState.Off)
+      .edgeEffect(EdgeEffect.Spring)
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
   private videoCard(video: VideoItem) {
-    Column({ space: 10 }) {
+    Column({ space: 6 }) {
       Row() {
-        Text(videoSourceLabel(video))
-          .fontSize(11)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.immersive_light'))
-          .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-          .borderRadius(13)
-          .backgroundColor('#6617181A')
-        Blank()
         if (this.formatDuration(video.durationMs).length > 0) {
           Text(this.formatDuration(video.durationMs))
-            .fontSize(12)
+            .fontSize(11)
             .fontColor('#D9F7F8FA')
         }
+        Blank()
+        SymbolGlyph($r('sys.symbol.play_circle_fill'))
+          .fontSize(18)
+          .fontColor([$r('app.color.immersive_light')])
       }
       .width('100%')
-
-      Blank()
-
-      SymbolGlyph($r('sys.symbol.play_circle_fill'))
-        .fontSize(36)
-        .fontColor([$r('app.color.immersive_light')])
-        .opacity(0.92)
+      .alignItems(VerticalAlign.Center)
 
       Blank()
 
       Text(video.title)
         .width('100%')
-        .fontSize(22)
+        .fontSize(15)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.immersive_light'))
         .maxLines(2)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
-    .width('100%')
-    .height(220)
+    .width(SHELF_VIDEO_WIDTH)
+    .height(SHELF_VIDEO_HEIGHT)
     .alignItems(HorizontalAlign.Start)
-    .padding(20)
-    .borderRadius(28)
+    .padding(12)
+    .borderRadius(16)
     .linearGradient({
       angle: 135,
       colors: [['#FF2A3340', 0], ['#FF17181A', 1]]
@@ -574,72 +611,69 @@ export struct ExplorePage {
       .justifyContent(FlexAlign.Center)
       .padding({ bottom: FLOATING_TAB_CONTENT_INSET })
     } else {
-    Column() {
-      this.readingCategoryRow()
-      Scroll(this.readingScroller) {
-        Flex({ direction: FlexDirection.Row, wrap: FlexWrap.Wrap }) {
-          ForEach(this.filteredReadings(), (reading: ReadingWork, index: number) => {
-            Column() {
-              this.readingCard(reading)
-            }
-            .width(this.cardFlowWidth())
-            .margin({ right: this.cardRightMargin(index), bottom: 14 })
-          }, (reading: ReadingWork) =>
-            `${reading.id}:${this.coverPath(reading.id)}:${this.isReadingDownloaded(reading) ? '1' : '0'}`)
+      List({ space: 8, scroller: this.readingScroller }) {
+        ForEach(this.visibleReadingCategories(), (category: string) => {
+          ListItem() {
+            this.readingShelf(category)
+          }
+        }, (category: string) => category)
+        ListItem() {
+          Column()
+            .height(FLOATING_TAB_CONTENT_INSET)
         }
-        .width('100%')
       }
       .width('100%')
-      .layoutWeight(1)
-      .padding({ left: 18, right: 18, top: 10, bottom: FLOATING_TAB_CONTENT_INSET })
+      .height('100%')
       .scrollBar(BarState.Off)
       .edgeEffect(EdgeEffect.Spring)
       .clip(false)
-      .onDidScroll((_xOffset: number, _yOffset: number, _scrollState: ScrollState) =>
+      .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) =>
         this.readingFloatingBarTracker.update(this.readingScroller, this.onFloatingBarCompactChange))
     }
-    .width('100%')
-    .height('100%')
-    }
   }
 
   @Builder
-  private readingCategoryRow() {
-    Scroll() {
-      Row({ space: 8 }) {
-        ForEach(this.readingCategories, (category: string) => {
-          Text(`${category} ${this.categoryCount(category)}`)
-            .fontSize(12)
-            .fontWeight(this.readingCategory === category ? FontWeight.Medium : FontWeight.Regular)
-            .fontColor(this.readingCategory === category ? $r('app.color.ink') : $r('app.color.ink_muted'))
-            .padding({ left: 12, right: 12, top: 7, bottom: 7 })
-            .borderRadius(16)
-            .backgroundColor(this.readingCategory === category ?
-              $r('app.color.accent_soft') : $r('app.color.surface_raised'))
-            .onClick(() => this.selectReadingCategory(category))
-        }, (category: string) => category)
+  private readingShelf(category: string) {
+    Column() {
+      ContentShelf({
+        title: category,
+        meta: `${this.categoryCount(category)} 本`
+      })
+      Scroll() {
+        Row({ space: 10 }) {
+          ForEach(this.readingsForCategory(category), (reading: ReadingWork) => {
+            Column() {
+              CoverCard({
+                artwork: this.readingArtwork(),
+                artworkPath: this.coverPath(reading.id),
+                title: reading.title,
+                actionIcon: $r('sys.symbol.book_pages_fill'),
+                selected: this.isReadingSelected(reading),
+                cardWidth: SHELF_COVER_WIDTH,
+                cardHeight: SHELF_COVER_HEIGHT,
+                coverOnly: true,
+                compact: true,
+                downloaded: this.isReadingDownloaded(reading),
+                onOpen: () => this.openReading(reading)
+              })
+            }
+            .width(SHELF_COVER_WIDTH)
+            .height(SHELF_COVER_HEIGHT)
+          }, (reading: ReadingWork) =>
+            `${reading.id}:${this.coverPath(reading.id)}:${this.isReadingDownloaded(reading) ? '1' : '0'}`)
+        }
+        .height(SHELF_COVER_HEIGHT)
+        .alignItems(VerticalAlign.Top)
       }
-      .padding({ left: 18, right: 18, top: 14, bottom: 2 })
+      .scrollable(ScrollDirection.Horizontal)
+      .width('100%')
+      .height(SHELF_COVER_HEIGHT)
+      .padding({ left: 16, right: 16 })
+      .scrollBar(BarState.Off)
+      .edgeEffect(EdgeEffect.Spring)
     }
-    .scrollable(ScrollDirection.Horizontal)
-    .scrollBar(BarState.Off)
-    .edgeEffect(EdgeEffect.Spring)
     .width('100%')
-  }
-
-  @Builder
-  private readingCard(reading: ReadingWork) {
-    CoverCard({
-      artwork: this.readingArtwork(),
-      artworkPath: this.coverPath(reading.id),
-      title: reading.title,
-      actionIcon: $r('sys.symbol.book_pages_fill'),
-      selected: this.isReadingSelected(reading),
-      coverRatio: this.readingCoverRatio(reading),
-      coverOnly: true,
-      downloaded: this.isReadingDownloaded(reading),
-      onOpen: () => this.openReading(reading)
-    })
+    .alignItems(HorizontalAlign.Start)
   }
 
   @Builder

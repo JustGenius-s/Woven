@@ -14,6 +14,7 @@ import { PageChrome } from '../components/PageChrome';
 export struct KanaPage {
   journey: LearningJourney | undefined = undefined;
   initialKanaKey: string = 'あ';
+  embedded: boolean = false;
   onScrollerReady: (scroller: Scroller) => void = (scroller: Scroller) => {};
   onFloatingBarCompactChange: (compact: boolean) => void = (compact: boolean) => {};
   onAsk: (context: AiInquiryContext) => void = (context: AiInquiryContext) => {};
@@ -50,13 +51,21 @@ export struct KanaPage {
   }
 
   build() {
-    PageChrome({
-      title: '五十音',
-      scrollers: [this.pageScroller],
-      pageContent: () => {
+    Column() {
+      if (this.embedded) {
         this.pageContent()
+      } else {
+        PageChrome({
+          title: '五十音',
+          scrollers: [this.pageScroller],
+          pageContent: () => {
+            this.pageContent()
+          }
+        })
       }
-    })
+    }
+    .width('100%')
+    .height('100%')
   }
 
   @Builder

@@ -1,7 +1,7 @@
 import { common } from '@kit.AbilityKit';
 import { curves, window } from '@kit.ArkUI';
 import { MOTION_DURATION, systemGestureInset } from '../../common/AppTheme';
-import { GrammarIndexEntry, LearningJourney, VocabularyEntry } from '../../model/ContentModels';
+import { LearningJourney, VocabularyEntry } from '../../model/ContentModels';
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { AiInquiryFactory } from '../../services/AiInquiryFactory';
 import { ContentRepository } from '../../services/ContentRepository';
@@ -20,7 +20,6 @@ import { PitchAccentMark } from '../components/PitchAccentMark';
 
 const JOURNEY_WORD_STAGE_MASK: number = 1 << 2;
 const JOURNEY_GRAMMAR_STAGE_MASK: number = 1 << 3;
-const RECENT_GRAMMAR_LIMIT: number = 6;
 const RECENT_WORD_LIMIT: number = 16;
 
 @Component
@@ -30,7 +29,6 @@ export struct VocabularyStudyPage {
   wordIds: string[] = [];
   initialWordId: string = '';
   journey: LearningJourney | undefined = undefined;
-  learnedGrammarIndex: number = 0;
   journeyCompletedMask: number = 0;
   onAsk: (context: AiInquiryContext) => void = (context: AiInquiryContext) => {};
   onBack: () => void = () => {};
@@ -40,7 +38,6 @@ export struct VocabularyStudyPage {
   @State private currentWordIndex: number = 0;
   @State private loadError: string = '';
   @State private learnedWords: LearnedVocabularySnapshot[] = [];
-  @State private grammarEntries: GrammarIndexEntry[] = [];
   @State private conversationCount: number = 0;
   @State private pageWidth: number = 360;
   @State private pageHeight: number = 720;
@@ -52,11 +49,6 @@ export struct VocabularyStudyPage {
     JapaneseTtsService.initialize(context);
     this.learnedWords = VocabularyLearningStore.loadLearnedWords(context);
     this.rebuildLearnedIndex(this.learnedWords);
-    try {
-      this.grammarEntries = ContentRepository.loadGrammarIndex(context);
-    } catch (error) {
-      this.grammarEntries = [];
-    }
     this.loadWords();
   }
 
@@ -170,26 +162,8 @@ export struct VocabularyStudyPage {
     }
   }
 
-  private learnedGrammarCount(): number {
-    if (this.grammarEntries.length === 0) {
-      return 0;
-    }
-    return Math.min(this.grammarEntries.length, Math.max(0, this.learnedGrammarIndex + 1));
-  }
-
   private learningContext(item: VocabularyEntry): string {
-    const grammarEnd: number = this.learnedGrammarCount();
-    const grammarStart: number = Math.max(0, grammarEnd - RECENT_GRAMMAR_LIMIT);
     let result: string = `目标词：${item.word}（${item.reading}）\n`;
-    if (grammarEnd > 0) {
-      result += '最近学习的语法：\n';
-      for (let index: number = grammarStart; index < grammarEnd; index++) {
-        const entry: GrammarIndexEntry = this.grammarEntries[index];
-        result += `- ${entry.title}：${entry.summary}\n`;
-      }
-    } else {
-      result += '最近学习的语法：暂无记录\n';
-    }
 
     const wordStart: number = Math.max(0, this.learnedWords.length - RECENT_WORD_LIMIT);
     if (this.learnedWords.length > 0) {

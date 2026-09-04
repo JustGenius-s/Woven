@@ -152,7 +152,6 @@ export interface LearningJourney {
   kana: JourneyKanaFocus[];
   vocabularyLevel: string;
   wordIds: string[];
-  grammarLessonId: string;
   grammarPattern: string;
   grammarMeaning: string;
   grammarExamples: string[];
@@ -176,59 +175,8 @@ export interface ContentManifestVocabulary {
   extraPitchCoverage?: number;
 }
 
-export interface ContentManifestGrammar {
-  totalLessons: number;
-  totalSections: number;
-}
-
 export interface ContentManifest {
   vocabulary: ContentManifestVocabulary;
-  grammar: ContentManifestGrammar;
-}
-
-export interface GrammarIndexEntry {
-  id: string;
-  level: string;
-  order: number;
-  title: string;
-  summary: string;
-  sectionCount: number;
-}
-
-export interface GrammarLesson {
-  id: string;
-  level: string;
-  order: number;
-  title: string;
-  summary: string;
-  sectionCount: number;
-  content: string;
-}
-
-export interface GrammarVocabularyEntry {
-  word: string;
-  reading: string;
-  meaning: string;
-}
-
-export interface GrammarBlock {
-  kind: string;
-  text: string;
-  cells: string[][];
-  ordered?: boolean;
-}
-
-export interface GrammarDocument {
-  blocks: GrammarBlock[];
-  vocabulary: GrammarVocabularyEntry[];
-}
-
-export interface InlineSegment {
-  text: string;
-  word: string;
-  reading: string;
-  meaning: string;
-  annotated: boolean;
 }
 
 export interface VocabularyExample {

@@ -1,6 +1,7 @@
 import { common } from '@kit.AbilityKit';
-import { ChipGroup, ChipGroupItemOptions, ChipSize, curves } from '@kit.ArkUI';
-import { FLOATING_TAB_CONTENT_INSET, MOTION_DURATION } from '../../common/AppTheme';
+import { LengthMetrics } from '@kit.ArkUI';
+import { OperationType, SubHeader } from '@ohos.arkui.advanced.SubHeader';
+import { FLOATING_TAB_CONTENT_INSET } from '../../common/AppTheme';
 import { LearningJourney, VocabularyEntry } from '../../model/ContentModels';
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { AiInquiryFactory } from '../../services/AiInquiryFactory';
@@ -14,6 +15,11 @@ import {
 } from '../../services/VocabularyLearningStore';
 import { aiTextSelectionMenu } from '../components/AiTextSelection';
 import { FloatingBarScrollTracker } from '../components/FloatingBarScrollTracker';
+import {
+  ContentShelf,
+  SHELF_LEVEL_HEIGHT,
+  SHELF_LEVEL_WIDTH
+} from '../components/ContentShelf';
 import { CoverCard } from '../components/CoverCard';
 import { planeLightEffect } from '../components/ImmersiveCanvas';
 import { PageChrome } from '../components/PageChrome';
@@ -38,8 +44,7 @@ export struct VocabularyPage {
   @State private resultCount: number = 0;
   @State private loadError: string = '';
   @State private learnedWords: LearnedVocabularySnapshot[] = [];
-  @State private heroIndex: number = 0;
-  @State private pageWidth: number = 360;
+  @State private levelCounts: number[] = [];
   private dataSource: VocabularyDataSource = new VocabularyDataSource();
   private learnedWordIds: Set<string> = new Set<string>();
   private homeScroller: Scroller = new Scroller();
@@ -56,6 +61,19 @@ export struct VocabularyPage {
     this.rebuildLearnedIndex(this.learnedWords);
     this.level = this.journey?.vocabularyLevel ?? 'N5';
     this.loadLevel(this.level);
+    this.loadLevelCounts(context);
+  }
+
+  private loadLevelCounts(context: common.Context): void {
+    const counts: number[] = [];
+    for (let index: number = 0; index < VOCABULARY_LEVELS.length; index++) {
+      try {
+        counts.push(ContentRepository.loadVocabulary(context, VOCABULARY_LEVELS[index]).length);
+      } catch (_error) {
+        counts.push(0);
+      }
+    }
+    this.levelCounts = counts;
   }
 
   private loadLevel(level: string): void {
@@ -101,16 +119,6 @@ export struct VocabularyPage {
     return this.learnedWordIds.has(id);
   }
 
-  private learnedInLevel(): number {
-    let count: number = 0;
-    for (let index: number = 0; index < this.source.length; index++) {
-      if (this.containsLearnedWord(this.source[index].id)) {
-        count++;
-      }
-    }
-    return count;
-  }
-
   private entriesToIds(items: VocabularyEntry[]): string[] {
     const ids: string[] = [];
     for (let index: number = 0; index < items.length; index++) {
@@ -128,7 +136,11 @@ export struct VocabularyPage {
     return items.length > 0 ? items[0].id : '';
   }
 
-  private openLevelDeck(): void {
+  private openLevelCover(level: string): void {
+    if (level !== this.level) {
+      this.query = '';
+      this.loadLevel(level);
+    }
     if (this.source.length === 0) {
       return;
     }
@@ -156,8 +168,8 @@ export struct VocabularyPage {
       `读音：${item.reading}\n释义：${item.meanings.join('；')}`));
   }
 
-  private levelCaption(): string {
-    switch (this.level) {
+  private levelCaption(level: string = this.level): string {
+    switch (level) {
       case '日常':
         return '高频常用';
       case '一般':
@@ -220,21 +232,6 @@ export struct VocabularyPage {
       `${item.reading}  ${meaning}`;
   }
 
-  private levelProgress(): number {
-    if (this.source.length === 0) {
-      return 0;
-    }
-    return this.learnedInLevel() / this.source.length;
-  }
-
-  private progressPercent(progress: number): string {
-    const percent: number = Math.max(0, Math.min(1, progress)) * 100;
-    if (percent > 0 && percent < 1) {
-      return '<1%';
-    }
-    return `${Math.round(percent)}%`;
-  }
-
   private recentLearnedEntries(): VocabularyEntry[] {
     const entries: VocabularyEntry[] = [];
     for (let learnedIndex: number = this.learnedWords.length - 1;
@@ -249,49 +246,19 @@ export struct VocabularyPage {
     return entries;
   }
 
-  private heroDisplayCount(): number {
-    return this.pageWidth >= 700 && this.journey !== undefined ? 2 : 1;
+  private levelCount(index: number): number {
+    if (index < 0 || index >= this.levelCounts.length) {
+      return 0;
+    }
+    return this.levelCounts[index];
   }
 
-  private levelChipItems(): ChipGroupItemOptions[] {
-    const items: ChipGroupItemOptions[] = [];
-    for (let index: number = 0; index < VOCABULARY_LEVELS.length; index++) {
-      const level: string = VOCABULARY_LEVELS[index];
-      items.push({
-        label: { text: level },
-        accessibilityDescription: `切换到 ${level} 词库`
-      });
+  private vocabularyTotal(): number {
+    let total: number = 0;
+    for (let index: number = 0; index < this.levelCounts.length; index++) {
+      total += this.levelCounts[index];
     }
-    return items;
-  }
-
-  private selectedLevelIndexes(): number[] {
-    const index: number = VOCABULARY_LEVELS.indexOf(this.level);
-    return [index >= 0 ? index : 0];
-  }
-
-  private selectLevelIndexes(indexes: number[]): void {
-    if (indexes.length === 0) {
-      return;
-    }
-    const index: number = indexes[indexes.length - 1];
-    if (index < 0 || index >= VOCABULARY_LEVELS.length) {
-      return;
-    }
-    const nextLevel: string = VOCABULARY_LEVELS[index];
-    if (nextLevel === this.level) {
-      return;
-    }
-    this.query = '';
-    this.heroIndex = 0;
-    this.loadLevel(nextLevel);
-  }
-
-  private updatePageWidth(width: Length): void {
-    const next: number = typeof width === 'number' ? width : Number.parseFloat(width as string);
-    if (!Number.isNaN(next) && next > 0) {
-      this.pageWidth = next;
-    }
+    return total;
   }
 
   private openSearch(): void {
@@ -319,12 +286,8 @@ export struct VocabularyPage {
           title: '词库',
           largeTitle: false,
           showSearchAction: true,
-          bottomHeight: 52,
           scrollers: [this.homeScroller, this.searchScroller],
           onSearch: () => this.openSearch(),
-          bottomContent: () => {
-            this.levelChips()
-          },
           pageContent: () => {
             this.vocabularyContent()
           }
@@ -334,30 +297,6 @@ export struct VocabularyPage {
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Transparent)
-    .onAreaChange((oldArea: Area, newArea: Area) => this.updatePageWidth(newArea.width))
-  }
-
-  @Builder
-  private levelChips() {
-    ChipGroup({
-      items: this.levelChipItems(),
-      selectedIndexes: this.selectedLevelIndexes(),
-      multiple: false,
-      itemStyle: {
-        size: ChipSize.NORMAL
-      },
-      chipGroupSpace: {
-        itemSpace: 8,
-        startSpace: 20,
-        endSpace: 20
-      },
-      chipGroupPadding: {
-        top: 4,
-        bottom: 8
-      },
-      onChange: (indexes: number[]) => this.selectLevelIndexes(indexes)
-    })
-    .width('100%')
   }
 
   @Builder
@@ -408,52 +347,39 @@ export struct VocabularyPage {
 
   @Builder
   private vocabularyHome() {
-    List({ space: 0, scroller: this.homeScroller }) {
-      ListItem() {
-        Column() {
-          Swiper() {
-            this.levelDeck()
-            if (this.journey !== undefined) {
-              this.journeyDeck()
-            }
-          }
-          .index(this.heroIndex)
-          .displayCount(this.heroDisplayCount())
-          .nextMargin(this.heroDisplayCount() === 1 && this.journey !== undefined ? 34 : 0, true)
-          .indicator(false)
-          .loop(false)
-          .duration(MOTION_DURATION)
-          .curve(curves.springMotion(0.42, 0.86, 0.16))
-          .itemSpace(this.heroDisplayCount() === 1 ? 12 : 16)
-          .height(304)
-          .width('100%')
-          .onChange((index: number) => this.heroIndex = index)
+    List({ space: 8, scroller: this.homeScroller }) {
+      if (this.journey !== undefined) {
+        ListItem() {
+          this.journeyShelf()
         }
-        // Swiper has no padding attribute, so the side insets belong on the
-        // wrapper: this keeps the deck aligned with the 20vp gutters used by
-        // the sections below and stops the nextMargin peek from spilling past
-        // the screen edge.
-        .width('100%')
-        .padding({ left: 20, right: 20 })
+      }
+
+      ListItem() {
+        this.levelShelf()
       }
 
       if (this.recentLearnedEntries().length > 0) {
         ListItem() {
           Column() {
-            Text('最近已学')
-              .width('100%')
-              .fontSize(24)
-              .fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.ink'))
-              .margin({ bottom: 8 })
-
-            ForEach(this.recentLearnedEntries(), (item: VocabularyEntry) => {
-              this.wordRow(item, this.source)
-            }, (item: VocabularyEntry) => item.id)
+            SubHeader({
+              primaryTitle: '最近已学',
+              operationType: OperationType.BUTTON,
+              operationItem: [{ value: `${this.recentLearnedEntries().length} 个` }],
+              contentMargin: {
+                start: LengthMetrics.vp(16),
+                end: LengthMetrics.vp(16)
+              }
+            })
+            Column() {
+              ForEach(this.recentLearnedEntries(), (item: VocabularyEntry) => {
+                this.wordRow(item, this.source)
+              }, (item: VocabularyEntry) => item.id)
+            }
+            .width('100%')
+            .padding({ left: 16, right: 16 })
           }
           .width('100%')
           .alignItems(HorizontalAlign.Start)
-          .padding({ left: 20, right: 20, top: 28 })
         }
       }
 
@@ -472,31 +398,80 @@ export struct VocabularyPage {
   }
 
   @Builder
-  private levelDeck() {
-    CoverCard({
-      artwork: this.levelArtwork(this.level),
-      badge: this.level,
-      meta: `${this.source.length} 个`,
-      title: this.levelCaption(),
-      subtitle: `已学 ${this.progressPercent(this.levelProgress())}`,
-      footer: `${this.source.length} 个单词`,
-      actionLabel: this.learnedInLevel() > 0 ? '继续' : '开始',
-      onOpen: () => this.openLevelDeck()
-    })
+  private journeyShelf() {
+    Column() {
+      ContentShelf({
+        title: '当前旅程',
+        meta: `${this.journey?.wordIds.length ?? 0} 个核心词`
+      })
+      Scroll() {
+        Row({ space: 10 }) {
+          Column() {
+            CoverCard({
+              artwork: $r('app.media.journey_vocabulary'),
+              badge: '旅程',
+              title: this.journey?.title ?? '',
+              subtitle: this.journey?.setting ?? '',
+              compact: true,
+              cardWidth: SHELF_LEVEL_WIDTH,
+              cardHeight: SHELF_LEVEL_HEIGHT,
+              onOpen: () => this.openJourneyDeck()
+            })
+          }
+          .width(SHELF_LEVEL_WIDTH)
+          .height(SHELF_LEVEL_HEIGHT)
+        }
+        .height(SHELF_LEVEL_HEIGHT)
+        .alignItems(VerticalAlign.Top)
+      }
+      .scrollable(ScrollDirection.Horizontal)
+      .width('100%')
+      .height(SHELF_LEVEL_HEIGHT)
+      .padding({ left: 16, right: 16 })
+      .scrollBar(BarState.Off)
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
   }
 
   @Builder
-  private journeyDeck() {
-    CoverCard({
-      artwork: $r('app.media.journey_vocabulary'),
-      badge: '当前旅程',
-      meta: `${this.journey?.wordIds.length ?? 0} 个核心词`,
-      title: this.journey?.title ?? '',
-      subtitle: this.journey?.setting ?? '',
-      footer: this.journey?.japaneseTitle ?? '',
-      actionLabel: '进入',
-      onOpen: () => this.openJourneyDeck()
-    })
+  private levelShelf() {
+    Column() {
+      ContentShelf({
+        title: '词库',
+        meta: `${this.vocabularyTotal()} 个词`
+      })
+      Scroll() {
+        Row({ space: 10 }) {
+          ForEach(VOCABULARY_LEVELS, (level: string, index: number) => {
+            Column() {
+              CoverCard({
+                artwork: this.levelArtwork(level),
+                badge: level,
+                meta: `${this.levelCount(index)} 个`,
+                title: this.levelCaption(level),
+                compact: true,
+                cardWidth: SHELF_LEVEL_WIDTH,
+                cardHeight: SHELF_LEVEL_HEIGHT,
+                onOpen: () => this.openLevelCover(level)
+              })
+            }
+            .width(SHELF_LEVEL_WIDTH)
+            .height(SHELF_LEVEL_HEIGHT)
+          }, (level: string) => level)
+        }
+        .height(SHELF_LEVEL_HEIGHT)
+        .alignItems(VerticalAlign.Top)
+      }
+      .scrollable(ScrollDirection.Horizontal)
+      .width('100%')
+      .height(SHELF_LEVEL_HEIGHT)
+      .padding({ left: 16, right: 16 })
+      .scrollBar(BarState.Off)
+      .edgeEffect(EdgeEffect.Spring)
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
   }
 
   @Builder

@@ -5,6 +5,7 @@ import { curves } from '@kit.ArkUI';
 export struct ImmersiveBackdrop {
   @BuilderParam canvasContent: () => void = this.emptyContent;
   @Prop sceneToneIndex: number = -1;
+  @Prop paper: boolean = false;
 
   @State private settled: boolean = false;
 
@@ -37,7 +38,7 @@ export struct ImmersiveBackdrop {
 
   build() {
     Stack() {
-      if (this.sceneToneIndex >= 0) {
+      if (!this.paper && this.sceneToneIndex >= 0) {
         Column()
           .width('100%')
           .height('100%')
@@ -49,31 +50,33 @@ export struct ImmersiveBackdrop {
           .hitTestBehavior(HitTestMode.None)
       }
 
-      Column()
-        .width(500)
-        .height(500)
-        .borderRadius(250)
-        .border({ width: 1.5, color: $r('app.color.accent') })
-        .opacity(this.settled ? (this.sceneToneIndex >= 0 ? 0.035 : 0.08) : 0)
-        .scale({ x: this.settled ? 1 : 0.68, y: this.settled ? 1 : 0.68 })
-        .position({ x: -258, y: -210 })
-        .animation({ curve: curves.springMotion(0.62, 0.9, 0.12) })
-        .hitTestBehavior(HitTestMode.None)
+      if (!this.paper) {
+        Column()
+          .width(500)
+          .height(500)
+          .borderRadius(250)
+          .border({ width: 1.5, color: $r('app.color.accent') })
+          .opacity(this.settled ? (this.sceneToneIndex >= 0 ? 0.035 : 0.08) : 0)
+          .scale({ x: this.settled ? 1 : 0.68, y: this.settled ? 1 : 0.68 })
+          .position({ x: -258, y: -210 })
+          .animation({ curve: curves.springMotion(0.62, 0.9, 0.12) })
+          .hitTestBehavior(HitTestMode.None)
 
-      Column()
-        .width(280)
-        .height(280)
-        .borderRadius(140)
-        .radialGradient({
-          center: ['42%', '38%'],
-          radius: '50%',
-          colors: [[$r('app.color.gravity_glow'), 0], [Color.Transparent, 1]]
-        })
-        .opacity(this.settled ? (this.sceneToneIndex >= 0 ? 0.34 : 1) : 0)
-        .translate({ x: this.settled ? -18 : 28, y: this.settled ? 14 : 48 })
-        .position({ x: '56%', y: 360 })
-        .animation({ curve: curves.springMotion(0.72, 0.92, 0.1) })
-        .hitTestBehavior(HitTestMode.None)
+        Column()
+          .width(280)
+          .height(280)
+          .borderRadius(140)
+          .radialGradient({
+            center: ['42%', '38%'],
+            radius: '50%',
+            colors: [[$r('app.color.gravity_glow'), 0], [Color.Transparent, 1]]
+          })
+          .opacity(this.settled ? (this.sceneToneIndex >= 0 ? 0.34 : 1) : 0)
+          .translate({ x: this.settled ? -18 : 28, y: this.settled ? 14 : 48 })
+          .position({ x: '56%', y: 360 })
+          .animation({ curve: curves.springMotion(0.72, 0.92, 0.1) })
+          .hitTestBehavior(HitTestMode.None)
+      }
 
       this.canvasContent()
     }
@@ -84,7 +87,8 @@ export struct ImmersiveBackdrop {
     // An opaque backdrop sits above the HdsNavigation material layer and
     // cancels the immersive effect. Keep it transparent for the neutral tone;
     // the EntryAbility window background supplies the surface color.
-    .backgroundColor(this.sceneToneIndex >= 0 ? this.sceneTone() : Color.Transparent)
+    .backgroundColor(this.paper ? Color.White :
+      (this.sceneToneIndex >= 0 ? this.sceneTone() : Color.Transparent))
   }
 }
 

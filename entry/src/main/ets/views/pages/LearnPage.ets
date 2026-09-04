@@ -3,38 +3,34 @@ import { curves } from '@kit.ArkUI';
 import { FLOATING_TAB_CONTENT_INSET } from '../../common/AppTheme';
 import {
   ContentManifest,
-  GrammarIndexEntry,
   KanaCell,
   KanaRow,
   LearningCatalog,
   ReadingWork
 } from '../../model/ContentModels';
-import { AiInquiryContext } from '../../model/DeepSeekModels';
+import { GrammarWork } from '../../model/GrammarModels';
 import { ContentRepository } from '../../services/ContentRepository';
 import { FloatingBarScrollTracker } from '../components/FloatingBarScrollTracker';
 import { planeLightEffect } from '../components/ImmersiveCanvas';
 import { PageChrome } from '../components/PageChrome';
-import { GrammarPage } from './GrammarPage';
 
 @Component
 export struct LearnPage {
-  savedLessonIndex: number = 0;
   kanaKey: string = 'あ';
   learnedWordCount: number = 0;
   videoCount: number = 0;
   lastVideoTitle: string = '';
   readingIndex: number = -1;
   scenarioIndex: number = -1;
+  grammarId: string = '';
   onScrollerReady: (scroller: Scroller) => void = (scroller: Scroller) => {};
   onFloatingBarCompactChange: (compact: boolean) => void = (compact: boolean) => {};
-  onLessonChange: (index: number) => void = (index: number) => {};
   onOpenKana: () => void = () => {};
   onOpenVocabulary: () => void = () => {};
   onOpenExplore: (tab: number) => void = (tab: number) => {};
-  onAsk: (context: AiInquiryContext) => void = (context: AiInquiryContext) => {};
+  onOpenGrammar: () => void = () => {};
 
-  @State private mode: number = 0;
-  @State private grammarIndex: GrammarIndexEntry[] = [];
+  @State private grammarWorks: GrammarWork[] = [];
   @State private catalog: LearningCatalog | undefined = undefined;
   @State private readingWorks: ReadingWork[] = [];
   @State private manifest: ContentManifest | undefined = undefined;
@@ -47,12 +43,13 @@ export struct LearnPage {
     this.onScrollerReady(this.progressScroller);
     try {
       const context: common.Context = this.getUIContext().getHostContext() as common.Context;
-      this.grammarIndex = ContentRepository.loadGrammarIndex(context);
+      this.grammarWorks = ContentRepository.loadGrammarWorks(context);
       this.catalog = ContentRepository.loadCatalog(context);
       this.readingWorks = ContentRepository.loadReadingWorks(context);
       this.manifest = ContentRepository.loadManifest(context);
       this.loadError = '';
       void this.refreshReadings(context);
+      void this.refreshGrammar(context);
     } catch (error) {
       this.loadError = '学习进度没有正确载入';
     }
@@ -62,14 +59,16 @@ export struct LearnPage {
     try {
       this.readingWorks = await ContentRepository.prefetchReadings(context);
     } catch (error) {
-      // Keep the bundled Aozora list if the catalog is offline.
+      // Keep the last catalog if the network is offline.
     }
   }
 
-  private changeMode(mode: number): void {
-    this.getUIContext().animateTo({ curve: curves.springMotion(0.4, 0.86, 0.16) }, () => {
-      this.mode = mode;
-    });
+  private async refreshGrammar(context: common.Context): Promise<void> {
+    try {
+      this.grammarWorks = await ContentRepository.prefetchGrammar(context);
+    } catch (error) {
+      // Keep the cached Irodori list if the catalog is offline.
+    }
   }
 
   private clampIndex(index: number, count: number): number {
@@ -133,14 +132,42 @@ export struct LearnPage {
     return index >= 0 && index < cells.length ? `发音 ${cells[index].romaji}` : '从清音开始';
   }
 
+  private currentGrammar(): GrammarWork | undefined {
+    for (let index: number = 0; index < this.grammarWorks.length; index++) {
+      if (this.grammarWorks[index].id === this.grammarId) {
+        return this.grammarWorks[index];
+      }
+    }
+    return undefined;
+  }
+
   private grammarDetail(): string {
-    const index: number = this.clampIndex(this.savedLessonIndex, this.grammarIndex.length);
-    return index >= 0 ? this.grammarIndex[index].title : '尚未开始';
+    const lesson: GrammarWork | undefined = this.currentGrammar();
+    if (lesson === undefined) {
+      return this.grammarWorks.length > 0 ? 'Irodori 生活の日本語' : '尚未开始';
+    }
+    return lesson.titleJa.length > 0 ? lesson.titleJa : lesson.title;
   }
 
   private grammarCaption(): string {
-    const index: number = this.clampIndex(this.savedLessonIndex, this.grammarIndex.length);
-    return index >= 0 ? `${this.grammarIndex[index].level} · 第 ${index + 1} 课` : '尚未开始';
+    const lesson: GrammarWork | undefined = this.currentGrammar();
+    if (lesson === undefined) {
+      return '入门 · 初级1 · 初级2';
+    }
+    return lesson.lessonNo === 0 ? lesson.level : `${lesson.level} · 第 ${lesson.lessonNo} 课`;
+  }
+
+  private grammarProgressIndex(): number {
+    const lesson: GrammarWork | undefined = this.currentGrammar();
+    if (lesson === undefined) {
+      return 0;
+    }
+    for (let index: number = 0; index < this.grammarWorks.length; index++) {
+      if (this.grammarWorks[index].id === lesson.id) {
+        return index + 1;
+      }
+    }
+    return 0;
   }
 
   private videoHeadline(): string {
@@ -193,20 +220,7 @@ export struct LearnPage {
   }
 
   build() {
-    if (this.mode === 1) {
-      GrammarPage({
-        entries: this.grammarIndex,
-        initialIndex: this.savedLessonIndex,
-        onIndexChange: this.onLessonChange,
-        onAsk: this.onAsk,
-        onBack: () => this.changeMode(0)
-      })
-      .transition(TransitionEffect.OPACITY
-        .combine(TransitionEffect.translate({ x: 20 }))
-        .animation({ curve: curves.springMotion(0.4, 0.86, 0.16) }))
-    } else {
-      this.progressHome()
-    }
+    this.progressHome()
   }
 
   @Builder
@@ -263,15 +277,15 @@ export struct LearnPage {
           ListItem() {
             this.journeyCard(
               2,
-              '语法',
+              '文法',
               this.grammarDetail(),
               this.grammarCaption(),
-              `${Math.min(this.savedLessonIndex + 1, this.grammarIndex.length)} / ${this.grammarIndex.length}`,
+              `${this.grammarProgressIndex()} / ${this.grammarWorks.length}`,
               $r('app.media.journey_grammar'),
               $r('sys.symbol.bookmark_fill'),
               $r('app.color.word_card_green'),
-              this.progress(this.savedLessonIndex + 1, this.grammarIndex.length),
-              () => this.changeMode(1))
+              this.progress(this.grammarProgressIndex(), this.grammarWorks.length),
+              () => this.onOpenGrammar())
           }
 
           ListItem() {

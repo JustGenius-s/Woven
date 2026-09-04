@@ -22,21 +22,46 @@ export struct CoverCard {
   @Prop actionLabel: string = '';
   @Prop actionEnabled: boolean = true;
   @Prop selected: boolean = false;
+  @Prop cardWidth: number = 0;
   @Prop cardHeight: number = 304;
   @Prop coverRatio: number = 0;
   @Prop coverOnly: boolean = false;
   @Prop downloaded: boolean = false;
+  @Prop compact: boolean = false;
   onOpen: () => void = () => {};
 
+  private plateRadius(): number {
+    return this.compact ? 16 : 28;
+  }
+
+  private chromePad(): number {
+    return this.compact ? 8 : 16;
+  }
+
+  private chromeSize(): number {
+    return this.compact ? 32 : 40;
+  }
+
+  private chromeIcon(): number {
+    return this.compact ? 16 : 22;
+  }
+
+  private plateWidth(): Length {
+    if (this.cardWidth > 0) {
+      return this.cardWidth;
+    }
+    return '100%';
+  }
+
   build() {
-    if (this.coverRatio > 0) {
+    if (!this.compact && this.coverRatio > 0) {
       Column() {
         this.coverStack()
       }
-      .width('100%')
+      .width(this.plateWidth())
       .aspectRatio(this.coverRatio)
       .backgroundColor(Color.White)
-      .borderRadius(28)
+      .borderRadius(this.plateRadius())
       .clip(true)
       .border({
         width: this.selected ? 1.5 : 0.5,
@@ -49,15 +74,15 @@ export struct CoverCard {
       Column() {
         this.coverStack()
       }
-      .width('100%')
+      .width(this.plateWidth())
       .height(this.cardHeight)
-      .borderRadius(28)
+      .backgroundColor(Color.White)
+      .borderRadius(this.plateRadius())
       .clip(true)
       .border({
         width: this.selected ? 1.5 : 0.5,
         color: this.selected ? $r('app.color.accent') : $r('app.color.line')
       })
-      .visualEffect(planeLightEffect())
       .accessibilityText(this.accessLabel())
       .onClick(() => this.onOpen())
     }
@@ -66,19 +91,19 @@ export struct CoverCard {
   @Builder
   private coverStack() {
     Stack({ alignContent: Alignment.BottomStart }) {
+      Image(this.artwork)
+        .width(this.imageWidth())
+        .height(this.imageHeight())
+        .objectFit(ImageFit.Cover)
+        .hitTestBehavior(HitTestMode.None)
+
       if (this.artworkPath.length > 0) {
         Image(this.coverUri())
-          .width('100%')
-          .height('100%')
+          .width(this.imageWidth())
+          .height(this.imageHeight())
           .objectFit(ImageFit.Cover)
-          .interpolation(ImageInterpolation.High)
+          .interpolation(ImageInterpolation.Medium)
           .syncLoad(true)
-          .hitTestBehavior(HitTestMode.None)
-      } else {
-        Image(this.artwork)
-          .width('100%')
-          .height('100%')
-          .objectFit(ImageFit.Cover)
           .hitTestBehavior(HitTestMode.None)
       }
 
@@ -88,8 +113,22 @@ export struct CoverCard {
         this.coverOverlay()
       }
     }
-    .width('100%')
-    .height('100%')
+    .width(this.imageWidth())
+    .height(this.imageHeight())
+  }
+
+  private imageWidth(): Length {
+    if (this.compact && this.cardWidth > 0) {
+      return this.cardWidth;
+    }
+    return '100%';
+  }
+
+  private imageHeight(): Length {
+    if (this.compact && this.cardHeight > 0) {
+      return this.cardHeight;
+    }
+    return '100%';
   }
 
   @Builder
@@ -97,13 +136,13 @@ export struct CoverCard {
     Row() {
       Stack({ alignContent: Alignment.Center }) {
         SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
-          .fontSize(22)
+          .fontSize(this.chromeIcon())
           .fontColor([$r('sys.color.icon_primary')])
           .opacity(this.downloaded ? 1 : 0.28)
       }
-      .width(40)
-      .height(40)
-      .borderRadius(20)
+      .width(this.chromeSize())
+      .height(this.chromeSize())
+      .borderRadius(this.chromeSize() / 2)
       .backgroundColor(Color.Transparent)
       .systemMaterial(FLOATING_ULTRA_THIN_MATERIAL)
       .hitTestBehavior(HitTestMode.None)
@@ -113,7 +152,7 @@ export struct CoverCard {
     }
     .width('100%')
     .alignItems(VerticalAlign.Center)
-    .padding(16)
+    .padding(this.chromePad())
   }
 
   @Builder
@@ -155,10 +194,10 @@ export struct CoverCard {
 
         Text(this.title)
           .width('100%')
-          .fontSize(28)
+          .fontSize(this.compact ? 17 : 28)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.immersive_light'))
-          .maxLines(1)
+          .maxLines(this.compact ? 2 : 1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
 
         if (this.subtitle.length > 0) {
@@ -198,7 +237,7 @@ export struct CoverCard {
       .width('100%')
       .height('100%')
       .alignItems(HorizontalAlign.Start)
-      .padding(20)
+      .padding(this.compact ? 12 : 20)
     }
     .width('100%')
     .height('100%')
@@ -216,23 +255,23 @@ export struct CoverCard {
     } else if (this.coverOnly) {
       Button({ type: ButtonType.Circle, stateEffect: true }) {
         SymbolGlyph(this.actionIcon)
-          .fontSize(20)
+          .fontSize(this.compact ? 16 : 20)
           .fontColor([$r('sys.color.icon_primary')])
       }
-      .width(40)
-      .height(40)
+      .width(this.chromeSize())
+      .height(this.chromeSize())
       .buttonStyle(ButtonStyleMode.NORMAL)
       .backgroundColor(Color.Transparent)
       .systemMaterial(FLOATING_ULTRA_THIN_MATERIAL)
     } else {
       Stack({ alignContent: Alignment.Center }) {
         SymbolGlyph(this.actionIcon)
-          .fontSize(24)
+          .fontSize(this.compact ? 18 : 24)
           .fontColor([$r('app.color.ink')])
       }
-      .width(40)
-      .height(40)
-      .borderRadius(20)
+      .width(this.chromeSize())
+      .height(this.chromeSize())
+      .borderRadius(this.chromeSize() / 2)
       .backgroundColor($r('app.color.immersive_light'))
     }
   }

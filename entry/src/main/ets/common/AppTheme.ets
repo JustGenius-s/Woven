@@ -1,5 +1,32 @@
 import { window } from '@kit.ArkUI';
 
+let readerPaperActive: boolean = false;
+let mainWindow: window.Window | undefined = undefined;
+let restSurfaceColor: string = '#F2F4F7';
+
+export function bindMainWindow(win: window.Window): void {
+  mainWindow = win;
+}
+
+export function rememberSurfaceColor(color: string): void {
+  restSurfaceColor = color;
+}
+
+export function isReaderPaperActive(): boolean {
+  return readerPaperActive;
+}
+
+export function applyReaderPaper(active: boolean): void {
+  readerPaperActive = active;
+  if (mainWindow === undefined) {
+    return;
+  }
+  try {
+    mainWindow.setWindowBackgroundColor(active ? '#FFFFFF' : restSurfaceColor);
+  } catch {
+  }
+}
+
 export const APP_HORIZONTAL_PADDING: number = 24;
 export const FLOATING_TAB_BAR_BOTTOM_MARGIN: number = 12;
 // Bottom breathing room for scroll content so the floating tab bar (and the
