@@ -33,12 +33,20 @@ export class ContentRepository {
     return ReadingCloudStore.cached(context);
   }
 
+  static async loadReadingWorksAsync(context: common.Context): Promise<ReadingWork[]> {
+    return await ReadingCloudStore.cachedAsync(context);
+  }
+
   static async prefetchReadings(context: common.Context): Promise<ReadingWork[]> {
     return await ReadingCloudStore.refresh(context);
   }
 
   static loadGrammarWorks(context: common.Context): GrammarWork[] {
     return GrammarCloudStore.cached(context);
+  }
+
+  static async loadGrammarWorksAsync(context: common.Context): Promise<GrammarWork[]> {
+    return await GrammarCloudStore.cachedAsync(context);
   }
 
   static async prefetchGrammar(context: common.Context): Promise<GrammarWork[]> {

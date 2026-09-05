@@ -59,6 +59,13 @@ export class GrammarCloudStore {
     return GrammarCloudStore.readDiskCache(context);
   }
 
+  static async cachedAsync(context: common.Context): Promise<GrammarWork[]> {
+    if (GrammarCloudStore.memory.length > 0) {
+      return GrammarCloudStore.memory;
+    }
+    return await GrammarCloudStore.readDiskCacheAsync(context);
+  }
+
   static async refresh(context: common.Context): Promise<GrammarWork[]> {
     if (GrammarCloudStore.inflight !== undefined) {
       return GrammarCloudStore.inflight;
@@ -105,7 +112,7 @@ export class GrammarCloudStore {
       works.push(GrammarCloudStore.toWork(rows[index]));
     }
     GrammarCloudStore.memory = works;
-    GrammarCloudStore.writeDiskCache(context, works);
+    await GrammarCloudStore.writeDiskCacheAsync(context, works);
     return works;
   }
 
@@ -226,15 +233,32 @@ export class GrammarCloudStore {
     }
   }
 
-  private static writeDiskCache(context: common.Context, works: GrammarWork[]): void {
+  private static async readDiskCacheAsync(context: common.Context): Promise<GrammarWork[]> {
+    const path: string = GrammarCloudStore.cachePath(context);
+    try {
+      if (!await fileIo.access(path)) {
+        return [];
+      }
+      const works: GrammarWork[] = JSON.parse(await fileIo.readText(path)) as GrammarWork[];
+      if (GrammarCloudStore.memory.length > 0) {
+        return GrammarCloudStore.memory;
+      }
+      GrammarCloudStore.memory = works;
+      return works;
+    } catch (error) {
+      return [];
+    }
+  }
+
+  private static async writeDiskCacheAsync(context: common.Context, works: GrammarWork[]): Promise<void> {
     const directory: string = `${context.filesDir}/grammar`;
     try {
-      if (!fileIo.accessSync(directory)) {
-        fileIo.mkdirSync(directory, true);
+      if (!await fileIo.access(directory)) {
+        await fileIo.mkdir(directory, true);
       }
     } catch (error) {
       try {
-        if (!fileIo.statSync(directory).isDirectory()) {
+        if (!(await fileIo.stat(directory)).isDirectory()) {
           return;
         }
       } catch (_statError) {
@@ -244,18 +268,18 @@ export class GrammarCloudStore {
     const path: string = GrammarCloudStore.cachePath(context);
     let exists: boolean = false;
     try {
-      exists = fileIo.accessSync(path);
+      exists = await fileIo.access(path);
     } catch (_error) {
       exists = false;
     }
     const file: fileIo.File = exists ?
-      fileIo.openSync(path, fileIo.OpenMode.WRITE_ONLY | fileIo.OpenMode.TRUNC) :
-      fileIo.openSync(path,
+      await fileIo.open(path, fileIo.OpenMode.WRITE_ONLY | fileIo.OpenMode.TRUNC) :
+      await fileIo.open(path,
         fileIo.OpenMode.CREATE | fileIo.OpenMode.WRITE_ONLY | fileIo.OpenMode.TRUNC);
     try {
-      fileIo.writeSync(file.fd, JSON.stringify(works));
+      await fileIo.write(file.fd, JSON.stringify(works));
     } finally {
-      fileIo.closeSync(file);
+      await fileIo.close(file);
     }
   }
 

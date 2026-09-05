@@ -11,6 +11,7 @@ import {
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { VideoItem, videoSourceLabel } from '../../model/VideoModels';
 import { ContentRepository } from '../../services/ContentRepository';
+import { ContentShelfDataSource } from '../../services/ContentShelfDataSource';
 import { ReadingBookService } from '../../services/ReadingBookService';
 import { VideoLibraryStore } from '../../services/VideoLibraryStore';
 import { FloatingBarScrollTracker } from '../components/FloatingBarScrollTracker';
@@ -45,8 +46,7 @@ export struct ExplorePage {
   @State private catalog: LearningCatalog | undefined = undefined;
   @State private videos: VideoItem[] = [];
   @State private readingWorks: ReadingWork[] = [];
-  @State private coverReady: number = 0;
-  @State private bookReadyTick: number = 0;
+  @State private localStateVersion: number = 0;
   @State private loadError: string = '';
   @State private readingsLoading: boolean = true;
   @State private pageWidth: number = 360;
@@ -66,6 +66,9 @@ export struct ExplorePage {
   private readingFloatingBarTracker: FloatingBarScrollTracker = new FloatingBarScrollTracker('explore-reading');
   private scenarioFloatingBarTracker: FloatingBarScrollTracker = new FloatingBarScrollTracker('explore-scenario');
   private coverPaths: Map<string, string> = new Map();
+  private downloadedReadingIds: Set<string> = new Set();
+  private shelfSources: Map<string, ContentShelfDataSource<ReadingWork>> = new Map();
+  private localStateGeneration: number = 0;
   private readonly readingCategories: string[] =
     ['L0入门', 'L0', 'L1', 'L2', 'L3', 'L4', 'L5'];
   private readonly videoGroupOrder: string[] =
@@ -80,10 +83,8 @@ export struct ExplorePage {
       const context: common.Context = this.getUIContext().getHostContext() as common.Context;
       this.catalog = ContentRepository.loadCatalog(context);
       this.videos = VideoLibraryStore.load(context);
-      this.readingWorks = ContentRepository.loadReadingWorks(context);
-      this.loadCovers(context);
       this.loadError = '';
-      void this.refreshReadings(context);
+      void this.initializeReadings(context);
     } catch (error) {
       this.catalog = undefined;
       this.videos = [];
@@ -92,12 +93,20 @@ export struct ExplorePage {
     }
   }
 
+  private async initializeReadings(context: common.Context): Promise<void> {
+    this.readingsLoading = true;
+    this.readingWorks = await ContentRepository.loadReadingWorksAsync(context);
+    this.resetShelfSources();
+    void this.refreshLocalState(context);
+    await this.refreshReadings(context);
+  }
+
   private async refreshReadings(context: common.Context): Promise<void> {
     this.readingsLoading = this.readingWorks.length === 0;
     try {
       this.readingWorks = await ContentRepository.prefetchReadings(context);
-      this.loadCovers(context);
-      this.bookReadyTick += 1;
+      this.resetShelfSources();
+      await this.refreshLocalState(context);
       void this.downloadCovers(context);
       if (this.readingWorks.length > 0) {
         this.loadError = '';
@@ -123,30 +132,40 @@ export struct ExplorePage {
     return this.pageWidth >= 700 && index % 2 === 0 ? 14 : 0;
   }
 
-  private loadCovers(context: common.Context): void {
-    const next: Map<string, string> = new Map();
-    for (let index: number = 0; index < this.readingWorks.length; index++) {
-      const reading: ReadingWork = this.readingWorks[index];
-      const ready: string = ReadingBookService.coverReady(context, reading);
-      if (ready.length > 0) {
-        next.set(reading.id, ready);
-        continue;
-      }
+  private async refreshLocalState(context: common.Context): Promise<void> {
+    const generation: number = ++this.localStateGeneration;
+    const readings: ReadingWork[] = this.readingWorks.slice();
+    const nextCovers: Map<string, string> = new Map();
+    const nextDownloaded: Set<string> = new Set();
+    for (let index: number = 0; index < readings.length; index++) {
+      const reading: ReadingWork = readings[index];
+      let cover: string = await ReadingBookService.coverReadyAsync(context, reading);
       const relative: string | undefined = reading.coverFile;
-      if (relative === undefined || relative.length === 0) {
-        continue;
+      if (cover.length === 0 && relative !== undefined && relative.length > 0) {
+        try {
+          cover = await ReadingBookService.materializeCoverAsync(context, reading.id, relative);
+        } catch (error) {
+          // Official cover is optional; the card falls back to a plate image.
+        }
       }
-      try {
-        next.set(reading.id, ReadingBookService.materializeCover(context, reading.id, relative));
-      } catch (error) {
-        // Official cover is optional; the card falls back to a plate image.
+      if (cover.length > 0) {
+        nextCovers.set(reading.id, cover);
+      }
+      if (await ReadingBookService.isBookReadyAsync(context, reading)) {
+        nextDownloaded.add(reading.id);
       }
     }
-    this.coverPaths = next;
-    this.coverReady += 1;
+    if (generation !== this.localStateGeneration) {
+      return;
+    }
+    this.coverPaths = nextCovers;
+    this.downloadedReadingIds = nextDownloaded;
+    this.localStateVersion += 1;
+    this.reloadShelfSources();
   }
 
   private async downloadCovers(context: common.Context): Promise<void> {
+    let changed: boolean = false;
     for (let index: number = 0; index < this.readingWorks.length; index++) {
       const reading: ReadingWork = this.readingWorks[index];
       if (reading.coverKey === undefined || reading.coverKey.length === 0) {
@@ -159,16 +178,20 @@ export struct ExplorePage {
         const path: string = await ReadingBookService.ensureCover(context, reading);
         if (path.length > 0) {
           this.coverPaths.set(reading.id, path);
-          this.coverReady += 1;
+          changed = true;
         }
       } catch (error) {
         // Cover download is optional.
       }
     }
+    if (changed) {
+      this.localStateVersion += 1;
+      this.reloadShelfSources();
+    }
   }
 
   private coverPath(readingId: string): string {
-    return this.coverReady >= 0 ? (this.coverPaths.get(readingId) ?? '') : '';
+    return this.localStateVersion >= 0 ? (this.coverPaths.get(readingId) ?? '') : '';
   }
 
   private matchesCategory(reading: ReadingWork, category: string): boolean {
@@ -193,21 +216,11 @@ export struct ExplorePage {
     const visible: string[] = [];
     for (let index: number = 0; index < this.readingCategories.length; index++) {
       const category: string = this.readingCategories[index];
-      if (this.categoryCount(category) > 0) {
+      if (this.shelfSource(category).totalCount() > 0) {
         visible.push(category);
       }
     }
     return visible;
-  }
-
-  private categoryCount(category: string): number {
-    let count: number = 0;
-    for (let index: number = 0; index < this.readingWorks.length; index++) {
-      if (this.matchesCategory(this.readingWorks[index], category)) {
-        count += 1;
-      }
-    }
-    return count;
   }
 
   private videosForGroup(label: string): VideoItem[] {
@@ -339,13 +352,34 @@ export struct ExplorePage {
 
   private onReadingOpenChange(): void {
     if (!this.readingOpen) {
-      this.bookReadyTick += 1;
+      void this.refreshLocalState(this.hostContext());
     }
   }
 
   private isReadingDownloaded(reading: ReadingWork): boolean {
-    return this.bookReadyTick >= 0 &&
-      ReadingBookService.isBookReady(this.hostContext(), reading);
+    return this.localStateVersion >= 0 && this.downloadedReadingIds.has(reading.id);
+  }
+
+  private shelfSource(category: string): ContentShelfDataSource<ReadingWork> {
+    let source: ContentShelfDataSource<ReadingWork> | undefined = this.shelfSources.get(category);
+    if (source === undefined) {
+      source = new ContentShelfDataSource<ReadingWork>();
+      this.shelfSources.set(category, source);
+    }
+    return source;
+  }
+
+  private resetShelfSources(): void {
+    for (let index: number = 0; index < this.readingCategories.length; index++) {
+      const category: string = this.readingCategories[index];
+      this.shelfSource(category).reset(this.readingsForCategory(category));
+    }
+  }
+
+  private reloadShelfSources(): void {
+    for (let index: number = 0; index < this.readingCategories.length; index++) {
+      this.shelfSource(this.readingCategories[index]).reload();
+    }
   }
 
   private openReading(reading: ReadingWork): void {
@@ -637,11 +671,11 @@ export struct ExplorePage {
     Column() {
       ContentShelf({
         title: category,
-        meta: `${this.categoryCount(category)} 本`
+        meta: `${this.shelfSource(category).totalCount()} 本`
       })
-      Scroll() {
-        Row({ space: 10 }) {
-          ForEach(this.readingsForCategory(category), (reading: ReadingWork) => {
+      List({ space: 10 }) {
+        LazyForEach(this.shelfSource(category), (reading: ReadingWork) => {
+          ListItem() {
             Column() {
               CoverCard({
                 artwork: this.readingArtwork(),
@@ -659,13 +693,10 @@ export struct ExplorePage {
             }
             .width(SHELF_COVER_WIDTH)
             .height(SHELF_COVER_HEIGHT)
-          }, (reading: ReadingWork) =>
-            `${reading.id}:${this.coverPath(reading.id)}:${this.isReadingDownloaded(reading) ? '1' : '0'}`)
-        }
-        .height(SHELF_COVER_HEIGHT)
-        .alignItems(VerticalAlign.Top)
+          }
+        }, (reading: ReadingWork) => reading.id)
       }
-      .scrollable(ScrollDirection.Horizontal)
+      .listDirection(Axis.Horizontal)
       .width('100%')
       .height(SHELF_COVER_HEIGHT)
       .padding({ left: 16, right: 16 })

@@ -68,6 +68,24 @@ export class GrammarBookService {
     return true;
   }
 
+  static async isLessonReadyAsync(context: common.Context, work: GrammarWork): Promise<boolean> {
+    if (work.pdfKey.length === 0) {
+      return false;
+    }
+    if (!await GrammarBookService.fileReadyAsync(GrammarBookService.localPdfPath(context, work.id),
+      work.pdfBytes ?? 0)) {
+      return false;
+    }
+    for (let index: number = 0; index < work.audioTracks.length; index++) {
+      const track: GrammarAudioTrack = work.audioTracks[index];
+      if (!await GrammarBookService.fileReadyAsync(GrammarBookService.localTrackPath(context, work, track),
+        track.bytes)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   static coverReady(context: common.Context, work: GrammarWork): string {
     if (work.coverKey === undefined || work.coverKey.length === 0) {
       return '';
@@ -76,20 +94,28 @@ export class GrammarBookService {
     return GrammarBookService.coverFileReady(path, work) ? path : '';
   }
 
+  static async coverReadyAsync(context: common.Context, work: GrammarWork): Promise<string> {
+    if (work.coverKey === undefined || work.coverKey.length === 0) {
+      return '';
+    }
+    const path: string = GrammarBookService.localCoverPath(context, work);
+    return await GrammarBookService.coverFileReadyAsync(path, work) ? path : '';
+  }
+
   static async ensureCover(context: common.Context, work: GrammarWork): Promise<string> {
     if (work.coverKey === undefined || work.coverKey.length === 0) {
       return '';
     }
     const path: string = GrammarBookService.localCoverPath(context, work);
-    if (GrammarBookService.coverFileReady(path, work)) {
+    if (await GrammarBookService.coverFileReadyAsync(path, work)) {
       return path;
     }
-    GrammarBookService.ensureDirectory(GrammarBookService.lessonDirectory(context, work.id));
+    await GrammarBookService.ensureDirectoryAsync(GrammarBookService.lessonDirectory(context, work.id));
     const bytes: ArrayBuffer = await GrammarCloudStore.downloadObject(work.coverKey);
     if (!GrammarBookService.isImageBuffer(bytes)) {
       throw new Error('封面不是图片');
     }
-    GrammarBookService.writeBuffer(path, bytes);
+    await GrammarBookService.writeBufferAsync(path, bytes);
     return path;
   }
 
@@ -192,6 +218,11 @@ export class GrammarBookService {
     }
   }
 
+  private static async coverFileReadyAsync(path: string, work: GrammarWork): Promise<boolean> {
+    const expectedBytes: number = work.coverBytes ?? 0;
+    return await GrammarBookService.fileReadyAsync(path, expectedBytes, expectedBytes > 0 ? 1 : 40000);
+  }
+
   private static isImageBuffer(buffer: ArrayBuffer): boolean {
     if (buffer.byteLength < 8) {
       return false;
@@ -217,6 +248,61 @@ export class GrammarBookService {
       return true;
     } catch (error) {
       return false;
+    }
+  }
+
+  private static async fileReadyAsync(path: string, expectedBytes: number,
+    minimumBytes: number = 1): Promise<boolean> {
+    try {
+      const stat: fileIo.Stat = await fileIo.stat(path);
+      if (stat.size < minimumBytes) {
+        return false;
+      }
+      return expectedBytes <= 0 || stat.size === expectedBytes;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  private static async writeBufferAsync(path: string, buffer: ArrayBuffer): Promise<void> {
+    if (buffer.byteLength === 0) {
+      throw new Error(`empty download: ${path}`);
+    }
+    const exists: boolean = await fileIo.access(path);
+    const mode: number = exists ? fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC :
+      fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC;
+    const file: fileIo.File = await fileIo.open(path, mode);
+    try {
+      const written: number = await fileIo.write(file.fd, buffer);
+      if (written !== buffer.byteLength) {
+        throw new Error(`short write ${written}/${buffer.byteLength}`);
+      }
+    } finally {
+      await fileIo.close(file);
+    }
+  }
+
+  private static async ensureDirectoryAsync(path: string): Promise<void> {
+    try {
+      if ((await fileIo.stat(path)).isDirectory()) {
+        return;
+      }
+    } catch (_error) {
+      // Missing — create below.
+    }
+    try {
+      await fileIo.mkdir(path, true);
+    } catch (error) {
+      try {
+        if ((await fileIo.stat(path)).isDirectory()) {
+          return;
+        }
+      } catch (_statError) {
+        const detail: string = error instanceof Error ? error.message : `${error}`;
+        throw new Error(`mkdir failed: ${path} (${detail})`);
+      }
+      const detail: string = error instanceof Error ? error.message : `${error}`;
+      throw new Error(`mkdir failed: ${path} (${detail})`);
     }
   }
 

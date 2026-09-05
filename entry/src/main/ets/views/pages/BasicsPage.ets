@@ -5,6 +5,7 @@ import { LearningJourney } from '../../model/ContentModels';
 import { GrammarWork } from '../../model/GrammarModels';
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { ContentRepository } from '../../services/ContentRepository';
+import { ContentShelfDataSource } from '../../services/ContentShelfDataSource';
 import { GrammarBookService } from '../../services/GrammarBookService';
 import { FloatingBarScrollTracker } from '../components/FloatingBarScrollTracker';
 import {
@@ -34,8 +35,7 @@ export struct BasicsPage {
   @State private lessons: GrammarWork[] = [];
   @State private lessonsLoading: boolean = true;
   @State private loadError: string = '';
-  @State private coverReady: number = 0;
-  @State private lessonReadyTick: number = 0;
+  @State private localStateVersion: number = 0;
   private basicsTabItems: SegmentButtonV2Items = new SegmentButtonV2Items([
     { text: '五十音' },
     { text: '文法' }
@@ -44,23 +44,32 @@ export struct BasicsPage {
   private grammarFloatingBarTracker: FloatingBarScrollTracker =
     new FloatingBarScrollTracker('basics-grammar');
   private coverPaths: Map<string, string> = new Map();
+  private downloadedLessonIds: Set<string> = new Set();
+  private shelfSources: Map<string, ContentShelfDataSource<GrammarWork>> = new Map();
+  private localStateGeneration: number = 0;
   private readonly lessonCategories: string[] = ['入门', '初级1', '初级2', '初中级'];
 
   aboutToAppear(): void {
     this.onScrollerReady(this.grammarScroller);
     this.basicsTabIndex = this.selectedTab;
     const context: common.Context = this.getUIContext().getHostContext() as common.Context;
-    this.lessons = ContentRepository.loadGrammarWorks(context);
-    this.loadCovers(context);
-    void this.refreshLessons(context);
+    void this.initializeLessons(context);
+  }
+
+  private async initializeLessons(context: common.Context): Promise<void> {
+    this.lessonsLoading = true;
+    this.lessons = await ContentRepository.loadGrammarWorksAsync(context);
+    this.resetShelfSources();
+    void this.refreshLocalState(context);
+    await this.refreshLessons(context);
   }
 
   private async refreshLessons(context: common.Context): Promise<void> {
     this.lessonsLoading = this.lessons.length === 0;
     try {
       this.lessons = await ContentRepository.prefetchGrammar(context);
-      this.loadCovers(context);
-      this.lessonReadyTick += 1;
+      this.resetShelfSources();
+      await this.refreshLocalState(context);
       void this.downloadCovers(context);
       if (this.lessons.length > 0) {
         this.loadError = '';
@@ -75,20 +84,32 @@ export struct BasicsPage {
     }
   }
 
-  private loadCovers(context: common.Context): void {
-    const next: Map<string, string> = new Map();
-    for (let index: number = 0; index < this.lessons.length; index++) {
-      const lesson: GrammarWork = this.lessons[index];
-      const ready: string = GrammarBookService.coverReady(context, lesson);
-      if (ready.length > 0) {
-        next.set(lesson.id, ready);
+  private async refreshLocalState(context: common.Context): Promise<void> {
+    const generation: number = ++this.localStateGeneration;
+    const lessons: GrammarWork[] = this.lessons.slice();
+    const nextCovers: Map<string, string> = new Map();
+    const nextDownloaded: Set<string> = new Set();
+    for (let index: number = 0; index < lessons.length; index++) {
+      const lesson: GrammarWork = lessons[index];
+      const cover: string = await GrammarBookService.coverReadyAsync(context, lesson);
+      if (cover.length > 0) {
+        nextCovers.set(lesson.id, cover);
+      }
+      if (await GrammarBookService.isLessonReadyAsync(context, lesson)) {
+        nextDownloaded.add(lesson.id);
       }
     }
-    this.coverPaths = next;
-    this.coverReady += 1;
+    if (generation !== this.localStateGeneration) {
+      return;
+    }
+    this.coverPaths = nextCovers;
+    this.downloadedLessonIds = nextDownloaded;
+    this.localStateVersion += 1;
+    this.reloadShelfSources();
   }
 
   private async downloadCovers(context: common.Context): Promise<void> {
+    let changed: boolean = false;
     for (let index: number = 0; index < this.lessons.length; index++) {
       const lesson: GrammarWork = this.lessons[index];
       if (lesson.coverKey === undefined || lesson.coverKey.length === 0) {
@@ -101,16 +122,20 @@ export struct BasicsPage {
         const path: string = await GrammarBookService.ensureCover(context, lesson);
         if (path.length > 0) {
           this.coverPaths.set(lesson.id, path);
-          this.coverReady += 1;
+          changed = true;
         }
       } catch (error) {
         // Cover download is optional.
       }
     }
+    if (changed) {
+      this.localStateVersion += 1;
+      this.reloadShelfSources();
+    }
   }
 
   private coverPath(lessonId: string): string {
-    return this.coverReady >= 0 ? (this.coverPaths.get(lessonId) ?? '') : '';
+    return this.localStateVersion >= 0 ? (this.coverPaths.get(lessonId) ?? '') : '';
   }
 
   private lessonsForCategory(category: string): GrammarWork[] {
@@ -127,26 +152,15 @@ export struct BasicsPage {
     const visible: string[] = [];
     for (let index: number = 0; index < this.lessonCategories.length; index++) {
       const category: string = this.lessonCategories[index];
-      if (this.categoryCount(category) > 0) {
+      if (this.shelfSource(category).totalCount() > 0) {
         visible.push(category);
       }
     }
     return visible;
   }
 
-  private categoryCount(category: string): number {
-    let count: number = 0;
-    for (let index: number = 0; index < this.lessons.length; index++) {
-      if (this.lessons[index].level === category) {
-        count += 1;
-      }
-    }
-    return count;
-  }
-
   private isLessonDownloaded(lesson: GrammarWork): boolean {
-    return this.lessonReadyTick >= 0 &&
-      GrammarBookService.isLessonReady(this.hostContext(), lesson);
+    return this.localStateVersion >= 0 && this.downloadedLessonIds.has(lesson.id);
   }
 
   private isLessonSelected(lesson: GrammarWork): boolean {
@@ -159,7 +173,29 @@ export struct BasicsPage {
 
   private onGrammarOpenChange(): void {
     if (!this.grammarOpen) {
-      this.lessonReadyTick += 1;
+      void this.refreshLocalState(this.hostContext());
+    }
+  }
+
+  private shelfSource(category: string): ContentShelfDataSource<GrammarWork> {
+    let source: ContentShelfDataSource<GrammarWork> | undefined = this.shelfSources.get(category);
+    if (source === undefined) {
+      source = new ContentShelfDataSource<GrammarWork>();
+      this.shelfSources.set(category, source);
+    }
+    return source;
+  }
+
+  private resetShelfSources(): void {
+    for (let index: number = 0; index < this.lessonCategories.length; index++) {
+      const category: string = this.lessonCategories[index];
+      this.shelfSource(category).reset(this.lessonsForCategory(category));
+    }
+  }
+
+  private reloadShelfSources(): void {
+    for (let index: number = 0; index < this.lessonCategories.length; index++) {
+      this.shelfSource(this.lessonCategories[index]).reload();
     }
   }
 
@@ -280,11 +316,11 @@ export struct BasicsPage {
     Column() {
       ContentShelf({
         title: category,
-        meta: `${this.categoryCount(category)} 课`
+        meta: `${this.shelfSource(category).totalCount()} 课`
       })
-      Scroll() {
-        Row({ space: 10 }) {
-          ForEach(this.lessonsForCategory(category), (lesson: GrammarWork) => {
+      List({ space: 10 }) {
+        LazyForEach(this.shelfSource(category), (lesson: GrammarWork) => {
+          ListItem() {
             Column() {
               CoverCard({
                 artwork: $r('app.media.journey_grammar'),
@@ -302,13 +338,10 @@ export struct BasicsPage {
             }
             .width(SHELF_COVER_WIDTH)
             .height(SHELF_COVER_HEIGHT)
-          }, (lesson: GrammarWork) =>
-            `${lesson.id}:${this.coverPath(lesson.id)}:${this.isLessonDownloaded(lesson) ? '1' : '0'}`)
-        }
-        .height(SHELF_COVER_HEIGHT)
-        .alignItems(VerticalAlign.Top)
+          }
+        }, (lesson: GrammarWork) => lesson.id)
       }
-      .scrollable(ScrollDirection.Horizontal)
+      .listDirection(Axis.Horizontal)
       .width('100%')
       .height(SHELF_COVER_HEIGHT)
       .padding({ left: 16, right: 16 })

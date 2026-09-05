@@ -103,7 +103,6 @@ export struct CoverCard {
           .height(this.imageHeight())
           .objectFit(ImageFit.Cover)
           .interpolation(ImageInterpolation.Medium)
-          .syncLoad(true)
           .hitTestBehavior(HitTestMode.None)
       }
 

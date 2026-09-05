@@ -57,6 +57,13 @@ export class ReadingCloudStore {
     return ReadingCloudStore.readDiskCache(context);
   }
 
+  static async cachedAsync(context: common.Context): Promise<ReadingWork[]> {
+    if (ReadingCloudStore.memory.length > 0) {
+      return ReadingCloudStore.memory;
+    }
+    return await ReadingCloudStore.readDiskCacheAsync(context);
+  }
+
   static async refresh(context: common.Context): Promise<ReadingWork[]> {
     if (ReadingCloudStore.inflight !== undefined) {
       return ReadingCloudStore.inflight;
@@ -132,7 +139,7 @@ export class ReadingCloudStore {
       works.push(ReadingCloudStore.toWork(rows[index]));
     }
     ReadingCloudStore.memory = works;
-    ReadingCloudStore.writeDiskCache(context, works);
+    await ReadingCloudStore.writeDiskCacheAsync(context, works);
     return works;
   }
 
@@ -245,15 +252,32 @@ export class ReadingCloudStore {
     }
   }
 
-  private static writeDiskCache(context: common.Context, works: ReadingWork[]): void {
+  private static async readDiskCacheAsync(context: common.Context): Promise<ReadingWork[]> {
+    const path: string = ReadingCloudStore.cachePath(context);
+    try {
+      if (!await fileIo.access(path)) {
+        return [];
+      }
+      const works: ReadingWork[] = JSON.parse(await fileIo.readText(path)) as ReadingWork[];
+      if (ReadingCloudStore.memory.length > 0) {
+        return ReadingCloudStore.memory;
+      }
+      ReadingCloudStore.memory = works;
+      return works;
+    } catch (error) {
+      return [];
+    }
+  }
+
+  private static async writeDiskCacheAsync(context: common.Context, works: ReadingWork[]): Promise<void> {
     const directory: string = `${context.filesDir}/reader`;
     try {
-      if (!fileIo.accessSync(directory)) {
-        fileIo.mkdirSync(directory, true);
+      if (!await fileIo.access(directory)) {
+        await fileIo.mkdir(directory, true);
       }
     } catch (error) {
       try {
-        if (!fileIo.statSync(directory).isDirectory()) {
+        if (!(await fileIo.stat(directory)).isDirectory()) {
           return;
         }
       } catch (_statError) {
@@ -263,18 +287,18 @@ export class ReadingCloudStore {
     const path: string = ReadingCloudStore.cachePath(context);
     let exists: boolean = false;
     try {
-      exists = fileIo.accessSync(path);
+      exists = await fileIo.access(path);
     } catch (_error) {
       exists = false;
     }
     const file: fileIo.File = exists ?
-      fileIo.openSync(path, fileIo.OpenMode.WRITE_ONLY | fileIo.OpenMode.TRUNC) :
-      fileIo.openSync(path,
+      await fileIo.open(path, fileIo.OpenMode.WRITE_ONLY | fileIo.OpenMode.TRUNC) :
+      await fileIo.open(path,
         fileIo.OpenMode.CREATE | fileIo.OpenMode.WRITE_ONLY | fileIo.OpenMode.TRUNC);
     try {
-      fileIo.writeSync(file.fd, JSON.stringify(works));
+      await fileIo.write(file.fd, JSON.stringify(works));
     } finally {
-      fileIo.closeSync(file);
+      await fileIo.close(file);
     }
   }
 

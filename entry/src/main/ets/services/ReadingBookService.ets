@@ -41,6 +41,35 @@ export class ReadingBookService {
     return ReadingBookService.materializePdf(context, readingId, relativePath);
   }
 
+  static async materializeCoverAsync(context: common.Context, readingId: string,
+    relativePath: string): Promise<string> {
+    const safeId: string = ReadingBookService.safeId(readingId);
+    const bookDirectory: string = ReadingBookService.bookDirectory(context, safeId);
+    const slash: number = relativePath.lastIndexOf('/');
+    const fileName: string = slash >= 0 ? relativePath.substring(slash + 1) : relativePath;
+    const bookPath: string = `${bookDirectory}/${fileName.length > 0 ? fileName : 'book.pdf'}`;
+    try {
+      if (await ReadingBookService.fileReadyAsync(bookPath, 0)) {
+        return bookPath;
+      }
+      await ReadingBookService.ensureDirectoryAsync(bookDirectory);
+      const bytes: Uint8Array = await context.resourceManager.getRawFileContent(relativePath);
+      if (bytes.byteLength === 0) {
+        throw new Error(`empty rawfile: ${relativePath}`);
+      }
+      const copy: ArrayBuffer = bytes.buffer.slice(bytes.byteOffset,
+        bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+      await ReadingBookService.writeBufferAsync(bookPath, copy);
+      if ((await fileIo.stat(bookPath)).size <= 0) {
+        throw new Error(`empty sandbox file: ${bookPath}`);
+      }
+      return bookPath;
+    } catch (error) {
+      const detail: string = error instanceof Error ? error.message : `${error}`;
+      throw new Error(`Unable to prepare reader PDF: ${safeId} (${detail})`);
+    }
+  }
+
   static materializePdf(context: common.Context, readingId: string, relativePath: string): string {
     const safeId: string = ReadingBookService.safeId(readingId);
     const bookDirectory: string = ReadingBookService.bookDirectory(context, safeId);
@@ -102,6 +131,21 @@ export class ReadingBookService {
     return true;
   }
 
+  static async isBookReadyAsync(context: common.Context, work: ReadingWork): Promise<boolean> {
+    if (!ReadingBookService.isCloudBook(work)) {
+      return true;
+    }
+    if (!await ReadingBookService.fileReadyAsync(ReadingBookService.localPdfPath(context, work.id),
+      work.pdfBytes ?? 0)) {
+      return false;
+    }
+    if (work.audioKey !== undefined && work.audioKey.length > 0) {
+      return await ReadingBookService.fileReadyAsync(ReadingBookService.localAudioPath(context, work.id),
+        work.audioBytes ?? 0);
+    }
+    return true;
+  }
+
   static imageUri(path: string): string {
     if (path.length === 0) {
       return '';
@@ -120,20 +164,28 @@ export class ReadingBookService {
     return ReadingBookService.coverFileReady(path, work) ? path : '';
   }
 
+  static async coverReadyAsync(context: common.Context, work: ReadingWork): Promise<string> {
+    if (work.coverKey === undefined || work.coverKey.length === 0) {
+      return '';
+    }
+    const path: string = ReadingBookService.localCoverPath(context, work);
+    return await ReadingBookService.coverFileReadyAsync(path, work) ? path : '';
+  }
+
   static async ensureCover(context: common.Context, work: ReadingWork): Promise<string> {
     if (work.coverKey === undefined || work.coverKey.length === 0) {
       return '';
     }
     const path: string = ReadingBookService.localCoverPath(context, work);
-    if (ReadingBookService.coverFileReady(path, work)) {
+    if (await ReadingBookService.coverFileReadyAsync(path, work)) {
       return path;
     }
-    ReadingBookService.ensureDirectory(ReadingBookService.bookDirectory(context, work.id));
+    await ReadingBookService.ensureDirectoryAsync(ReadingBookService.bookDirectory(context, work.id));
     const bytes: ArrayBuffer = await ReadingCloudStore.downloadObject(work.coverKey);
     if (!ReadingBookService.isImageBuffer(bytes)) {
       throw new Error('封面不是图片');
     }
-    ReadingBookService.writeBuffer(path, bytes);
+    await ReadingBookService.writeBufferAsync(path, bytes);
     return path;
   }
 
@@ -244,6 +296,11 @@ export class ReadingBookService {
     }
   }
 
+  private static async coverFileReadyAsync(path: string, work: ReadingWork): Promise<boolean> {
+    const expectedBytes: number = work.coverBytes ?? 0;
+    return await ReadingBookService.fileReadyAsync(path, expectedBytes, expectedBytes > 0 ? 1 : 40000);
+  }
+
   private static isImageBuffer(buffer: ArrayBuffer): boolean {
     if (buffer.byteLength < 8) {
       return false;
@@ -272,6 +329,19 @@ export class ReadingBookService {
     }
   }
 
+  private static async fileReadyAsync(path: string, expectedBytes: number,
+    minimumBytes: number = 1): Promise<boolean> {
+    try {
+      const stat: fileIo.Stat = await fileIo.stat(path);
+      if (stat.size < minimumBytes) {
+        return false;
+      }
+      return expectedBytes <= 0 || stat.size === expectedBytes;
+    } catch (error) {
+      return false;
+    }
+  }
+
   private static writeBytes(path: string, bytes: Uint8Array): void {
     const copy: ArrayBuffer = bytes.buffer.slice(bytes.byteOffset,
       bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
@@ -293,6 +363,24 @@ export class ReadingBookService {
     }
   }
 
+  private static async writeBufferAsync(path: string, buffer: ArrayBuffer): Promise<void> {
+    if (buffer.byteLength === 0) {
+      throw new Error(`empty download: ${path}`);
+    }
+    const exists: boolean = await fileIo.access(path);
+    const mode: number = exists ? fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC :
+      fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC;
+    const file: fileIo.File = await fileIo.open(path, mode);
+    try {
+      const written: number = await fileIo.write(file.fd, buffer);
+      if (written !== buffer.byteLength) {
+        throw new Error(`short write ${written}/${buffer.byteLength}`);
+      }
+    } finally {
+      await fileIo.close(file);
+    }
+  }
+
   private static safeId(readingId: string): string {
     return readingId.replace(/[^A-Za-z0-9_-]/g, '_');
   }
@@ -311,6 +399,30 @@ export class ReadingBookService {
     } catch (error) {
       try {
         if (fileIo.statSync(path).isDirectory()) {
+          return;
+        }
+      } catch (_statError) {
+        const detail: string = error instanceof Error ? error.message : `${error}`;
+        throw new Error(`mkdir failed: ${path} (${detail})`);
+      }
+      const detail: string = error instanceof Error ? error.message : `${error}`;
+      throw new Error(`mkdir failed: ${path} (${detail})`);
+    }
+  }
+
+  private static async ensureDirectoryAsync(path: string): Promise<void> {
+    try {
+      if ((await fileIo.stat(path)).isDirectory()) {
+        return;
+      }
+    } catch (_error) {
+      // Missing — create below.
+    }
+    try {
+      await fileIo.mkdir(path, true);
+    } catch (error) {
+      try {
+        if ((await fileIo.stat(path)).isDirectory()) {
           return;
         }
       } catch (_statError) {
