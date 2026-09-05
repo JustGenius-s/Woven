@@ -52,6 +52,7 @@ import { VocabularyPage } from '../views/pages/VocabularyPage';
 import { VocabularyStudyPage } from '../views/pages/VocabularyStudyPage';
 import { VideoPlayerPage } from '../views/pages/VideoPlayerPage';
 import { ImmersiveBackdrop } from '../views/components/ImmersiveCanvas';
+import { LaunchSplash } from '../views/components/LaunchSplash';
 import { ContextAiPanel } from '../views/components/ContextAiPanel';
 import { KanaLookupSheet } from '../views/components/KanaLookupSheet';
 
@@ -112,6 +113,8 @@ struct Index {
     lastSyncedAt: 0,
     detail: ''
   };
+  @State private splashOpen: boolean = true;
+
   aboutToAppear(): void {
     KanaLookupService.subscribe(this.kanaLookupListener);
     const context: common.Context = this.getUIContext().getHostContext() as common.Context;
@@ -437,6 +440,13 @@ struct Index {
           this.appShell()
         }
       })
+      if (this.splashOpen) {
+        LaunchSplash({
+          onFinished: () => {
+            this.splashOpen = false;
+          }
+        })
+      }
     }
     .width('100%')
     .height('100%')
