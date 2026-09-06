@@ -59,7 +59,9 @@ export interface RealtimeAudioInput {
 
 export interface RealtimeAudioOutput {
   format: RealtimeAudioOutputFormat;
-  voice: string;
+  voice: 'zh_female_vv_uranus_bigtts';
+  speed: 0;
+  loudness: 0;
 }
 
 export interface RealtimeAudioConfig {
@@ -77,6 +79,19 @@ export interface RealtimeSessionRequest {
   type: 'session.create' | 'session.update';
   event_id: string;
   session: RealtimeSessionConfig;
+  extension: RealtimeVoiceExtension;
+}
+
+export interface RealtimeVoiceExtension {
+  dialog: RealtimeVoiceDialogExtension;
+}
+
+export interface RealtimeVoiceDialogExtension {
+  extra: RealtimeVoiceDialogOptions;
+}
+
+export interface RealtimeVoiceDialogOptions {
+  enable_loudness_norm: boolean;
 }
 
 export function emptyRealtimeSnapshot(): RealtimeSnapshot {
@@ -85,7 +100,10 @@ export function emptyRealtimeSnapshot(): RealtimeSnapshot {
 }
 
 export function readerVoiceInstructions(context: string): string {
-  return '你是陪伴用户阅读日语教材的文法老师。用自然、温和的中文交流，日文例句保留原文。' +
+  return '你是陪伴用户阅读日语教材的文法老师。默认使用标准普通话讲解，用户要求日语时直接使用日语回复。' +
+    '始终使用应用指定的同一位说话人的自然女声，保持平稳、温和的教学语气和适中的语速。' +
+    '切换中文与日语只改变语言和发音，保持同一声线，不因例句中的不同角色改变音色、音高或扮演另一位说话人。' +
+    '用户要求日语回复或朗读是在指定语言，不是在请求更换音色。直接完成语言任务，不自行推断音色或接口不支持某种语言。' +
     '朗读日语词句时使用自然的日语读音，不按中文读汉字，不用中文谐音代替假名。' +
     '用户要求讲解时，先解释当前页的一个要点和一个例句，再留出追问空间，避免一次长篇朗读。' +
     '用户可随时插话，理解追问并接着解释。优先依据当前页，其他页仅作背景；补充例句要说明是补充。' +

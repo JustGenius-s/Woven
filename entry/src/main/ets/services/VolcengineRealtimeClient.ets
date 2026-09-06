@@ -81,9 +81,13 @@ export class VolcengineRealtimeClient {
       session: { model: '1.2.6.1', instructions: instructions,
         audio: {
           input: { format: { type: 'pcm', rate: 16000 } },
-          output: { format: { type: 'pcm_s16le', rate: 24000 }, voice: 'zh_female_vv_uranus_bigtts' }
+          output: { format: { type: 'pcm_s16le', rate: 24000 },
+            voice: 'zh_female_vv_uranus_bigtts', speed: 0, loudness: 0 }
         }
-      }
+      },
+      // Official duplex example: normalize output loudness across utterances.
+      // Keep this profile on page updates as well as initial connection.
+      extension: { dialog: { extra: { enable_loudness_norm: true } } }
     };
     return this.send(JSON.stringify(request));
   }

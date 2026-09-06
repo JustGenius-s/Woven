@@ -43,7 +43,7 @@ export class ReaderVoiceContextService {
     // Put the focus first, then nearby pages, then a bounded view of the rest
     // of the lesson. Page labels are PDF page numbers, never printed folios.
     let text: string = `日语教材：${title.slice(0, 160)}\n当前 PDF 第 ${pageIndex + 1} / ${pages.length} 页。` +
-      '\n讲解围绕当前页解释语法、例句和使用场景。中文解释，保留日文例句；其他页只作背景。\n' +
+      '\n讲解围绕当前页解释语法、例句和使用场景。默认中文解释，用户指定日语时用日语回复；保留日文例句，其他页只作背景。\n' +
       `【当前页 ${pageIndex + 1}】\n${pages[pageIndex].trim() ? pages[pageIndex].slice(0, 6000) :
         '本页没有可提取文字，可能是空白页或扫描图片。不能识别其中的图文，请用户描述；不要把其他页当作当前页。'}\n`;
     const order: number[] = [];
