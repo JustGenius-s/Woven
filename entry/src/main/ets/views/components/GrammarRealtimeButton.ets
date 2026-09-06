@@ -1,6 +1,7 @@
 import { common } from '@kit.AbilityKit';
-import { LengthMetrics } from '@kit.ArkUI';
-import { FLOATING_IMMERSIVE_SURFACE, immersiveSheetSurface } from '../../common/ImmersiveMaterial';
+import {
+  FLOATING_IMMERSIVE_SURFACE, appSheetOptions, immersiveFloatingPopupSurface
+} from '../../common/ImmersiveMaterial';
 import { showImmersiveNotice } from '../../common/ImmersiveNotice';
 import { RealtimeLine, RealtimeSnapshot, emptyRealtimeSnapshot } from '../../model/RealtimeVoiceModels';
 import { GrammarRealtimeSession } from '../../services/GrammarRealtimeSession';
@@ -13,11 +14,14 @@ export struct GrammarRealtimeButton {
   @Prop pageCount: number = 0;
   @Prop title: string = '';
   @Prop ready: boolean = false;
+  @Prop overlayOpen: boolean = false;
   onOpen: () => void = () => {};
+  onBack: () => void = () => {};
   onSettings: (section: 'deepseek' | 'realtime') => void = () => {};
   onSessionReady: (session: GrammarRealtimeSession) => void = () => {};
 
   @State private sheetOpen: boolean = false;
+  @State private panelVisible: boolean = false;
   @State private floating: boolean = false;
   @State private snapshot: RealtimeSnapshot = emptyRealtimeSnapshot();
   private session?: GrammarRealtimeSession;
@@ -49,7 +53,11 @@ export struct GrammarRealtimeButton {
     this.onSessionReady(this.session);
   }
 
-  aboutToDisappear(): void { this.leaving = true; void this.session?.dispose(); }
+  aboutToDisappear(): void {
+    this.leaving = true;
+    this.floating = false;
+    void this.session?.dispose();
+  }
 
   private context(): common.UIAbilityContext {
     return this.getUIContext().getHostContext() as common.UIAbilityContext;
@@ -76,6 +84,7 @@ export struct GrammarRealtimeButton {
 
   private openPanel(): void {
     this.onOpen();
+    this.panelVisible = true;
     this.sheetOpen = true;
     setTimeout(() => {
       if (!this.leaving && this.sheetOpen) { this.scroller.scrollEdge(Edge.Bottom); }
@@ -104,55 +113,69 @@ export struct GrammarRealtimeButton {
 
   private panelDisappeared(): void {
     this.collapsePanel();
+    this.panelVisible = false;
     const settings: boolean = this.pendingSettings;
     this.pendingSettings = false;
     if (settings && !this.leaving) { this.onSettings('realtime'); }
   }
 
+  private dismissFloating(action: DismissPopupAction): void {
+    if (action.reason === DismissReason.PRESS_BACK) {
+      // A nonmodal popup must preserve the reader's existing system-back action.
+      this.floating = false;
+      action.dismiss();
+      this.onBack();
+    }
+  }
+
   build() {
     Stack({ alignContent: Alignment.TopEnd }) {
-      Stack({ alignContent: Alignment.TopEnd }) {
-        if (this.floating) {
-          this.floatingControls()
-        } else {
-          Button({ type: ButtonType.Circle }) {
-            SymbolGlyph($r('sys.symbol.waveform_headphones'))
-              .fontSize(22).fontColor([$r('sys.color.icon_primary')])
-          }
-          .id('grammar-realtime-open').width(44).height(44)
-          .backgroundColor(Color.Transparent)
-          .enabled(this.ready).opacity(this.ready ? 1 : 0.4)
-          .accessibilityText('开始本页实时语音通话')
-          .accessibilityDescription('接通后共享麦克风声音和当前页教材，右侧显示通话控制')
-          .onClick(() => this.startCall())
-          .transition(TransitionEffect.asymmetric(
-            TransitionEffect.OPACITY.animation({ duration: 80, delay: 120, curve: Curve.Linear }),
-            TransitionEffect.OPACITY.animation({ duration: 80, curve: Curve.Linear })
-          ))
-        }
+      Button({ type: ButtonType.Circle }) {
+        SymbolGlyph($r('sys.symbol.waveform_headphones'))
+          .fontSize(22).fontColor([$r('sys.color.icon_primary')])
       }
-      .id('realtime-floating-surface')
-      .width(this.floating ? 52 : 44).height(this.floating ? 152 : 44)
-      .borderRadius(this.floating ? 26 : 22)
-      .attributeModifier(FLOATING_IMMERSIVE_SURFACE)
-      .clip(true).position({ right: 0, top: this.floating ? 56 : 0 })
-      .opacity(this.sheetOpen ? 0 : 1)
-      .hitTestBehavior(this.sheetOpen ? HitTestMode.None : HitTestMode.Default)
+      .id('grammar-realtime-open').width(44).height(44)
+      // Page content is outside the native material scope; keep an explicit
+      // readable entry surface. The active capsule gets its material from Popup.
+      .backgroundColor($r('app.color.immersive_plane'))
+      .backgroundBlurStyle(BlurStyle.COMPONENT_ULTRA_THIN)
+      .enabled(this.ready && !this.floating)
+      .opacity(this.floating || this.panelVisible ? 0 : (this.ready ? 1 : 0.4))
+      .hitTestBehavior(this.floating || this.panelVisible ? HitTestMode.None : HitTestMode.Default)
+      .accessibilityLevel(this.floating || this.panelVisible ? 'no-hide-descendants' : 'auto')
+      .accessibilityText('开始本页实时语音通话')
+      .accessibilityDescription('接通后共享麦克风声音和当前页教材，右侧显示通话控制')
+      .onClick(() => this.startCall())
     }
-    // Keep the sheet host mounted and let touches outside the visible capsule
-    // reach the PDF. A second material/border on each button would double its rim.
-    .width(52).height(208).hitTestBehavior(HitTestMode.Transparent)
-    .bindSheet($$this.sheetOpen, this.panel(), {
-      height: SheetSize.LARGE, preferType: SheetType.BOTTOM,
+    // The layout anchor stays enabled/visible when its entry button fades out.
+    // Both overlay hosts stay on the page; the sheet is not inside the popup.
+    .width(52).height(44).hitTestBehavior(HitTestMode.Transparent)
+    .bindPopup(this.floating && !this.panelVisible && !this.overlayOpen, {
+      builder: this.floatingControls,
+      placement: Placement.BottomRight,
+      targetSpace: 12,
+      width: 52,
+      radius: 26,
+      enableArrow: false,
+      mask: false,
+      autoCancel: false,
+      focusable: false,
+      showInSubWindow: false,
+      systemMaterial: immersiveFloatingPopupSurface().material,
+      popupColor: immersiveFloatingPopupSurface().backgroundColor,
+      backgroundBlurStyle: immersiveFloatingPopupSurface().blurStyle,
+      transition: TransitionEffect.OPACITY
+        .combine(TransitionEffect.translate({ y: -8 }))
+        .animation({ duration: 250, curve: Curve.Friction }),
+      onWillDismiss: (action: DismissPopupAction) => this.dismissFloating(action)
+    })
+    .bindSheet($$this.sheetOpen, this.panel(), appSheetOptions({
+      height: SheetSize.LARGE,
       title: { title: '语音伴读', subtitle: `PDF 第 ${this.pageIndex + 1} / ${this.pageCount} 页` },
-      dragBar: true, showClose: false, radius: LengthMetrics.vp(28),
-      systemMaterial: immersiveSheetSurface().material,
-      backgroundColor: immersiveSheetSurface().backgroundColor,
-      blurStyle: immersiveSheetSurface().blurStyle,
-      maskColor: '#33202124',
+      showClose: false,
       onWillDisappear: () => this.collapsePanel(),
       onDisappear: () => this.panelDisappeared()
-    })
+    }))
   }
 
   @Builder
@@ -185,11 +208,7 @@ export struct GrammarRealtimeButton {
       .onClick(() => this.endCall())
     }
     .id('realtime-floating-controls').width(52).height(152).padding(4)
-    .position({ right: 0, top: 0 })
-    .transition(TransitionEffect.asymmetric(
-      TransitionEffect.OPACITY.animation({ duration: 150, delay: 70, curve: Curve.Linear }),
-      TransitionEffect.OPACITY.animation({ duration: 80, curve: Curve.Linear })
-    ))
+    // Popup owns the sole material rim. Its builder root must stay in normal flow.
   }
 
   @Builder

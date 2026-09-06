@@ -2,7 +2,9 @@
 
 文法阅读页右上角、原课文播放按钮右侧的“语音伴读”按钮，直接发起实时通话，不自动打开对话面板。连接中及通话中，入口沿右侧展开为竖向悬浮胶囊，提供三个按钮：静音/恢复麦克风、打开对话面板、挂断（连接中为取消连接）。面板与连接分别管理，收起后回到悬浮控制，继续通话。
 
-按钮与面板使用现有最薄透明材质 `FLOATING_ULTRA_THIN_MATERIAL`。悬浮胶囊使用一个持续存在的材质容器，250 ms 摩擦曲线同步改变位置、尺寸与圆角，内部图标错时淡入淡出；不叠加第二圈边框或多层材质。点击面板按钮才拉起原生 sheet，面板使用系统展开、收起动效；不显式覆盖 sheet 的背景色，以免屏蔽原生沉浸材质。浮层外的触摸穿透到 PDF。
+通话胶囊由原生 `bindPopup` 承载，直接通过 `CustomPopupOptions.systemMaterial` 使用不额外赋色的 ULTRA_THIN 材质，保留系统折射、阴影与触摸光感。普通页面 Stack 不在 ArkUI 沉浸材质的生效区域，不能靠设置通用属性或增加透明底色获得折射。Popup 无箭头、无页面遮罩、不自动消失，固定对齐入口右边缘，间隔 12 vp；使用 250 ms 摩擦曲线淡入并轻移，内部三个按钮共享唯一材质背板。Popup builder 根节点保持正常布局，不设置 position、裁剪或第二层材质。入口本身保留普通模糊背板。
+
+所有 sheet（含设置中的三个服务、阅读目录/设置、课文音频、添加视频、五十音及通话面板）统一调用 `appSheetOptions`，使用原生弹窗默认档 ULTRA_THICK、28 vp 圆角和同一深浅色遮罩，减弱背景透出与折射干扰；不再使用浮动工具栏的超薄档或自定义材质染色。原生材质路径不覆盖背景色、背景模糊；不支持材质时统一回退。通话 sheet 与 Popup 绑定在同一页面宿主上，打开面板或音轨 sheet 时隐藏 Popup，对话面板收起动画结束后才恢复，期间不重建连接或清空字幕。浮层外触摸穿透到 PDF，系统返回沿用阅读页退出行为。
 
 ## 使用
 
@@ -16,7 +18,8 @@
 ## 接入依据
 
 - [鸿蒙转场动效设计指南](https://developer.huawei.com/consumer/cn/doc/design-guides/transition-animation-0000001750078488)：持续元素、共享容器、进出场元素的错时淡入淡出。
-- [鸿蒙 7 组件适配沉浸光感](https://developer.huawei.com/consumer/cn/doc/HarmonyOS-Guides/arkts-immersive-light-sense-component-adaptation)：薄材质与系统反色资源、限制材质面积和层数、sheet 使用原生系统材质。按本项目的透明度要求选择 ULTRA_THIN。
+- [鸿蒙 7 组件适配沉浸光感](https://developer.huawei.com/consumer/cn/doc/HarmonyOS-Guides/arkts-immersive-light-sense-component-adaptation)：悬浮控制采用 ULTRA_THIN，sheet 按弹窗用途采用 ULTRA_THICK，并由公共配置统一管理。
+- [开启沉浸光感](https://developer.huawei.com/consumer/cn/doc/HarmonyOS-Guides/arkts-immersive-light-sense-enable)：除弹窗、Slider、Toggle 等列出的组件外，材质只在 Navigation/NavDestination 标题栏、底部 TabBar 等指定区域生效。通话浮窗必须通过 Popup 的 options 配置材质。
 - [端到端实时语音·全双工版本](https://docs.volcengine.com/docs/6561/2549778?lang=zh)，核对的官方文档更新时间为 2026-09-04。
 - [接入必读](https://docs.volcengine.com/docs/6561/2549732?lang=zh)，包括 PCM、静音保活、上下文、关闭确认和错误处理。
 - 端点：`wss://openspeech.bytedance.com/api/v3/duplex/realtime/dialogue`；请求头仅 `X-Api-Key`。

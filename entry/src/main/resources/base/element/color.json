@@ -21,8 +21,8 @@
       "value": "#33FFFFFF"
     },
     {
-      "name": "immersive_panel_tint",
-      "value": "#59FFFFFF"
+      "name": "sheet_mask",
+      "value": "#33202124"
     },
     {
       "name": "immersive_plane",

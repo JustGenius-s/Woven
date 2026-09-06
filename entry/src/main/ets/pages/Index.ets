@@ -15,7 +15,7 @@ import {
   MOTION_DURATION,
   systemGestureInset
 } from '../common/AppTheme';
-import { bottomBarImmersiveMaterial } from '../common/ImmersiveMaterial';
+import { appSheetOptions, bottomBarImmersiveMaterial } from '../common/ImmersiveMaterial';
 import { AppSection, LearningJourney, PracticeScenario, ReadingWork } from '../model/ContentModels';
 import { GrammarWork } from '../model/GrammarModels';
 import { AiInquiryContext } from '../model/DeepSeekModels';
@@ -719,17 +719,12 @@ struct Index {
     }
     .width('100%')
     .height('100%')
-    .bindSheet($$this.kanaLookupOpen, this.kanaLookupSheet(), {
+    .bindSheet($$this.kanaLookupOpen, this.kanaLookupSheet(), appSheetOptions({
       height: SheetSize.LARGE,
-      preferType: SheetType.BOTTOM,
       title: { title: '五十音图' },
-      dragBar: true,
       showClose: true,
-      blurStyle: BlurStyle.COMPONENT_REGULAR,
-      backgroundColor: $r('app.color.surface_raised'),
-      maskColor: '#52000000',
       onDisappear: () => this.kanaLookupOpen = false
-    })
+    }))
     .padding({
       left: this.activeReading === undefined && this.activeVideo === undefined &&
         this.activeGrammar === undefined ? this.leftSafeInset() : 0,

@@ -17,7 +17,7 @@ import {
 } from '@kit.UIDesignKit';
 import { applyReaderPaper, statusBarInset, systemGestureInset } from '../../common/AppTheme';
 import {
-  FLOATING_IMMERSIVE_SURFACE, immersiveSheetSurface, preferredImmersiveMaterial
+  FLOATING_IMMERSIVE_SURFACE, appSheetOptions, preferredImmersiveMaterial
 } from '../../common/ImmersiveMaterial';
 import { showImmersiveNotice } from '../../common/ImmersiveNotice';
 import { ReadingAudioCue, ReadingAudioRect, ReadingPassage, ReadingWork } from '../../model/ContentModels';
@@ -762,19 +762,12 @@ export struct ReadingPage {
     .clip(false)
     .backgroundColor(Color.White)
     .onAreaChange((oldArea: Area, newArea: Area) => this.updateViewport(newArea.width, newArea.height))
-    .bindSheet($$this.panelOpen, this.readerPanel(), {
+    .bindSheet($$this.panelOpen, this.readerPanel(), appSheetOptions({
       height: this.panelKind === 0 ? SheetSize.LARGE : SheetSize.MEDIUM,
-      preferType: SheetType.BOTTOM,
       title: { title: this.panelKind === 0 ? '目录' : '阅读设置' },
-      dragBar: true,
       showClose: true,
-      radius: LengthMetrics.vp(28),
-      backgroundColor: immersiveSheetSurface().backgroundColor,
-      blurStyle: immersiveSheetSurface().blurStyle,
-      systemMaterial: immersiveSheetSurface().material,
-      maskColor: '#33202124',
       onDisappear: () => this.panelOpen = false
-    })
+    }))
     if (this.hasNarration()) {
       this.narrationControls()
     }

@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { promptAction, SegmentButtonV2Items, TabSegmentButtonV2, uiMaterial } from '@kit.ArkUI';
 import { picker } from '@kit.CoreFileKit';
 import { FLOATING_TAB_CONTENT_INSET } from '../../common/AppTheme';
+import { appSheetOptions } from '../../common/ImmersiveMaterial';
 import { showImmersiveNotice } from '../../common/ImmersiveNotice';
 import {
   LearningCatalog,
@@ -498,17 +499,12 @@ export struct ExplorePage {
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Transparent)
-    .bindSheet($$this.urlSheetOpen, this.urlSheet(), {
+    .bindSheet($$this.urlSheetOpen, this.urlSheet(), appSheetOptions({
       height: SheetSize.FIT_CONTENT,
-      preferType: SheetType.BOTTOM,
       title: { title: '添加网络视频' },
-      dragBar: true,
       showClose: true,
-      blurStyle: BlurStyle.COMPONENT_REGULAR,
-      backgroundColor: $r('app.color.surface_raised'),
-      maskColor: '#52000000',
       onDisappear: () => this.urlSheetOpen = false
-    })
+    }))
     .onAreaChange((oldArea: Area, newArea: Area) => this.updatePageWidth(newArea.width))
   }
 

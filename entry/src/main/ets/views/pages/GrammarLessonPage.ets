@@ -1,7 +1,7 @@
 import { common } from '@kit.AbilityKit';
-import { LengthMetrics, window } from '@kit.ArkUI';
+import { window } from '@kit.ArkUI';
 import { applyReaderPaper, statusBarInset, systemGestureInset } from '../../common/AppTheme';
-import { immersiveSheetSurface } from '../../common/ImmersiveMaterial';
+import { appSheetOptions } from '../../common/ImmersiveMaterial';
 import { showImmersiveNotice } from '../../common/ImmersiveNotice';
 import { GrammarAudioTrack, GrammarWork } from '../../model/GrammarModels';
 import { GrammarBookService } from '../../services/GrammarBookService';
@@ -260,7 +260,9 @@ export struct GrammarLessonPage {
         title: this.lesson.lessonNo === 0 ? this.lessonTitle() :
           `${this.lessonTitle()} · ${this.lesson.titleJa || this.lesson.title}`,
         ready: this.pdfReady && !this.failed && !this.downloading && !this.audioBusy,
+        overlayOpen: this.trackSheetOpen,
         onOpen: () => this.audioExpanded = false,
+        onBack: this.onBack,
         onSettings: this.onSettings,
         onSessionReady: (session: GrammarRealtimeSession) => this.realtime = session
       })
@@ -272,19 +274,12 @@ export struct GrammarLessonPage {
     .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
     .backgroundColor(Color.White)
     .onAreaChange((_oldArea: Area, area: Area) => this.viewportWidth = Number(area.width))
-    .bindSheet($$this.trackSheetOpen, this.trackSheet(), {
+    .bindSheet($$this.trackSheetOpen, this.trackSheet(), appSheetOptions({
       height: SheetSize.LARGE,
-      preferType: SheetType.BOTTOM,
       title: { title: '课文音频' },
-      dragBar: true,
       showClose: true,
-      radius: LengthMetrics.vp(28),
-      backgroundColor: immersiveSheetSurface().backgroundColor,
-      blurStyle: immersiveSheetSurface().blurStyle,
-      systemMaterial: immersiveSheetSurface().material,
-      maskColor: '#33202124',
       onDisappear: () => this.trackSheetOpen = false
-    })
+    }))
   }
 
   @Builder

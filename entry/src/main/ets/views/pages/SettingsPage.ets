@@ -1,7 +1,7 @@
 import { common } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { systemGestureInset } from '../../common/AppTheme';
-import { FLOATING_IMMERSIVE_SURFACE, immersiveSheetSurface } from '../../common/ImmersiveMaterial';
+import { FLOATING_IMMERSIVE_SURFACE, appSheetOptions } from '../../common/ImmersiveMaterial';
 import { showImmersiveNotice } from '../../common/ImmersiveNotice';
 import { ReadingWork } from '../../model/ContentModels';
 import { GrammarWork } from '../../model/GrammarModels';
@@ -416,21 +416,14 @@ export struct SettingsPage {
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Transparent)
-    .bindSheet($$this.sheetOpen, this.settingsSheet(), {
+    .bindSheet($$this.sheetOpen, this.settingsSheet(), appSheetOptions({
       height: SheetSize.FIT_CONTENT,
       detents: [SheetSize.FIT_CONTENT, SheetSize.LARGE],
-      preferType: SheetType.BOTTOM,
       title: { title: this.activeSheet === 'deepseek' ? 'DeepSeek' :
         (this.activeSheet === 'minimax' ? 'MiniMax 语音' : '火山引擎 · 实时语音') },
-      dragBar: true,
       showClose: true,
-      blurStyle: this.activeSheet === 'realtime' ? immersiveSheetSurface().blurStyle : BlurStyle.COMPONENT_REGULAR,
-      backgroundColor: this.activeSheet === 'realtime' ?
-        immersiveSheetSurface().backgroundColor : $r('app.color.surface_raised'),
-      systemMaterial: this.activeSheet === 'realtime' ? immersiveSheetSurface().material : undefined,
-      maskColor: this.activeSheet === 'realtime' ? '#33202124' : '#52000000',
       onDisappear: () => this.sheetOpen = false
-    })
+    }))
   }
 
   @Builder

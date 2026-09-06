@@ -1,4 +1,4 @@
-import { uiMaterial } from '@kit.ArkUI';
+import { LengthMetrics, uiMaterial } from '@kit.ArkUI';
 import { hdsMaterial, SystemMaterialParams } from '@kit.UIDesignKit';
 
 let cachedHighest: SystemMaterialParams | undefined = undefined;
@@ -64,9 +64,8 @@ export const FLOATING_ULTRA_THIN_MATERIAL: uiMaterial.Material = new uiMaterial.
 });
 
 const SHEET_MATERIAL: uiMaterial.Material = new uiMaterial.ImmersiveMaterial({
-  style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
-  materialColor: $r('app.color.immersive_panel_tint'),
-  colorInvert: true
+  // Use the native dialog grade: diffuse the page behind long text/form panels.
+  style: uiMaterial.ImmersiveStyle.ULTRA_THICK
 });
 
 export interface ImmersiveSurfaceStyle {
@@ -74,6 +73,15 @@ export interface ImmersiveSurfaceStyle {
   backgroundColor?: ResourceColor;
   blurStyle?: BlurStyle;
 }
+
+const NATIVE_FLOATING_POPUP: ImmersiveSurfaceStyle = {
+  material: new uiMaterial.ImmersiveMaterial({
+    style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
+    colorInvert: true,
+    interactive: true,
+    lightEffect: { color: Color.White }
+  })
+};
 
 let cachedFloatingSurface: ImmersiveSurfaceStyle | undefined = undefined;
 let cachedSheetSurface: ImmersiveSurfaceStyle | undefined = undefined;
@@ -102,9 +110,8 @@ function resolveArkUISurfaces(): void {
     };
     cachedSheetSurface = {
       material: smooth ? new uiMaterial.ImmersiveMaterial({
-        style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
-        materialColor: $r('app.color.immersive_plane_strong'),
-        colorInvert: true
+        style: uiMaterial.ImmersiveStyle.ULTRA_THICK,
+        materialColor: $r('app.color.immersive_plane_strong')
       }) : SHEET_MATERIAL
     };
   } else {
@@ -115,7 +122,7 @@ function resolveArkUISurfaces(): void {
     };
     cachedSheetSurface = {
       backgroundColor: $r('app.color.immersive_plane_strong'),
-      blurStyle: BlurStyle.COMPONENT_REGULAR
+      blurStyle: BlurStyle.COMPONENT_ULTRA_THICK
     };
   }
 }
@@ -138,8 +145,29 @@ export class FloatingImmersiveSurface implements AttributeModifier<CommonAttribu
 
 export const FLOATING_IMMERSIVE_SURFACE: FloatingImmersiveSurface = new FloatingImmersiveSurface();
 
-/** Sheets use their own native backplate, without whole-panel press deformation. */
-export function immersiveSheetSurface(): ImmersiveSurfaceStyle {
+function immersiveSheetSurface(): ImmersiveSurfaceStyle {
   if (cachedSheetSurface === undefined) { resolveArkUISurfaces(); }
   return cachedSheetSurface!;
+}
+
+/** All sheets share material, scrim and corners; callers own content and lifecycle. */
+export function appSheetOptions(options: SheetOptions): SheetOptions {
+  const surface: ImmersiveSurfaceStyle = immersiveSheetSurface();
+  options.systemMaterial = surface.material;
+  options.backgroundColor = surface.backgroundColor;
+  options.blurStyle = surface.blurStyle;
+  options.maskColor = $r('app.color.sheet_mask');
+  options.radius = LengthMetrics.vp(28);
+  options.preferType = SheetType.BOTTOM;
+  options.dragBar = true;
+  return options;
+}
+
+/**
+ * Ordinary page Stacks are outside ArkUI's immersive material scope. Put the
+ * call capsule on CustomPopupOptions.systemMaterial, not on its builder root.
+ */
+export function immersiveFloatingPopupSurface(): ImmersiveSurfaceStyle {
+  const surface: ImmersiveSurfaceStyle = floatingSurface();
+  return surface.material === FLOATING_ULTRA_THIN_MATERIAL ? NATIVE_FLOATING_POPUP : surface;
 }
