@@ -31,6 +31,7 @@ interface BiliViewResponse {
 
 interface BiliViewData {
   title?: string;
+  pic?: string;
   cid?: number;
   aid?: number;
   bvid?: string;
@@ -54,6 +55,17 @@ interface BiliDurl {
 export class BilibiliStreamResolver {
   static canResolve(url: string): boolean {
     return isBilibiliUrl(url);
+  }
+
+  static async coverUrl(rawUrl: string): Promise<string> {
+    const pageUrl: string = await BilibiliStreamResolver.expandShortUrl(rawUrl.trim());
+    const bvid: string = extractBilibiliBvid(pageUrl);
+    const aid: string = bvid.length > 0 ? '' : extractBilibiliAid(pageUrl);
+    if (bvid.length === 0 && aid.length === 0) {
+      return '';
+    }
+    const view: BiliViewData = await BilibiliStreamResolver.fetchView(bvid, aid);
+    return (view.pic ?? '').replace(/^http:\/\//, 'https://');
   }
 
   static async resolve(rawUrl: string): Promise<ResolvedVideoStream> {

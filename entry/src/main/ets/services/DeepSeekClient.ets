@@ -31,7 +31,7 @@ export class DeepSeekClient {
     }
   }
 
-  complete(messages: DeepSeekMessage[]): Promise<string> {
+  complete(messages: DeepSeekMessage[], maxTokens: number = 320): Promise<string> {
     if (this.apiKey.length === 0) {
       hilog.warn(LOG_DOMAIN, LOG_TAG, 'Request rejected before dispatch: API key is missing');
       return Promise.reject(new Error('请先保存 DeepSeek API Key'));
@@ -85,7 +85,7 @@ export class DeepSeekClient {
         messages: messages,
         thinking: { type: 'disabled' },
         stream: false,
-        max_tokens: 320,
+        max_tokens: Math.max(1, Math.min(2048, Math.floor(maxTokens))),
         temperature: 0.7
       };
       request.request(DEEPSEEK_URL, {

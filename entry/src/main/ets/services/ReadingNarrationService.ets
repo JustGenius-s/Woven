@@ -36,6 +36,7 @@ export class ReadingNarrationService {
   private static ready: boolean = false;
   private static preparing: boolean = false;
   private static sandboxFd: number = -1;
+  private static sourceTask: Promise<void> = Promise.resolve();
 
   static subscribe(listener: ReadingNarrationListener): void {
     if (ReadingNarrationService.listeners.indexOf(listener) < 0) {
@@ -114,12 +115,17 @@ export class ReadingNarrationService {
   }
 
   static async prepare(context: common.Context, audioFile: string, durationMs: number): Promise<void> {
-    if (ReadingNarrationService.audioFile === audioFile && ReadingNarrationService.ready &&
-      ReadingNarrationService.player !== undefined) {
-      return;
-    }
-    ReadingNarrationService.context = context as common.UIAbilityContext;
-    await ReadingNarrationService.load(audioFile, durationMs);
+    const task: Promise<void> = ReadingNarrationService.sourceTask.then(async (): Promise<void> => {
+      if (ReadingNarrationService.audioFile === audioFile && ReadingNarrationService.ready &&
+        ReadingNarrationService.player !== undefined) {
+        return;
+      }
+      ReadingNarrationService.context = context as common.UIAbilityContext;
+      await ReadingNarrationService.load(audioFile, durationMs);
+    });
+    // Track switches and reader exits must finish closing the old source before opening another one.
+    ReadingNarrationService.sourceTask = task.catch(() => {});
+    await task;
   }
 
   static async toggle(): Promise<void> {
@@ -141,7 +147,7 @@ export class ReadingNarrationService {
       // Other media may not have a prepared source.
     }
     const state: string = ReadingNarrationService.machine.state;
-    if (state === 'completed') {
+    if (state === 'completed' && ReadingNarrationService.positionMs >= ReadingNarrationService.durationMs) {
       await ReadingNarrationService.seek(0);
     }
     try {
@@ -179,10 +185,19 @@ export class ReadingNarrationService {
   }
 
   static async release(): Promise<void> {
+    const task: Promise<void> = ReadingNarrationService.sourceTask.then(async (): Promise<void> => {
+      await ReadingNarrationService.releasePlayer();
+    });
+    ReadingNarrationService.sourceTask = task.catch(() => {});
+    await task;
+  }
+
+  private static async releasePlayer(): Promise<void> {
     const path: string = ReadingNarrationService.audioFile;
     ReadingNarrationService.playing = false;
     ReadingNarrationService.ready = false;
     ReadingNarrationService.positionMs = 0;
+    ReadingNarrationService.durationMs = 0;
     ReadingNarrationService.audioFile = '';
     if (ReadingNarrationService.player !== undefined) {
       try {

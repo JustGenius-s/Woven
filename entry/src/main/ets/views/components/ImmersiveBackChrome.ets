@@ -15,6 +15,7 @@ export struct ImmersiveBackChrome {
   subtitle: string = '';
   closeIcon: boolean = false;
   paper: boolean = false;
+  @Prop trailingSpace: number = 0;
   scrollers: Scroller[] = [];
   onBack: () => void = () => {};
   @BuilderParam pageContent: () => void = this.emptyPageContent;
@@ -28,6 +29,7 @@ export struct ImmersiveBackChrome {
       this.pageContent()
     }
     .titleBar({
+      padding: this.trailingSpace > 0 ? { end: LengthMetrics.vp(this.trailingSpace) } : undefined,
       // Keep the back button and title below the status bar while the bar
       // background still extends into it. Defaults to false when omitted.
       avoidLayoutSafeArea: true,

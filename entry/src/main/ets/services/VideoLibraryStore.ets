@@ -81,19 +81,37 @@ export class VideoLibraryStore {
 
   static remove(context: common.Context, videoId: string): VideoItem[] {
     const videos: VideoItem[] = VideoLibraryStore.load(context);
-    const next: VideoItem[] = [];
+    const next: VideoItem[] = videos.filter((item: VideoItem) => item.id !== videoId);
+    // Commit first: a failed library write must not destroy a retained video.
+    VideoLibraryStore.save(context, next);
     for (let index: number = 0; index < videos.length; index++) {
       const item: VideoItem = videos[index];
       if (item.id === videoId) {
-        if (item.sourceKind === VIDEO_SOURCE_FILE) {
+        if (item.sourceKind === VIDEO_SOURCE_FILE &&
+          item.source.indexOf(`${context.filesDir}/${LIBRARY_DIRECTORY}/`) === 0) {
           VideoLibraryStore.removeFile(item.source);
         }
-      } else {
-        next.push(item);
+        VideoLibraryStore.removeFile(VideoLibraryStore.coverFilePath(context, item.id));
       }
     }
-    VideoLibraryStore.save(context, next);
     return next;
+  }
+
+  static coverFilePath(context: common.Context, videoId: string): string {
+    return `${context.filesDir}/${LIBRARY_DIRECTORY}/covers/${encodeURIComponent(videoId)}.jpg`;
+  }
+
+  static saveCover(context: common.Context, videoId: string, path: string): boolean {
+    const videos: VideoItem[] = VideoLibraryStore.load(context);
+    for (let index: number = 0; index < videos.length; index++) {
+      if (videos[index].id === videoId) {
+        videos[index].coverPath = path;
+        VideoLibraryStore.save(context, videos);
+        return true;
+      }
+    }
+    // A thumbnail may finish after the user deletes its video. Never reinsert it.
+    return false;
   }
 
   static saveTitle(context: common.Context, videoId: string, title: string): void {
@@ -142,13 +160,15 @@ export class VideoLibraryStore {
   private static save(context: common.Context, videos: VideoItem[]): void {
     const directory: string = VideoLibraryStore.ensureDirectory(context);
     const path: string = `${directory}/${LIBRARY_FILE}`;
-    const file: fileIo.File = fileIo.openSync(path,
+    const temporary: string = `${path}.tmp`;
+    const file: fileIo.File = fileIo.openSync(temporary,
       fileIo.OpenMode.CREATE | fileIo.OpenMode.WRITE_ONLY | fileIo.OpenMode.TRUNC);
     try {
       fileIo.writeSync(file.fd, JSON.stringify(videos));
     } finally {
       fileIo.closeSync(file);
     }
+    fileIo.renameSync(temporary, path);
   }
 
   private static libraryPath(context: common.Context): string {

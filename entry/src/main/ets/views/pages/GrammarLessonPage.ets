@@ -1,7 +1,13 @@
 import { common } from '@kit.AbilityKit';
-import { applyReaderPaper } from '../../common/AppTheme';
+import { LengthMetrics, window } from '@kit.ArkUI';
+import { applyReaderPaper, statusBarInset, systemGestureInset } from '../../common/AppTheme';
+import { FLOATING_ULTRA_THIN_MATERIAL } from '../../common/ImmersiveMaterial';
+import { showImmersiveNotice } from '../../common/ImmersiveNotice';
 import { GrammarAudioTrack, GrammarWork } from '../../model/GrammarModels';
 import { GrammarBookService } from '../../services/GrammarBookService';
+import { GrammarRealtimeSession } from '../../services/GrammarRealtimeSession';
+import { ReaderNavigation } from '../../services/ReaderNavigation';
+import { ReaderPreferences } from '../../services/ReaderPreferences';
 import {
   ReadingNarrationListener,
   ReadingNarrationService,
@@ -9,49 +15,66 @@ import {
 } from '../../services/ReadingNarrationService';
 import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
 import { PdfReadingCanvas } from '../components/PdfReadingCanvas';
+import { ReaderAudioControls } from '../components/ReaderAudioControls';
+import { ReaderPageProgress } from '../components/ReaderPageProgress';
+import { GrammarRealtimeButton } from '../components/GrammarRealtimeButton';
 
 const EMPTY_LESSON: GrammarWork = {
-  id: '',
-  level: '',
-  cefr: '',
-  lessonNo: 0,
-  title: '',
-  titleJa: '',
-  topic: '',
-  summary: '',
-  sourceName: '',
-  sourceUrl: '',
-  rights: '',
-  pdfKey: '',
-  pageCount: 0,
-  audioTracks: [],
-  sortOrder: 0
+  id: '', level: '', cefr: '', lessonNo: 0, title: '', titleJa: '', topic: '', summary: '',
+  sourceName: '', sourceUrl: '', rights: '', pdfKey: '', pageCount: 0, audioTracks: [], sortOrder: 0
 };
 
 @Component
 export struct GrammarLessonPage {
+  @Env(SystemProperties.WINDOW_AVOID_AREA) private avoidAreas: window.UIEnvWindowAvoidAreaInfoVP;
   lesson: GrammarWork = EMPTY_LESSON;
   onBack: () => void = () => {};
+  onSettings: (section: 'deepseek' | 'realtime') => void = () => {};
 
   @State private downloading: boolean = false;
   @State private downloadLabel: string = '';
   @State private failed: boolean = false;
   @State private failReason: string = '';
   @State private pdfPath: string = '';
+  @State private pageIndex: number = 0;
+  @State private pageCount: number = 0;
+  @State private jumpPage: number = 0;
+  @State private pdfReady: boolean = false;
+  @State private viewportWidth: number = 360;
   @State private trackIndex: number = 0;
   @State private trackSheetOpen: boolean = false;
+  @State private audioExpanded: boolean = false;
   @State private playing: boolean = false;
   @State private audioReady: boolean = false;
+  @State private audioBusy: boolean = false;
+  @State private positionMs: number = 0;
+  @State private durationMs: number = 0;
 
   private leaving: boolean = false;
-  private readonly onNarration: ReadingNarrationListener =
-    (snapshot: ReadingNarrationSnapshot) => {
-      this.playing = snapshot.playing;
-      this.audioReady = snapshot.ready;
-    };
+  private realtime?: GrammarRealtimeSession;
+  private activeAudioPath: string = '';
+  private readonly onNarration: ReadingNarrationListener = (snapshot: ReadingNarrationSnapshot) => {
+    if (this.leaving) {
+      return;
+    }
+    if (snapshot.audioFile !== this.activeAudioPath) {
+      this.playing = false;
+      this.audioReady = false;
+      this.positionMs = 0;
+      return;
+    }
+    this.playing = snapshot.playing;
+    this.audioReady = snapshot.ready;
+    this.positionMs = snapshot.positionMs;
+    this.durationMs = snapshot.durationMs;
+  };
 
   aboutToAppear(): void {
     applyReaderPaper(true);
+    this.pageCount = this.lesson.pageCount;
+    this.pageIndex = Math.max(0, ReaderPreferences.progress(this.hostContext(), this.progressId()).resourceIndex);
+    this.jumpPage = this.pageIndex;
+    ReadingNarrationService.subscribe(this.onNarration);
     void this.openLesson();
   }
 
@@ -66,34 +89,35 @@ export struct GrammarLessonPage {
     return this.getUIContext().getHostContext() as common.Context;
   }
 
+  private progressId(): string {
+    return `grammar_${this.lesson.id}`;
+  }
+
   private lessonTitle(): string {
-    if (this.lesson.lessonNo === 0) {
-      return this.lesson.titleJa.length > 0 ? this.lesson.titleJa : this.lesson.title;
-    }
-    return `第${this.lesson.lessonNo}课`;
+    return this.lesson.lessonNo === 0 ? (this.lesson.titleJa.length > 0 ? this.lesson.titleJa : this.lesson.title) :
+      `第${this.lesson.lessonNo}课`;
   }
 
   private lessonSubtitle(): string {
-    const ja: string = this.lesson.titleJa;
-    if (ja.length > 0 && this.lesson.lessonNo > 0) {
-      return `${this.lesson.level} · ${ja}`;
-    }
-    return this.lesson.level;
+    return this.lesson.titleJa.length > 0 && this.lesson.lessonNo > 0 ?
+      `${this.lesson.level} · ${this.lesson.titleJa}` : this.lesson.level;
   }
 
   private currentTrack(): GrammarAudioTrack | undefined {
-    if (this.trackIndex < 0 || this.trackIndex >= this.lesson.audioTracks.length) {
-      return undefined;
-    }
     return this.lesson.audioTracks[this.trackIndex];
   }
 
   private trackLabel(): string {
     const track: GrammarAudioTrack | undefined = this.currentTrack();
-    if (track === undefined) {
-      return '这一课没有音频';
-    }
-    return `${this.trackIndex + 1}/${this.lesson.audioTracks.length}  ${track.title}`;
+    return track === undefined ? '课文音频' : `${this.trackIndex + 1}/${this.lesson.audioTracks.length} · ${track.title}`;
+  }
+
+  private onPageChanged(index: number): void {
+    this.pageIndex = ReaderNavigation.page(index, this.pageCount);
+    this.jumpPage = this.pageIndex;
+    ReaderPreferences.saveProgress(this.hostContext(), this.progressId(), {
+      resourceIndex: this.pageIndex, domPos: '', pageOffset: 0
+    });
   }
 
   private async openLesson(): Promise<void> {
@@ -101,110 +125,182 @@ export struct GrammarLessonPage {
     this.downloadLabel = '正在准备教材…';
     this.failed = false;
     try {
-      const files = await GrammarBookService.ensureLesson(
-        this.hostContext(), this.lesson, (label: string) => {
+      const files = await GrammarBookService.ensureLesson(this.hostContext(), this.lesson, (label: string) => {
+        if (!this.leaving) {
           this.downloadLabel = label;
-        });
+        }
+      });
       if (this.leaving) {
         return;
       }
       this.pdfPath = files.pdfPath;
       this.downloading = false;
-      ReadingNarrationService.subscribe(this.onNarration);
-      await this.prepareCurrentTrack();
     } catch (error) {
-      this.failed = true;
-      this.downloading = false;
-      this.failReason = error instanceof Error ? error.message : `${error}`;
+      if (!this.leaving) {
+        this.failed = true;
+        this.downloading = false;
+        this.failReason = error instanceof Error ? error.message : `${error}`;
+      }
+      return;
+    }
+    this.audioBusy = true;
+    try {
+      await this.prepareCurrentTrack();
+    } finally {
+      this.audioBusy = false;
     }
   }
 
-  private async prepareCurrentTrack(): Promise<void> {
+  private async prepareCurrentTrack(): Promise<boolean> {
     const track: GrammarAudioTrack | undefined = this.currentTrack();
-    if (track === undefined) {
-      return;
+    if (track === undefined || this.leaving) {
+      return false;
     }
-    const path: string = GrammarBookService.localTrackPath(this.hostContext(), this.lesson, track);
-    await ReadingNarrationService.prepare(this.hostContext(), path, track.durationMs);
+    this.activeAudioPath = GrammarBookService.localTrackPath(this.hostContext(), this.lesson, track);
+    try {
+      await ReadingNarrationService.prepare(this.hostContext(), this.activeAudioPath, track.durationMs);
+      return !this.leaving && ReadingNarrationService.snapshot().ready;
+    } catch (_error) {
+      if (!this.leaving) {
+        showImmersiveNotice(this.getUIContext(), '音频暂时无法播放', '请稍后重试，教材可以继续阅读');
+      }
+      return false;
+    }
   }
 
   private async toggleAudio(): Promise<void> {
-    if (this.currentTrack() === undefined) {
+    if (this.currentTrack() === undefined || this.audioBusy || this.downloading || this.leaving) {
       return;
     }
-    if (!this.audioReady) {
-      await this.prepareCurrentTrack();
+    this.audioBusy = true;
+    try {
+      await this.realtime?.stop();
+      if ((!this.audioReady || ReadingNarrationService.snapshot().audioFile !== this.activeAudioPath) &&
+        !await this.prepareCurrentTrack()) {
+        return;
+      }
+      if (!this.leaving) {
+        await ReadingNarrationService.toggle();
+      }
+    } finally {
+      this.audioBusy = false;
     }
-    await ReadingNarrationService.toggle();
   }
 
-  private async selectTrack(index: number): Promise<void> {
-    if (index < 0 || index >= this.lesson.audioTracks.length) {
+  private async selectTrack(index: number, autoplay: boolean): Promise<void> {
+    if (index < 0 || index >= this.lesson.audioTracks.length || this.audioBusy || this.leaving) {
       return;
     }
-    this.trackIndex = index;
     this.trackSheetOpen = false;
-    await ReadingNarrationService.release();
-    ReadingNarrationService.subscribe(this.onNarration);
-    await this.prepareCurrentTrack();
-    await ReadingNarrationService.toggle();
+    this.audioBusy = true;
+    try {
+      await this.realtime?.stop();
+      await ReadingNarrationService.pause();
+      if (this.leaving) {
+        return;
+      }
+      this.trackIndex = index;
+      this.playing = false;
+      this.audioReady = false;
+      this.positionMs = 0;
+      this.durationMs = this.currentTrack()?.durationMs ?? 0;
+      if (await this.prepareCurrentTrack() && autoplay && !this.leaving) {
+        await ReadingNarrationService.play();
+      }
+    } finally {
+      this.audioBusy = false;
+    }
   }
 
-  private async stepTrack(delta: number): Promise<void> {
-    const next: number = this.trackIndex + delta;
-    if (next < 0 || next >= this.lesson.audioTracks.length) {
-      return;
+  private async seekAudio(position: number): Promise<void> {
+    if (this.audioReady && !this.audioBusy && !this.leaving &&
+      ReadingNarrationService.snapshot().audioFile === this.activeAudioPath) {
+      await ReadingNarrationService.seek(position);
     }
-    await this.selectTrack(next);
   }
 
   build() {
-    Column() {
+    Stack() {
       ImmersiveBackChrome({
         title: this.lessonTitle(),
         subtitle: this.lessonSubtitle(),
         paper: true,
+        trailingSpace: this.lesson.audioTracks.length > 0 ? 128 : 72,
         onBack: this.onBack,
-        pageContent: () => {
-          this.pageBody()
-        }
+        pageContent: (): void => this.pageBody()
       })
+      if (this.lesson.audioTracks.length > 0) {
+        ReaderAudioControls({
+          expanded: this.audioExpanded,
+          playing: this.playing,
+          ready: this.audioReady,
+          busy: this.audioBusy || this.downloading,
+          positionMs: this.positionMs,
+          durationMs: this.durationMs,
+          availableWidth: this.viewportWidth - 88,
+          title: this.trackLabel(),
+          previousLabel: '上一个课文音频',
+          nextLabel: '下一个课文音频',
+          canPrevious: this.trackIndex > 0,
+          canNext: this.trackIndex + 1 < this.lesson.audioTracks.length,
+          hasTrackList: true,
+          onToggle: () => { void this.toggleAudio(); },
+          onPrevious: () => { void this.selectTrack(this.trackIndex - 1, this.playing); },
+          onNext: () => { void this.selectTrack(this.trackIndex + 1, this.playing); },
+          onSeek: (position: number) => { void this.seekAudio(position); },
+          onTrackList: () => this.trackSheetOpen = true
+        })
+          .position({ right: 72, top: statusBarInset(this.avoidAreas) + 6 })
+          .hitTestBehavior(HitTestMode.Transparent)
+      }
+      GrammarRealtimeButton({
+        pdfPath: this.pdfPath,
+        pageIndex: this.pageIndex,
+        pageCount: this.pageCount,
+        title: this.lesson.lessonNo === 0 ? this.lessonTitle() :
+          `${this.lessonTitle()} · ${this.lesson.titleJa || this.lesson.title}`,
+        ready: this.pdfReady && !this.failed && !this.downloading && !this.audioBusy,
+        onOpen: () => this.audioExpanded = false,
+        onSettings: this.onSettings,
+        onSessionReady: (session: GrammarRealtimeSession) => this.realtime = session
+      })
+        .position({ right: 16, top: statusBarInset(this.avoidAreas) + 6 })
+        .hitTestBehavior(HitTestMode.Transparent)
     }
     .width('100%')
     .height('100%')
+    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
     .backgroundColor(Color.White)
+    .onAreaChange((_oldArea: Area, area: Area) => this.viewportWidth = Number(area.width))
     .bindSheet($$this.trackSheetOpen, this.trackSheet(), {
       height: SheetSize.LARGE,
       preferType: SheetType.BOTTOM,
       title: { title: '课文音频' },
       dragBar: true,
       showClose: true,
-      backgroundColor: $r('app.color.surface_raised'),
-      maskColor: '#52000000',
+      radius: LengthMetrics.vp(28),
+      backgroundColor: Color.Transparent,
+      systemMaterial: FLOATING_ULTRA_THIN_MATERIAL,
+      maskColor: '#33202124',
       onDisappear: () => this.trackSheetOpen = false
     })
   }
 
   @Builder
   private pageBody() {
-    Column() {
+    Stack({ alignContent: Alignment.Bottom }) {
       if (this.downloading) {
         Column({ space: 10 }) {
-          LoadingProgress()
-            .width(28)
-            .height(28)
-            .color($r('app.color.ink'))
-          Text(this.downloadLabel)
-            .fontSize(15)
-            .fontColor($r('app.color.ink_muted'))
+          LoadingProgress().width(28).height(28).color($r('app.color.ink'))
+          Text(this.downloadLabel).fontSize(15).fontColor($r('app.color.ink_muted'))
         }
         .width('100%')
-        .layoutWeight(1)
+        .height('100%')
         .justifyContent(FlexAlign.Center)
       } else if (this.failed) {
         Text(this.failReason.length > 0 ? this.failReason : '教材加载失败')
           .width('100%')
-          .layoutWeight(1)
+          .height('100%')
           .fontSize(15)
           .fontColor($r('app.color.danger'))
           .textAlign(TextAlign.Center)
@@ -212,58 +308,34 @@ export struct GrammarLessonPage {
       } else if (this.pdfPath.length > 0) {
         PdfReadingCanvas({
           pdfPath: this.pdfPath,
-          startPage: 0
+          startPage: this.pageIndex,
+          jumpPage: this.jumpPage,
+          onPageCountChanged: (count: number) => {
+            this.pageCount = count;
+            this.pdfReady = count > 0;
+          },
+          onPageChanged: (index: number) => this.onPageChanged(index),
+          onFailed: (reason: string) => {
+            this.pdfReady = false;
+            this.failed = true;
+            this.failReason = reason;
+          }
         })
-        .width('100%')
-        .layoutWeight(1)
-      } else {
-        Blank()
-          .layoutWeight(1)
+          .width('100%')
+          .height('100%')
       }
-      this.controlBar()
+      ReaderPageProgress({
+        pageIndex: this.pageIndex,
+        pageCount: this.pageCount,
+        ready: this.pdfReady && !this.failed && !this.downloading,
+        onJump: (index: number) => this.onPageChanged(index)
+      })
+        .width(Math.min(640, this.viewportWidth - 32))
+        .margin({ bottom: systemGestureInset(this.avoidAreas) + 10 })
     }
     .width('100%')
     .height('100%')
     .backgroundColor(Color.White)
-  }
-
-  @Builder
-  private controlBar() {
-    Column() {
-      Row({ space: 16 }) {
-        SymbolGlyph($r('sys.symbol.backward_end_fill'))
-          .fontSize(22)
-          .fontColor([this.trackIndex > 0 ? $r('app.color.ink') : $r('app.color.ink_muted')])
-          .onClick(() => {
-            void this.stepTrack(-1);
-          })
-        SymbolGlyph(this.playing ? $r('sys.symbol.pause_fill') : $r('sys.symbol.play_fill'))
-          .fontSize(30)
-          .fontColor([$r('app.color.accent')])
-          .onClick(() => {
-            void this.toggleAudio();
-          })
-        SymbolGlyph($r('sys.symbol.forward_end_fill'))
-          .fontSize(22)
-          .fontColor([this.trackIndex + 1 < this.lesson.audioTracks.length ?
-            $r('app.color.ink') : $r('app.color.ink_muted')])
-          .onClick(() => {
-            void this.stepTrack(1);
-          })
-        Text(this.trackLabel())
-          .layoutWeight(1)
-          .fontSize(13)
-          .fontColor($r('app.color.ink'))
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .onClick(() => this.trackSheetOpen = true)
-      }
-      .width('100%')
-      .alignItems(VerticalAlign.Center)
-    }
-    .width('100%')
-    .padding({ left: 18, right: 18, top: 10, bottom: 18 })
-    .backgroundColor($r('app.color.surface_raised'))
   }
 
   @Builder
@@ -274,23 +346,24 @@ export struct GrammarLessonPage {
           Row() {
             Text(track.title)
               .fontSize(16)
-              .fontColor(this.trackIndex === index ? $r('app.color.accent') : $r('app.color.ink'))
+              .fontColor(this.trackIndex === index ? $r('sys.color.font_primary') : $r('sys.color.font_secondary'))
               .layoutWeight(1)
             if (this.trackIndex === index) {
               SymbolGlyph($r('sys.symbol.checkmark'))
                 .fontSize(18)
-                .fontColor([$r('app.color.accent')])
+                .fontColor([$r('sys.color.icon_primary')])
             }
           }
           .width('100%')
+          .constraintSize({ minHeight: 52 })
           .padding({ left: 20, right: 20, top: 14, bottom: 14 })
-          .onClick(() => {
-            void this.selectTrack(index);
-          })
+          .enabled(!this.audioBusy)
+          .onClick(() => { void this.selectTrack(index, true); })
         }
       }, (track: GrammarAudioTrack) => track.id)
     }
     .width('100%')
+    .height('100%')
     .padding({ bottom: 24 })
   }
 }

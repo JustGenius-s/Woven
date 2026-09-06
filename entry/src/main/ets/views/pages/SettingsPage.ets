@@ -1,6 +1,7 @@
 import { common } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { systemGestureInset } from '../../common/AppTheme';
+import { FLOATING_ULTRA_THIN_MATERIAL } from '../../common/ImmersiveMaterial';
 import { showImmersiveNotice } from '../../common/ImmersiveNotice';
 import { ReadingWork } from '../../model/ContentModels';
 import { GrammarWork } from '../../model/GrammarModels';
@@ -11,6 +12,7 @@ import {
   HuaweiAccountSnapshot
 } from '../../model/SyncModels';
 import { ContentRepository } from '../../services/ContentRepository';
+import { RealtimeVoicePreferences } from '../../services/RealtimeVoicePreferences';
 import { DISTRIBUTED_SYNC_PERMISSION_REQUIRED } from '../../services/DistributedSyncPermission';
 import {
   GrammarBookService,
@@ -42,6 +44,7 @@ export struct SettingsPage {
   @Env(SystemProperties.WINDOW_AVOID_AREA) private avoidAreas: window.UIEnvWindowAvoidAreaInfoVP;
   initialApiKey: string = '';
   initialMinimaxApiKey: string = '';
+  initialSheet: 'deepseek' | 'minimax' | 'realtime' | '' = '';
   @Prop account: HuaweiAccountSnapshot = EMPTY_ACCOUNT;
   @Prop syncState: CloudSyncSnapshot = EMPTY_SYNC;
   onBack: () => void = () => {};
@@ -52,7 +55,11 @@ export struct SettingsPage {
   @State private apiKey: string = '';
   @State private minimaxApiKey: string = '';
   @State private sheetOpen: boolean = false;
-  @State private activeSheet: 'deepseek' | 'minimax' = 'deepseek';
+  @State private activeSheet: 'deepseek' | 'minimax' | 'realtime' = 'deepseek';
+  @State private realtimeApiKey: string = '';
+  @State private savedRealtimeApiKey: string = '';
+  @State private realtimeSaving: boolean = false;
+  @State private realtimeError: string = '';
   @State private downloadBusy: boolean = false;
   @State private downloadLabel: string = '';
   @State private pendingCount: number = 0;
@@ -74,6 +81,11 @@ export struct SettingsPage {
   aboutToAppear(): void {
     this.apiKey = this.initialApiKey;
     this.minimaxApiKey = this.initialMinimaxApiKey;
+    this.loadRealtimeCredentials();
+    if (this.initialSheet !== '') {
+      this.activeSheet = this.initialSheet;
+      this.sheetOpen = true;
+    }
     void this.refreshLibrary();
   }
 
@@ -118,6 +130,49 @@ export struct SettingsPage {
     this.minimaxApiKey = this.initialMinimaxApiKey;
     this.activeSheet = 'minimax';
     this.sheetOpen = true;
+  }
+
+  private loadRealtimeCredentials(): void {
+    try {
+      const credentials = RealtimeVoicePreferences.read(this.hostContext());
+      this.savedRealtimeApiKey = credentials.apiKey;
+      this.realtimeApiKey = credentials.apiKey;
+      this.realtimeError = '';
+    } catch (_error) {
+      this.realtimeError = '暂时无法读取火山配置，请重新填写';
+    }
+  }
+
+  private hasSavedRealtime(): boolean {
+    return this.savedRealtimeApiKey.trim().length > 0;
+  }
+
+  private canSaveRealtime(): boolean {
+    return !this.realtimeSaving && this.realtimeApiKey.trim().length > 0 &&
+      this.realtimeApiKey.trim() !== this.savedRealtimeApiKey;
+  }
+
+  private openRealtimeSheet(): void {
+    this.loadRealtimeCredentials();
+    this.activeSheet = 'realtime';
+    this.sheetOpen = true;
+  }
+
+  private async saveRealtime(remove: boolean = false): Promise<void> {
+    if (this.realtimeSaving || (!remove && !this.canSaveRealtime())) { return; }
+    const apiKey: string = remove ? '' : this.realtimeApiKey.trim();
+    this.realtimeSaving = true;
+    this.realtimeError = '';
+    try {
+      await RealtimeVoicePreferences.save(this.hostContext(), { apiKey: apiKey });
+      this.savedRealtimeApiKey = apiKey;
+      this.realtimeApiKey = apiKey;
+      this.sheetOpen = false;
+    } catch (_error) {
+      this.realtimeError = remove ? '配置未能移除，请重试' : '配置未能保存，请重试';
+    } finally {
+      this.realtimeSaving = false;
+    }
   }
 
   private save(): void {
@@ -361,16 +416,18 @@ export struct SettingsPage {
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Transparent)
-    .bindSheet($$this.sheetOpen, this.activeSheet === 'deepseek' ? this.deepSeekSheet() : this.minimaxSheet(), {
+    .bindSheet($$this.sheetOpen, this.settingsSheet(), {
       height: SheetSize.FIT_CONTENT,
       detents: [SheetSize.FIT_CONTENT, SheetSize.LARGE],
       preferType: SheetType.BOTTOM,
-      title: { title: this.activeSheet === 'deepseek' ? 'DeepSeek' : 'MiniMax 语音' },
+      title: { title: this.activeSheet === 'deepseek' ? 'DeepSeek' :
+        (this.activeSheet === 'minimax' ? 'MiniMax 语音' : '火山引擎 · 实时语音') },
       dragBar: true,
       showClose: true,
-      blurStyle: BlurStyle.COMPONENT_REGULAR,
-      backgroundColor: $r('app.color.surface_raised'),
-      maskColor: '#52000000',
+      blurStyle: this.activeSheet === 'realtime' ? undefined : BlurStyle.COMPONENT_REGULAR,
+      backgroundColor: this.activeSheet === 'realtime' ? Color.Transparent : $r('app.color.surface_raised'),
+      systemMaterial: this.activeSheet === 'realtime' ? FLOATING_ULTRA_THIN_MATERIAL : undefined,
+      maskColor: this.activeSheet === 'realtime' ? '#33202124' : '#52000000',
       onDisappear: () => this.sheetOpen = false
     })
   }
@@ -386,6 +443,7 @@ export struct SettingsPage {
               this.grammarLibrarySection()
               this.deepSeekSection()
               this.ttsSection()
+              this.realtimeSection()
             }
             .width('100%')
             .constraintSize({ maxWidth: 560 })
@@ -673,6 +731,83 @@ export struct SettingsPage {
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
+  private settingsSheet() {
+    if (this.activeSheet === 'deepseek') {
+      this.deepSeekSheet()
+    } else if (this.activeSheet === 'minimax') {
+      this.minimaxSheet()
+    } else {
+      this.realtimeSheet()
+    }
+  }
+
+  @Builder
+  private realtimeSection() {
+    Column({ space: 8 }) {
+      Text('实时语音').width('100%').padding({ left: 8 })
+        .fontSize(14).fontWeight(FontWeight.Medium).fontColor($r('app.color.ink_muted'))
+      Row({ space: 14 }) {
+        SymbolGlyph($r('sys.symbol.waveform_headphones')).fontSize(22)
+          .fontColor([$r('sys.color.icon_primary')])
+        Column({ space: 3 }) {
+          Text('火山引擎').fontSize(17).fontWeight(FontWeight.Medium).fontColor($r('sys.color.font_primary'))
+          Text('豆包实时语音 3.0 · API Key').fontSize(13).fontColor($r('sys.color.font_secondary'))
+        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+        Text(this.hasSavedRealtime() ? '已配置' : '未配置').fontSize(14)
+          .fontColor(this.hasSavedRealtime() ? $r('app.color.success') : $r('sys.color.font_secondary'))
+        SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([$r('sys.color.icon_secondary')])
+      }
+      .id('settings-realtime')
+      .width('100%').constraintSize({ minHeight: 72 })
+      .padding({ left: 18, right: 18, top: 10, bottom: 10 }).borderRadius(24)
+      .backgroundColor(Color.Transparent).systemMaterial(FLOATING_ULTRA_THIN_MATERIAL)
+      .accessibilityText(this.hasSavedRealtime() ? '火山实时语音，已配置' : '火山实时语音，未配置')
+      .onClick(() => this.openRealtimeSheet())
+      Text('使用豆包实时语音 3.0，围绕当前教材讲解和对话，支持随时插话。')
+        .width('100%').padding({ left: 8, right: 8, top: 2 })
+        .fontSize(13).lineHeight(19).fontColor($r('app.color.ink_muted'))
+    }.width('100%').alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
+  private realtimeSheet() {
+    Column({ space: 18 }) {
+      Text('API Key').fontSize(16).fontWeight(FontWeight.Medium).fontColor($r('sys.color.font_primary'))
+      TextInput({ text: this.realtimeApiKey, placeholder: '请输入火山语音 API Key' })
+        .id('realtime-api-key').type(InputType.Password).showPasswordIcon(true)
+        .height(52).fontSize(16).maxLength(500)
+        .fontColor($r('sys.color.font_primary')).placeholderColor($r('sys.color.font_secondary'))
+        .backgroundColor(Color.Transparent).systemMaterial(FLOATING_ULTRA_THIN_MATERIAL)
+        .borderRadius(14).padding({ left: 14, right: 14 }).enabled(!this.realtimeSaving)
+        .onChange((value: string) => this.realtimeApiKey = value)
+      Text('从火山语音控制台获取 API Key，填写并保存后即可发起实时语音连接。')
+        .fontSize(13).lineHeight(19).fontColor($r('sys.color.font_secondary')).width('100%')
+      Hyperlink('https://console.volcengine.com/speech/new/setting/apikeys?projectName=default', '获取 API Key')
+        .id('realtime-get-api-key').color($r('sys.color.font_primary')).height(44)
+        .accessibilityText('打开火山语音控制台的 API Key 管理')
+      Text('密钥仅保存在此设备。接通后会实时发送麦克风声音、当前页文字及教材摘录。')
+        .fontSize(13).lineHeight(19).fontColor($r('sys.color.font_secondary')).width('100%')
+      if (this.realtimeError) {
+        Text(this.realtimeError).fontSize(13).fontColor($r('app.color.danger')).width('100%')
+      }
+      Button(this.realtimeSaving ? '正在保存…' : '保存')
+        .id('realtime-save-settings').width('100%').height(48)
+        .backgroundColor(Color.Transparent).systemMaterial(FLOATING_ULTRA_THIN_MATERIAL)
+        .fontColor($r('sys.color.font_primary')).enabled(this.canSaveRealtime())
+        .accessibilityText('保存火山实时语音配置').onClick(() => { void this.saveRealtime(); })
+      if (this.hasSavedRealtime()) {
+        Button('移除配置', { type: ButtonType.ROUNDED_RECTANGLE })
+          .id('realtime-remove-settings').width('100%').height(44)
+          .buttonStyle(ButtonStyleMode.TEXTUAL).role(ButtonRole.ERROR).enabled(!this.realtimeSaving)
+          .accessibilityText('移除本地火山语音 API Key')
+          .onClick(() => { void this.saveRealtime(true); })
+      }
+    }
+    .width('100%').constraintSize({ maxWidth: 560 }).alignItems(HorizontalAlign.Start)
+    .padding({ left: 20, right: 20, top: 8, bottom: 28 })
   }
 
   @Builder

@@ -14,21 +14,23 @@ import { ContentRepository } from '../../services/ContentRepository';
 import { ContentShelfDataSource } from '../../services/ContentShelfDataSource';
 import { ReadingBookService } from '../../services/ReadingBookService';
 import { VideoLibraryStore } from '../../services/VideoLibraryStore';
+import { VideoCoverService } from '../../services/VideoCoverService';
 import { FloatingBarScrollTracker } from '../components/FloatingBarScrollTracker';
 import {
   ContentShelf,
   SHELF_COVER_HEIGHT,
   SHELF_COVER_WIDTH,
-  SHELF_VIDEO_HEIGHT,
-  SHELF_VIDEO_WIDTH
+  SHELF_VIDEO_HEIGHT
 } from '../components/ContentShelf';
 import { CoverCard } from '../components/CoverCard';
 import { PageChrome } from '../components/PageChrome';
+import { VideoShelfCard } from '../components/VideoShelfCard';
 
 @Component
 export struct ExplorePage {
   @Prop selectedTab: number = 0;
   @Prop videoId: string = '';
+  @Prop @Watch('onVideoOpenChange') videoOpen: boolean = false;
   @Prop readingIndex: number = -1;
   @Prop @Watch('onReadingOpenChange') readingOpen: boolean = false;
   @Prop scenarioIndex: number = -1;
@@ -37,6 +39,7 @@ export struct ExplorePage {
   onFloatingBarCompactChange: (compact: boolean) => void = (compact: boolean) => {};
   onTabChange: (index: number) => void = (index: number) => {};
   onOpenVideo: (video: VideoItem) => void = (video: VideoItem) => {};
+  onVideoLibraryChange: () => void = () => {};
   onOpenReading: (reading: ReadingWork, index: number) => void =
     (reading: ReadingWork, index: number) => {};
   onScenarioChange: (index: number) => void = (index: number) => {};
@@ -69,6 +72,7 @@ export struct ExplorePage {
   private downloadedReadingIds: Set<string> = new Set();
   private shelfSources: Map<string, ContentShelfDataSource<ReadingWork>> = new Map();
   private localStateGeneration: number = 0;
+  private videoCoverGeneration: number = 0;
   private readonly readingCategories: string[] =
     ['L0入门', 'L0', 'L1', 'L2', 'L3', 'L4', 'L5'];
   private readonly videoGroupOrder: string[] =
@@ -82,7 +86,7 @@ export struct ExplorePage {
     try {
       const context: common.Context = this.getUIContext().getHostContext() as common.Context;
       this.catalog = ContentRepository.loadCatalog(context);
-      this.videos = VideoLibraryStore.load(context);
+      this.refreshVideos(context);
       this.loadError = '';
       void this.initializeReadings(context);
     } catch (error) {
@@ -90,6 +94,36 @@ export struct ExplorePage {
       this.videos = [];
       this.readingWorks = [];
       this.loadError = '探索内容没有正确载入';
+    }
+  }
+
+  aboutToDisappear(): void {
+    this.videoCoverGeneration++;
+    this.localStateGeneration++;
+  }
+
+  private refreshVideos(context: common.Context): void {
+    this.videos = VideoLibraryStore.load(context);
+    void this.loadVideoCovers(context, ++this.videoCoverGeneration);
+  }
+
+  private async loadVideoCovers(context: common.Context, generation: number): Promise<void> {
+    const videos: VideoItem[] = this.videos.slice();
+    for (let index: number = 0; index < videos.length; index += 2) {
+      if (generation !== this.videoCoverGeneration) {
+        return;
+      }
+      await Promise.all(videos.slice(index, index + 2).map((video: VideoItem) =>
+        VideoCoverService.ensure(context, video)));
+      if (generation === this.videoCoverGeneration) {
+        this.videos = VideoLibraryStore.load(context);
+      }
+    }
+  }
+
+  private onVideoOpenChange(): void {
+    if (!this.videoOpen) {
+      this.refreshVideos(this.hostContext());
     }
   }
 
@@ -308,7 +342,7 @@ export struct ExplorePage {
   private confirmUrl(): void {
     try {
       const item: VideoItem = VideoLibraryStore.addUrl(this.hostContext(), this.urlDraft, this.titleDraft);
-      this.videos = VideoLibraryStore.load(this.hostContext());
+      this.refreshVideos(this.hostContext());
       this.urlSheetOpen = false;
       this.onOpenVideo(item);
     } catch (error) {
@@ -328,7 +362,7 @@ export struct ExplorePage {
         return;
       }
       const item: VideoItem = await VideoLibraryStore.importFromUri(this.hostContext(), uris[0], uris[0]);
-      this.videos = VideoLibraryStore.load(this.hostContext());
+      this.refreshVideos(this.hostContext());
       this.onOpenVideo(item);
     } catch (error) {
       const detail: string = error instanceof Error ? error.message : '无法导入视频';
@@ -337,7 +371,13 @@ export struct ExplorePage {
   }
 
   private removeVideo(videoId: string): void {
-    this.videos = VideoLibraryStore.remove(this.hostContext(), videoId);
+    try {
+      const next: VideoItem[] = VideoLibraryStore.remove(this.hostContext(), videoId);
+      this.getUIContext().animateTo({ duration: 220, curve: Curve.Friction }, () => this.videos = next);
+      this.onVideoLibraryChange();
+    } catch (_error) {
+      showImmersiveNotice(this.getUIContext(), '删除失败', '视频仍保留在列表中，请重试');
+    }
   }
 
   private formatDuration(durationMs: number): string {
@@ -409,6 +449,9 @@ export struct ExplorePage {
       return;
     }
     this.exploreTabIndex = index;
+    if (index === 0) {
+      this.refreshVideos(this.hostContext());
+    }
     this.onTabChange(index);
   }
 
@@ -473,14 +516,17 @@ export struct ExplorePage {
   private urlSheet() {
     Column({ space: 14 }) {
       TextInput({ text: this.urlDraft, placeholder: 'https://' })
+        .id('video-url-input')
         .width('100%')
         .height(48)
         .onChange((value: string) => this.urlDraft = value)
       TextInput({ text: this.titleDraft, placeholder: '标题（可选）' })
+        .id('video-title-input')
         .width('100%')
         .height(48)
         .onChange((value: string) => this.titleDraft = value)
       Button('添加并播放', { type: ButtonType.ROUNDED_RECTANGLE, stateEffect: true })
+        .id('video-url-submit')
         .width('100%')
         .buttonStyle(ButtonStyleMode.EMPHASIZED)
         .enabled(VideoLibraryStore.normalizedUrl(this.urlDraft).length > 0)
@@ -558,12 +604,13 @@ export struct ExplorePage {
         Row({ space: 10 }) {
           ForEach(this.videosForGroup(label), (video: VideoItem) => {
             this.videoCard(video)
-          }, (video: VideoItem) => video.id)
+          }, (video: VideoItem) => `${video.id}:${video.coverPath ?? ''}:${video.title}:${video.durationMs}`)
         }
         .height(SHELF_VIDEO_HEIGHT)
         .alignItems(VerticalAlign.Top)
       }
       .scrollable(ScrollDirection.Horizontal)
+      .align(Alignment.TopStart)
       .width('100%')
       .height(SHELF_VIDEO_HEIGHT)
       .padding({ left: 16, right: 16 })
@@ -576,56 +623,15 @@ export struct ExplorePage {
 
   @Builder
   private videoCard(video: VideoItem) {
-    Column({ space: 6 }) {
-      Row() {
-        if (this.formatDuration(video.durationMs).length > 0) {
-          Text(this.formatDuration(video.durationMs))
-            .fontSize(11)
-            .fontColor('#D9F7F8FA')
-        }
-        Blank()
-        SymbolGlyph($r('sys.symbol.play_circle_fill'))
-          .fontSize(18)
-          .fontColor([$r('app.color.immersive_light')])
-      }
-      .width('100%')
-      .alignItems(VerticalAlign.Center)
-
-      Blank()
-
-      Text(video.title)
-        .width('100%')
-        .fontSize(15)
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.immersive_light'))
-        .maxLines(2)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-    }
-    .width(SHELF_VIDEO_WIDTH)
-    .height(SHELF_VIDEO_HEIGHT)
-    .alignItems(HorizontalAlign.Start)
-    .padding(12)
-    .borderRadius(16)
-    .linearGradient({
-      angle: 135,
-      colors: [['#FF2A3340', 0], ['#FF17181A', 1]]
+    VideoShelfCard({
+      videoId: video.id,
+      title: video.title,
+      duration: this.formatDuration(video.durationMs),
+      coverPath: video.coverPath ?? '',
+      selected: this.videoId === video.id,
+      onOpen: () => this.onOpenVideo(video),
+      onRemove: () => this.removeVideo(video.id)
     })
-    .border({
-      width: this.videoId === video.id ? 1.5 : 0.5,
-      color: this.videoId === video.id ? $r('app.color.accent') : $r('app.color.line')
-    })
-    .clip(true)
-    .accessibilityText(video.title)
-    .onClick(() => this.onOpenVideo(video))
-    .bindContextMenu(this.videoCardMenu(video), ResponseType.LongPress)
-  }
-
-  @Builder
-  private videoCardMenu(video: VideoItem) {
-    Menu() {
-      MenuItem({ content: '删除' })
-        .onChange(() => this.removeVideo(video.id))
-    }
   }
 
   @Builder

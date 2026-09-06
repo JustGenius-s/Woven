@@ -64,6 +64,7 @@ struct Index {
   @State private deepSeekApiKey: string = '';
   @State private minimaxApiKey: string = '';
   @State private settingsOpen: boolean = false;
+  @State private settingsInitialSheet: 'deepseek' | 'realtime' | '' = '';
   @State private activeScenario: PracticeScenario | undefined = undefined;
   @State private activeReading: ReadingWork | undefined = undefined;
   @State private activeGrammar: GrammarWork | undefined = undefined;
@@ -340,6 +341,20 @@ struct Index {
       this.getUIContext().getHostContext() as common.Context, apiKey);
   }
 
+  private openReaderSettings(section: 'deepseek' | 'realtime'): void {
+    this.settingsInitialSheet = section;
+    this.getUIContext().animateTo({ duration: 250, curve: Curve.Friction }, () => {
+      this.settingsOpen = true;
+    });
+  }
+
+  private closeSettings(): void {
+    this.settingsInitialSheet = '';
+    this.getUIContext().animateTo({ duration: 250, curve: Curve.Friction }, () => {
+      this.settingsOpen = false;
+    });
+  }
+
   private startPractice(scenario: PracticeScenario): void {
     this.getUIContext().animateTo({ curve: curves.springMotion(0.4, 0.84, 0.18) }, () => {
       this.activeScenario = scenario;
@@ -435,7 +450,7 @@ struct Index {
     Stack() {
       ImmersiveBackdrop({
         sceneToneIndex: this.vocabularyStudyOpen && !this.settingsOpen ? this.vocabularySceneTone : -1,
-        paper: this.activeReading !== undefined || this.activeGrammar !== undefined,
+        paper: !this.settingsOpen && (this.activeReading !== undefined || this.activeGrammar !== undefined),
         canvasContent: () => {
           this.appShell()
         }
@@ -462,7 +477,26 @@ struct Index {
   private appShell() {
     Stack({ alignContent: Alignment.Bottom }) {
       Stack({ alignContent: Alignment.Center }) {
-        if (this.activeVideo !== undefined) {
+        if (this.settingsOpen) {
+          SettingsPage({
+            initialSheet: this.settingsInitialSheet,
+            initialApiKey: this.deepSeekApiKey,
+            initialMinimaxApiKey: this.minimaxApiKey,
+            account: this.accountSnapshot,
+            syncState: this.cloudSyncSnapshot,
+            onBack: () => this.closeSettings(),
+            onSave: (apiKey: string) => this.saveDeepSeekApiKey(apiKey),
+            onSaveMinimax: (apiKey: string) => this.saveMinimaxApiKey(apiKey),
+            onSync: () => this.syncLearningState(
+              this.getUIContext().getHostContext() as common.Context, true)
+          })
+          .width('100%')
+          .height('100%')
+          .constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
+          .transition(TransitionEffect.OPACITY
+            .combine(TransitionEffect.scale({ x: 0.97, y: 0.97 }))
+            .animation({ curve: curves.springMotion(0.4, 0.86, 0.16) }))
+        } else if (this.activeVideo !== undefined) {
           VideoPlayerPage({
             video: this.activeVideo,
             onBack: () => this.closeVideoPlayer()
@@ -475,7 +509,8 @@ struct Index {
         } else if (this.activeGrammar !== undefined) {
           GrammarLessonPage({
             lesson: this.activeGrammar,
-            onBack: () => this.closeGrammar()
+            onBack: () => this.closeGrammar(),
+            onSettings: (section: 'deepseek' | 'realtime') => this.openReaderSettings(section)
           })
           .width('100%')
           .height('100%')
@@ -505,24 +540,6 @@ struct Index {
           .transition(TransitionEffect.OPACITY
             .combine(TransitionEffect.scale({ x: 0.94, y: 0.94 }))
             .animation({ curve: curves.springMotion(0.42, 0.82, 0.18) }))
-        } else if (this.settingsOpen) {
-          SettingsPage({
-            initialApiKey: this.deepSeekApiKey,
-            initialMinimaxApiKey: this.minimaxApiKey,
-            account: this.accountSnapshot,
-            syncState: this.cloudSyncSnapshot,
-            onBack: () => this.settingsOpen = false,
-            onSave: (apiKey: string) => this.saveDeepSeekApiKey(apiKey),
-            onSaveMinimax: (apiKey: string) => this.saveMinimaxApiKey(apiKey),
-            onSync: () => this.syncLearningState(
-              this.getUIContext().getHostContext() as common.Context, true)
-          })
-          .width('100%')
-          .height('100%')
-          .constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
-          .transition(TransitionEffect.OPACITY
-            .combine(TransitionEffect.scale({ x: 0.97, y: 0.97 }))
-            .animation({ curve: curves.springMotion(0.4, 0.86, 0.16) }))
         } else if (this.vocabularyStudyOpen) {
           VocabularyStudyPage({
             level: this.vocabularyStudyLevel,
@@ -598,6 +615,7 @@ struct Index {
             ExplorePage({
               selectedTab: this.exploreTab,
               videoId: this.videoId,
+              videoOpen: this.activeVideo !== undefined,
               readingIndex: this.readingIndex,
               readingOpen: this.activeReading !== undefined,
               scenarioIndex: this.scenarioIndex,
@@ -606,6 +624,10 @@ struct Index {
               onFloatingBarCompactChange: (compact: boolean) => this.setFloatingBarsCompact(compact),
               onTabChange: (index: number) => this.saveExploreTab(index),
               onOpenVideo: (video: VideoItem) => this.openVideo(video),
+              onVideoLibraryChange: () => {
+                this.videoId = '';
+                this.refreshVideoLibrary(this.getUIContext().getHostContext() as common.Context);
+              },
               onOpenReading: (reading: ReadingWork, index: number) => this.openReading(reading, index),
               onScenarioChange: (index: number) => this.saveScenarioIndex(index),
               onStartScenario: (scenario: PracticeScenario) => this.startPractice(scenario),
@@ -747,6 +769,10 @@ struct Index {
       this.closeInquiry();
       return true;
     }
+    if (this.settingsOpen) {
+      this.closeSettings();
+      return true;
+    }
     if (this.activeGrammar !== undefined) {
       this.closeGrammar();
       return true;
@@ -761,10 +787,6 @@ struct Index {
     }
     if (this.activeScenario !== undefined) {
       this.closePractice();
-      return true;
-    }
-    if (this.settingsOpen) {
-      this.settingsOpen = false;
       return true;
     }
     if (this.vocabularyStudyOpen) {

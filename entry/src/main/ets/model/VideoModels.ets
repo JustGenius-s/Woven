@@ -8,6 +8,7 @@ export interface VideoItem {
   source: string;
   createdAt: number;
   durationMs: number;
+  coverPath?: string;
 }
 
 export enum VideoPlaybackPhase {

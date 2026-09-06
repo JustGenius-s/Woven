@@ -15,10 +15,12 @@ export struct PdfReadingCanvas {
   @Prop highlightPage: number = 0;
   @Prop highlightRects: ReadingAudioRect[] = [];
   onPageChanged: (index: number) => void = (_index: number) => {};
+  onPageCountChanged: (count: number) => void = (_count: number) => {};
   onFailed: (reason: string) => void = (_reason: string) => {};
 
   private controller: pdfViewManager.PdfController = new pdfViewManager.PdfController();
   private loaded: boolean = false;
+  private disposed: boolean = false;
   @State private failed: boolean = false;
   @State private failReason: string = '';
 
@@ -27,6 +29,7 @@ export struct PdfReadingCanvas {
   }
 
   aboutToDisappear(): void {
+    this.disposed = true;
     this.closeDocument();
   }
 
@@ -55,24 +58,33 @@ export struct PdfReadingCanvas {
       return;
     }
     try {
-      this.controller.registerPageCountChangedListener((_pageCount: number) => {});
+      this.controller.registerPageCountChangedListener((pageCount: number) => this.onPageCountChanged(pageCount));
       this.controller.registerPageChangedListener((pageIndex: number) => {
-        this.onPageChanged(pageIndex);
+        if (this.loaded) {
+          this.onPageChanged(pageIndex);
+        }
       });
       // Always open at page 0 first. A saved progress index past the real page
       // count throws BusinessError 1011302001 (invalid page number).
       const result: pdfService.ParseResult =
         await this.controller.loadDocument(this.pdfPath, '', 0);
+      if (this.disposed) {
+        this.controller.releaseDocument();
+        return;
+      }
       if (result !== pdfService.ParseResult.PARSE_SUCCESS) {
         this.markFailed(this.parseResultLabel(result));
         return;
       }
       this.loaded = true;
+      const pageCount: number = this.controller.getPageCount();
+      this.onPageCountChanged(pageCount);
       this.applyViewStyle();
-      const target: number = Math.max(0, this.startPage);
+      const target: number = Math.max(0, Math.min(this.startPage, pageCount - 1));
       if (target > 0) {
         this.controller.goToPage(target);
       }
+      this.onPageChanged(target);
       this.applyHighlight();
     } catch (error) {
       const err: BusinessError = error as BusinessError;
@@ -108,11 +120,15 @@ export struct PdfReadingCanvas {
       pdfViewManager.DisplayDirection.VERTICAL :
       pdfViewManager.DisplayDirection.HORIZONTAL);
     this.controller.setPageSpacing(0, 0);
+
   }
 
   onJumpPage(_propertyName?: string): void {
     if (this.loaded) {
-      this.controller.goToPage(this.jumpPage);
+      const target: number = Math.max(0, Math.min(this.jumpPage, this.controller.getPageCount() - 1));
+      if (target !== this.controller.getPageIndex()) {
+        this.controller.goToPage(target);
+      }
     }
   }
 

@@ -19,7 +19,7 @@ export struct PageChrome {
   largeTitle: boolean = true;
   customTitle: boolean = false;
   showSearchAction: boolean = false;
-  showMenuAction: boolean = false;
+  @Prop showMenuAction: boolean = false;
   menuIcon: Resource = $r('sys.symbol.plus');
   menuLabel: string = '菜单';
   bottomHeight: number = 0;

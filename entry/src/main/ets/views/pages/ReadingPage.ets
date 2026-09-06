@@ -9,18 +9,15 @@ import {
   window
 } from '@kit.ArkUI';
 import {
-  ActionBarButton,
-  ActionBarStyle,
   BlurStrategy,
   DividerShowType,
-  HdsActionBar,
   HdsNavigation,
   HdsNavigationTitleMode,
   TitleSize
 } from '@kit.UIDesignKit';
-import { SymbolGlyphModifier } from '@ohos.arkui.modifier';
-import { applyReaderPaper, systemGestureInset } from '../../common/AppTheme';
-import { FLOATING_CHROME_MATERIAL, preferredImmersiveMaterial } from '../../common/ImmersiveMaterial';
+import { applyReaderPaper, statusBarInset, systemGestureInset } from '../../common/AppTheme';
+import { FLOATING_ULTRA_THIN_MATERIAL, preferredImmersiveMaterial } from '../../common/ImmersiveMaterial';
+import { showImmersiveNotice } from '../../common/ImmersiveNotice';
 import { ReadingAudioCue, ReadingAudioRect, ReadingPassage, ReadingWork } from '../../model/ContentModels';
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { AiInquiryFactory } from '../../services/AiInquiryFactory';
@@ -32,8 +29,11 @@ import {
   ReadingNarrationSnapshot
 } from '../../services/ReadingNarrationService';
 import { ReaderPreferences, ReaderProgressSnapshot, ReaderStyleSnapshot } from '../../services/ReaderPreferences';
+import { ReaderNavigation } from '../../services/ReaderNavigation';
 import { aiTextSelectionMenu } from '../components/AiTextSelection';
 import { PdfReadingCanvas } from '../components/PdfReadingCanvas';
+import { ReaderAudioControls } from '../components/ReaderAudioControls';
+import { ReaderPageProgress } from '../components/ReaderPageProgress';
 
 const EMPTY_READING: ReadingWork = {
   id: '',
@@ -87,22 +87,30 @@ export struct ReadingPage {
   @State private localAudioPath: string = '';
   @State private narrationPlaying: boolean = false;
   @State private narrationReady: boolean = false;
+  @State private narrationExpanded: boolean = false;
+  @State private narrationBusy: boolean = false;
+  @State private narrationPositionMs: number = 0;
+  @State private narrationDurationMs: number = 0;
+  @State private audioScrubbing: boolean = false;
+  @State private pageScrubbing: boolean = false;
+  @State private actualPdfPageCount: number = 0;
   @State private highlightKey: string = '';
   @State private highlightPage: number = 0;
   @State private highlightRects: ReadingAudioRect[] = [];
 
   private leaving: boolean = false;
   private pageController: SwiperController = new SwiperController();
+  private narrationBound: boolean = false;
+  private passageScrollers: Map<number, Scroller> = new Map<number, Scroller>();
+  private passageOffsets: Map<number, number> = new Map<number, number>();
   private pinchStartFontSize: number = 22;
   private hasSavedStyle: boolean = false;
-  private ignorePageSyncUntil: number = 0;
-  private lastNarrationPage: number = -1;
   private readonly onNarrationSnapshot: ReadingNarrationListener =
     (snapshot: ReadingNarrationSnapshot) => this.handleNarrationSnapshot(snapshot);
   @State private flipOptions: SegmentButtonOptions = SegmentButtonOptions.tab({
     buttons: [
       { text: '左右翻页' },
-      { text: '上下翻页' }
+      { text: '上下滚动' }
     ] as ItemRestriction<SegmentButtonTextItem>,
     fontColor: $r('app.color.ink_muted'),
     selectedFontColor: $r('app.color.ink'),
@@ -110,8 +118,8 @@ export struct ReadingPage {
     selectedFontSize: 14,
     fontWeight: FontWeight.Regular,
     selectedFontWeight: FontWeight.Medium,
-    backgroundColor: $r('app.color.surface_raised'),
-    selectedBackgroundColor: $r('app.color.accent_soft'),
+    backgroundColor: Color.Transparent,
+    selectedBackgroundColor: '#14808080',
     borderRadiusMode: BorderRadiusMode.CUSTOM,
     backgroundBorderRadius: LengthMetrics.vp(20),
     itemBorderRadius: LengthMetrics.vp(17),
@@ -128,8 +136,10 @@ export struct ReadingPage {
     this.flipMode = Math.max(0, Math.min(style.flipMode, 1));
     this.flipIndexes = [this.flipMode];
     const progress: ReaderProgressSnapshot = ReaderPreferences.progress(this.hostContext(), this.reading.id);
-    this.currentPassageIndex = this.safePassageIndex(progress.resourceIndex);
+    this.currentPassageIndex = this.isPdfBook() ? Math.max(0, progress.resourceIndex) :
+      this.safePassageIndex(progress.resourceIndex);
     this.displayPageIndex = this.currentPassageIndex;
+    this.narrationDurationMs = this.reading.audioDurationMs ?? 0;
     if (this.isPdfBook()) {
       void this.openPdfBook();
     } else if (this.hasBundledAudio()) {
@@ -186,6 +196,9 @@ export struct ReadingPage {
       this.pdfJumpPage = this.currentPassageIndex;
       this.pdfFailed = false;
       this.pdfFailReason = '';
+      if (this.hasBundledAudio()) {
+        this.bindNarration(this.reading.audioFile ?? '');
+      }
     } catch (error) {
       this.pdfPath = '';
       this.pdfFailed = true;
@@ -197,9 +210,24 @@ export struct ReadingPage {
     if (audioPath.length === 0) {
       return;
     }
+    this.narrationBound = true;
     ReadingNarrationService.subscribe(this.onNarrationSnapshot);
-    void ReadingNarrationService.prepare(
-      this.hostContext(), audioPath, this.reading.audioDurationMs ?? 0);
+    void this.prepareBoundNarration(audioPath);
+  }
+
+  private async prepareBoundNarration(audioPath: string): Promise<void> {
+    this.narrationBusy = true;
+    try {
+      await ReadingNarrationService.prepare(this.hostContext(), audioPath, this.reading.audioDurationMs ?? 0);
+    } catch (_error) {
+      if (!this.leaving) {
+        showImmersiveNotice(this.getUIContext(), '朗读暂时无法播放', '请稍后重试');
+      }
+    } finally {
+      if (!this.leaving) {
+        this.narrationBusy = false;
+      }
+    }
   }
 
   private hasBundledAudio(): boolean {
@@ -208,13 +236,13 @@ export struct ReadingPage {
   }
 
   private readingLength(): number {
-    return this.reading.passages.length;
+    return this.actualPdfPageCount > 0 ? this.actualPdfPageCount : this.reading.passages.length;
   }
 
   aboutToDisappear(): void {
     this.leaving = true;
     applyReaderPaper(false);
-    if (this.hasAudio()) {
+    if (this.narrationBound) {
       ReadingNarrationService.unsubscribe(this.onNarrationSnapshot);
       void ReadingNarrationService.release();
     }
@@ -250,12 +278,14 @@ export struct ReadingPage {
   }
 
   private handleNarrationSnapshot(snapshot: ReadingNarrationSnapshot): void {
-    this.narrationPlaying = snapshot.playing;
-    this.narrationReady = snapshot.ready;
-    if (!snapshot.playing) {
+    if (this.leaving || snapshot.audioFile !== this.narrationAudioPath()) {
       return;
     }
-    if (!this.hasNarrationCues()) {
+    this.narrationPlaying = snapshot.playing;
+    this.narrationReady = snapshot.ready;
+    this.narrationPositionMs = snapshot.positionMs;
+    this.narrationDurationMs = Math.max(0, snapshot.durationMs);
+    if (!this.hasNarrationCues() || this.audioScrubbing || this.pageScrubbing) {
       return;
     }
     const cue: ReadingAudioCue | undefined =
@@ -264,14 +294,9 @@ export struct ReadingPage {
       this.clearHighlight();
       return;
     }
-    if (cue.page !== this.currentPassageIndex) {
-      this.ignorePageSyncUntil = Date.now() + 450;
-      this.currentPassageIndex = this.safePassageIndex(cue.page);
-      this.displayPageIndex = this.currentPassageIndex;
-      this.pdfJumpPage = this.currentPassageIndex;
-      this.saveProgress();
+    if (snapshot.playing && !this.passageVisible(cue.page)) {
+      this.jumpToPassage(cue.page, false);
     }
-    this.lastNarrationPage = cue.page;
     this.applyCueHighlight(cue);
   }
 
@@ -294,22 +319,65 @@ export struct ReadingPage {
   }
 
   private async toggleNarration(): Promise<void> {
-    if (!this.hasNarration()) {
+    if (!this.hasNarration() || this.narrationBusy || this.downloading) {
       return;
     }
-    if (!this.narrationReady) {
-      await ReadingNarrationService.prepare(
-        this.hostContext(), this.narrationAudioPath(), this.reading.audioDurationMs ?? 0);
-    }
-    if (!this.narrationPlaying && this.hasNarrationCues()) {
-      const snapshot: ReadingNarrationSnapshot = ReadingNarrationService.snapshot();
-      const current: ReadingAudioCue | undefined =
-        ReadingNarrationService.cueAt(this.narrationCues(), snapshot.positionMs);
-      if (current === undefined || current.page !== this.currentPassageIndex) {
-        await this.seekNarrationToPage(this.currentPassageIndex);
+    this.narrationBusy = true;
+    try {
+      if (!this.narrationReady) {
+        await ReadingNarrationService.prepare(
+          this.hostContext(), this.narrationAudioPath(), this.reading.audioDurationMs ?? 0);
       }
+      if (this.leaving) {
+        return;
+      }
+      if (!ReadingNarrationService.snapshot().ready) {
+        showImmersiveNotice(this.getUIContext(), '朗读暂时无法播放', '请稍后重试');
+        return;
+      }
+      if (!this.narrationPlaying && this.hasNarrationCues()) {
+        const snapshot: ReadingNarrationSnapshot = ReadingNarrationService.snapshot();
+        const current: ReadingAudioCue | undefined =
+          ReadingNarrationService.cueAt(this.narrationCues(), snapshot.positionMs);
+      if (current === undefined || !this.passageVisible(current.page)) {
+          await this.seekNarrationToPage(this.currentPassageIndex);
+        }
+      }
+      await ReadingNarrationService.toggle();
+    } catch (_error) {
+      if (!this.leaving) {
+        showImmersiveNotice(this.getUIContext(), '朗读暂时无法播放', '请稍后重试');
+      }
+    } finally {
+      this.narrationBusy = false;
     }
-    await ReadingNarrationService.toggle();
+  }
+
+  private audioStepTarget(direction: number): number {
+    return ReaderNavigation.audioTarget(this.narrationCues(), this.narrationPositionMs,
+      this.narrationDurationMs, direction);
+  }
+
+  private canStepAudio(direction: number): boolean {
+    return this.narrationReady && !this.narrationBusy &&
+      Math.abs(this.audioStepTarget(direction) - this.narrationPositionMs) > 100;
+  }
+
+  private async seekAudio(positionMs: number): Promise<void> {
+    if (!this.narrationReady || this.narrationBusy || this.leaving) {
+      return;
+    }
+    this.narrationBusy = true;
+    try {
+      const cue: ReadingAudioCue | undefined = ReadingNarrationService.cueAt(this.narrationCues(), positionMs);
+      if (cue !== undefined) {
+        this.jumpToPassage(cue.page, false);
+        this.applyCueHighlight(cue);
+      }
+      await ReadingNarrationService.seek(positionMs);
+    } finally {
+      this.narrationBusy = false;
+    }
   }
 
   private async seekNarrationToPage(page: number): Promise<void> {
@@ -320,8 +388,7 @@ export struct ReadingPage {
       return;
     }
     if (targetPage !== this.currentPassageIndex) {
-      this.ignorePageSyncUntil = Date.now() + 450;
-      this.jumpToPassage(targetPage);
+      this.jumpToPassage(targetPage, false);
     }
     await ReadingNarrationService.seek(cue.startMs);
   }
@@ -331,11 +398,7 @@ export struct ReadingPage {
   }
 
   private safePassageIndex(index: number): number {
-    const total: number = this.readingLength();
-    if (total === 0) {
-      return 0;
-    }
-    return Math.max(0, Math.min(index, total - 1));
+    return ReaderNavigation.page(index, this.readingLength());
   }
 
   private isWideLandscape(width: number = this.viewportWidth, height: number = this.viewportHeight): boolean {
@@ -362,10 +425,7 @@ export struct ReadingPage {
 
   private pageLabel(): string {
     const total: number = Math.max(1, this.readingLength());
-    if (this.isPdfBook()) {
-      return `${this.currentPassageIndex + 1} / ${total}`;
-    }
-    const firstPassage: number = Math.min(this.displayPageIndex * this.pageStride(), total - 1);
+    const firstPassage: number = Math.min(this.visiblePageStart(), total - 1);
     const start: number = firstPassage + 1;
     if (this.dualPage && firstPassage + 1 < total) {
       return `${start}–${start + 1} / ${total}`;
@@ -373,20 +433,21 @@ export struct ReadingPage {
     return `${start} / ${total}`;
   }
 
-  private readingProgressTotal(): number {
-    return Math.max(1, this.readingLength());
+  private visiblePageStart(): number {
+    return this.isPdfBook() ? Math.floor(this.currentPassageIndex / this.pageStride()) * this.pageStride() :
+      this.displayPageIndex * this.pageStride();
   }
 
-  private readingProgressValue(): number {
-    const total: number = this.readingProgressTotal();
-    if (this.isPdfBook()) {
-      return Math.min(this.currentPassageIndex + 1, total);
+  private passageVisible(index: number): boolean {
+    return index >= this.visiblePageStart() && index < this.visiblePageStart() + this.pageStride();
+  }
+
+  private catalogPages(): number[] {
+    const pages: number[] = [];
+    for (let index: number = 0; index < this.readingLength(); index++) {
+      pages.push(index);
     }
-    const current: number = this.displayPageIndex * this.pageStride() + 1;
-    if (this.dualPage && current < total) {
-      return Math.min(current + 1, total);
-    }
-    return Math.min(current, total);
+    return pages;
   }
 
   private passageTitle(index: number): string {
@@ -395,6 +456,15 @@ export struct ReadingPage {
     }
     return this.reading.passages[index].title ??
       (this.reading.complete ? `第 ${index + 1} 阅读页` : `節選 ${index + 1}`);
+  }
+
+  private passageScroller(index: number): Scroller {
+    let scroller: Scroller | undefined = this.passageScrollers.get(index);
+    if (scroller === undefined) {
+      scroller = new Scroller();
+      this.passageScrollers.set(index, scroller);
+    }
+    return scroller;
   }
 
   private minimumFontSize(): number {
@@ -501,28 +571,32 @@ export struct ReadingPage {
     this.onAsk(AiInquiryFactory.selection(content, `阅读 · ${this.reading.title}`, detail));
   }
 
-  private jumpToPassage(index: number): void {
+  private jumpToPassage(index: number, syncAudio: boolean = true): void {
     const next: number = this.safePassageIndex(index);
+    this.panelOpen = false;
     this.currentPassageIndex = next;
-    this.displayPageIndex = Math.floor(next / this.pageStride());
+    this.displayPageIndex = this.isPdfBook() ? next : Math.floor(next / this.pageStride());
     if (this.isPdfBook()) {
       this.pdfJumpPage = next;
     } else {
       this.pageController.changeIndex(this.displayPageIndex, true);
     }
     this.saveProgress();
-    this.panelOpen = false;
-    if (this.hasNarrationCues() && this.narrationPlaying && Date.now() >= this.ignorePageSyncUntil) {
+    if (syncAudio && this.hasNarrationCues() && this.narrationPlaying) {
       void this.seekNarrationToPage(next);
     }
   }
 
   private onPdfPageChanged(index: number): void {
+    if (index === this.currentPassageIndex) {
+      return;
+    }
     this.currentPassageIndex = this.safePassageIndex(index);
     this.displayPageIndex = this.currentPassageIndex;
+    this.pdfJumpPage = this.currentPassageIndex;
+    this.clearHighlight();
     this.saveProgress();
-    if (this.hasNarrationCues() && this.narrationPlaying && Date.now() >= this.ignorePageSyncUntil &&
-      index !== this.lastNarrationPage) {
+    if (this.hasNarrationCues() && this.narrationPlaying) {
       void this.seekNarrationToPage(index);
     }
   }
@@ -535,12 +609,15 @@ export struct ReadingPage {
 
   private toggleControls(): void {
     if (!this.panelOpen && !this.pinching) {
-      this.controlsVisible = !this.controlsVisible;
+      this.getUIContext().animateTo({ curve: Curve.Friction, duration: 220 }, () => {
+        this.controlsVisible = !this.controlsVisible;
+        this.narrationExpanded = false;
+      });
     }
   }
 
   private handleReaderScroll(yOffset: number, scrollSource: ScrollSource): void {
-    if (this.panelOpen || Math.abs(yOffset) < 1) {
+    if (this.panelOpen || this.narrationExpanded || Math.abs(yOffset) < 1) {
       return;
     }
     // Spring bounce at the bottom looks like an upward scroll and would
@@ -567,7 +644,8 @@ export struct ReadingPage {
       this.fontSize = this.clampFontSize(this.fontSize);
     }
     if (oldStride !== this.pageStride()) {
-      this.displayPageIndex = Math.floor(this.currentPassageIndex / this.pageStride());
+      this.displayPageIndex = this.isPdfBook() ? this.currentPassageIndex :
+        Math.floor(this.currentPassageIndex / this.pageStride());
       this.pageController.changeIndex(this.displayPageIndex, false);
     }
   }
@@ -578,7 +656,8 @@ export struct ReadingPage {
     }
     this.forceSinglePage = !this.forceSinglePage;
     this.dualPage = !this.forceSinglePage;
-    this.displayPageIndex = Math.floor(this.currentPassageIndex / this.pageStride());
+    this.displayPageIndex = this.isPdfBook() ? this.currentPassageIndex :
+      Math.floor(this.currentPassageIndex / this.pageStride());
     if (!this.isPdfBook()) {
       this.pageController.changeIndex(this.displayPageIndex, true);
     }
@@ -588,51 +667,13 @@ export struct ReadingPage {
     return systemGestureInset(this.avoidAreas);
   }
 
-  private readerAction(icon: Resource, label: string, action: () => void): ActionBarButton {
-    return new ActionBarButton({
-      baseIconSymbolGlyphModifier: new SymbolGlyphModifier(icon)
-        .fontSize(22)
-        .fontColor([$r('sys.color.icon_primary')]),
-      accessibilityText: label,
-      hoverTips: label,
-      onClick: action
-    });
-  }
-
-  private endActions(): ActionBarButton[] {
-    const actions: ActionBarButton[] = [];
-    if (this.isWideLandscape()) {
-      actions.push(this.readerAction($r('sys.symbol.rectangle_split_2x1'),
-        this.dualPage ? '切换单页' : '切换双页', () => this.togglePageLayout()));
-    }
-    actions.push(this.readerAction($r('sys.symbol.gearshape_fill'), '阅读设置', () => this.openSettings()));
-    return actions;
-  }
-
-  private actionBarStyle(): ActionBarStyle {
-    return new ActionBarStyle({
-      height: LengthMetrics.vp(56),
-      innerSpace: LengthMetrics.vp(8),
-      startSpace: LengthMetrics.vp(8),
-      endSpace: LengthMetrics.vp(8),
-      margin: LengthMetrics.vp(0),
-      backgroundBlurStyle: BlurStyle.NONE
-    });
-  }
-
   build() {
+    Stack() {
     HdsNavigation() {
       Stack({ alignContent: Alignment.Bottom }) {
         this.readerCanvas()
         if (this.controlsVisible) {
           this.bottomControls()
-        } else if (this.hasNarration() && this.narrationPlaying) {
-          Column() {
-            this.narrationChip()
-          }
-          .width('100%')
-          .alignItems(HorizontalAlign.Center)
-          .padding({ bottom: this.bottomSafeInset() + 10 })
         }
         if (this.pinching && !this.isPdfBook()) {
           Text(`${this.fontSize} fp`)
@@ -642,7 +683,7 @@ export struct ReadingPage {
             .padding({ left: 18, right: 18, top: 10, bottom: 10 })
             .borderRadius(22)
             .backgroundColor(Color.Transparent)
-            .systemMaterial(FLOATING_CHROME_MATERIAL)
+            .systemMaterial(FLOATING_ULTRA_THIN_MATERIAL)
             .position({ x: '50%', y: '48%' })
             .translate({ x: '-50%', y: '-50%' })
         }
@@ -660,6 +701,7 @@ export struct ReadingPage {
       )
     }
     .titleBar({
+      padding: { end: LengthMetrics.vp(this.hasNarration() ? 72 : 16) },
       // This page declares its own titleBar instead of using ImmersiveBackChrome,
       // so it needs the same opt-in: keep the back button and title below the
       // status bar while the bar background still extends into it.
@@ -726,11 +768,18 @@ export struct ReadingPage {
       dragBar: true,
       showClose: true,
       radius: LengthMetrics.vp(28),
-      blurStyle: BlurStyle.COMPONENT_REGULAR,
-      backgroundColor: $r('app.color.surface_raised'),
+      backgroundColor: Color.Transparent,
+      systemMaterial: FLOATING_ULTRA_THIN_MATERIAL,
       maskColor: '#33202124',
       onDisappear: () => this.panelOpen = false
     })
+    if (this.hasNarration()) {
+      this.narrationControls()
+    }
+    }
+    .width('100%')
+    .height('100%')
+    .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
   }
 
   @Builder
@@ -787,6 +836,10 @@ export struct ReadingPage {
         highlightPage: this.highlightPage,
         highlightRects: this.highlightRects,
         onPageChanged: (index: number) => this.onPdfPageChanged(index),
+        onPageCountChanged: (count: number) => {
+          this.actualPdfPageCount = count;
+          this.currentPassageIndex = this.safePassageIndex(this.currentPassageIndex);
+        },
         onFailed: (reason: string) => {
           this.pdfFailReason = reason;
           this.pdfFailed = true;
@@ -895,7 +948,7 @@ export struct ReadingPage {
 
   @Builder
   private passagePage(index: number, compact: boolean) {
-    Scroll() {
+    Scroll(this.passageScroller(index)) {
       Column() {
         Text(this.passageTitle(index))
           .width('100%')
@@ -966,7 +1019,7 @@ export struct ReadingPage {
         // at the same screen position while the reading area gains the space
         // at the bottom instead.
         top: 16 + (this.controlsVisible ? 0 : READER_TITLE_BAR_HEIGHT),
-        bottom: 96
+        bottom: 96 + this.bottomSafeInset()
       })
     }
     .width('100%')
@@ -976,76 +1029,80 @@ export struct ReadingPage {
     .onWillScroll((xOffset: number, yOffset: number, scrollState: ScrollState, scrollSource: ScrollSource) => {
       this.handleReaderScroll(yOffset, scrollSource);
     })
-    .onClick(() => this.currentPassageIndex = index)
-  }
-
-  @Builder
-  private narrationChip() {
-    Row({ space: 6 }) {
-      SymbolGlyph(this.narrationPlaying ? $r('sys.symbol.pause_fill') : $r('sys.symbol.play_fill'))
-        .fontSize(16)
-        .fontColor([$r('sys.color.icon_primary')])
-      Text(this.narrationPlaying ? '暂停' : '朗读')
-        .fontSize(12)
-        .fontColor($r('sys.color.font_primary'))
-    }
-    .padding({ left: 12, right: 14, top: 6, bottom: 6 })
-    .borderRadius(16)
-    .backgroundColor(Color.Transparent)
-    .systemMaterial(FLOATING_CHROME_MATERIAL)
-    .accessibilityText(this.narrationPlaying ? '暂停朗读' : '朗读')
+    .onDidScroll(() => {
+      this.passageOffsets.set(index, this.passageScroller(index).currentOffset().yOffset);
+    })
+    .onAppear(() => {
+      this.passageScroller(index).scrollTo({ xOffset: 0, yOffset: this.passageOffsets.get(index) ?? 0 });
+    })
     .onClick(() => {
-      void this.toggleNarration();
+      this.currentPassageIndex = index;
+      this.toggleControls();
     })
   }
 
   @Builder
-  private bottomControls() {
-    Column({ space: 10 }) {
-      if (this.hasNarration()) {
-        Row() {
-          this.narrationChip()
-        }
-      }
-      Column({ space: 12 }) {
-        Row({ space: 10 }) {
-          Progress({
-            value: this.readingProgressValue(),
-            total: this.readingProgressTotal(),
-            type: ProgressType.Linear
-          })
-            .layoutWeight(1)
-            .height(6)
-            .color($r('app.color.accent'))
-            .backgroundColor($r('app.color.line'))
-            .style({ strokeWidth: 6 })
-            .accessibilityText(`阅读进度 ${this.pageLabel()}`)
-          Text(this.pageLabel())
-            .fontSize(12)
-            .fontColor($r('sys.color.font_secondary'))
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Center)
-        HdsActionBar({
-          startButtons: [
-            this.readerAction($r('sys.symbol.book_pages_fill'), '目录', () => this.openCatalog())
-          ],
-          endButtons: this.endActions(),
-          actionBarStyle: this.actionBarStyle(),
-          blurStrategy: BlurStrategy.ADAPTIVE
-        })
-      }
-      .width('100%')
-      .padding({ left: 14, right: 14, top: 12, bottom: 4 })
-      .borderRadius(28)
-      .systemMaterial(FLOATING_CHROME_MATERIAL)
+  private narrationControls() {
+    ReaderAudioControls({
+      expanded: this.narrationExpanded,
+      playing: this.narrationPlaying,
+      ready: this.narrationReady,
+      busy: this.narrationBusy || this.downloading,
+      positionMs: this.narrationPositionMs,
+      durationMs: this.narrationDurationMs,
+      availableWidth: this.viewportWidth - 32,
+      title: '原声朗读',
+      previousLabel: this.hasNarrationCues() ? '上一个朗读段落' : '快退 15 秒',
+      nextLabel: this.hasNarrationCues() ? '下一个朗读段落' : '快进 15 秒',
+      canPrevious: this.canStepAudio(-1),
+      canNext: this.canStepAudio(1),
+      onToggle: () => { void this.toggleNarration(); },
+      onPrevious: () => { void this.seekAudio(this.audioStepTarget(-1)); },
+      onNext: () => { void this.seekAudio(this.audioStepTarget(1)); },
+      onSeek: (position: number) => { void this.seekAudio(position); },
+      onScrubbing: (scrubbing: boolean) => this.audioScrubbing = scrubbing
+    })
+      .position({ right: 16, top: statusBarInset(this.avoidAreas) + 6 })
+      .hitTestBehavior(HitTestMode.Transparent)
+  }
+
+  @Builder
+  private readerTool(icon: Resource, label: string, action: () => void) {
+    Button({ type: ButtonType.Circle }) {
+      SymbolGlyph(icon)
+        .fontSize(21)
+        .fontColor([$r('sys.color.icon_primary')])
     }
-    .width('100%')
-    .alignItems(HorizontalAlign.Center)
-    .padding({ left: 16, right: 16, bottom: this.bottomSafeInset() + 10 })
-    .transition(TransitionEffect.OPACITY
-      .combine(TransitionEffect.translate({ y: 18 }))
-      .animation({ curve: Curve.Friction, duration: 220 }))
+    .width(44)
+    .height(44)
+    .backgroundColor(Color.Transparent)
+    .accessibilityText(label)
+    .onClick(action)
+  }
+
+  @Builder
+  private readerTools() {
+    Row({ space: 2 }) {
+      this.readerTool($r('sys.symbol.book_pages'), '目录', () => this.openCatalog())
+      this.readerTool($r('sys.symbol.gearshape'), '阅读设置', () => this.openSettings())
+    }
+  }
+
+  @Builder
+  private bottomControls() {
+    ReaderPageProgress({
+      pageIndex: this.visiblePageStart(),
+      pageCount: this.readingLength(),
+      pageSpan: this.pageStride(),
+      ready: !this.downloading && !this.pdfFailed && (!this.isPdfBook() || this.actualPdfPageCount > 0),
+      onJump: (index: number) => this.jumpToPassage(index),
+      onScrubbing: (scrubbing: boolean) => this.pageScrubbing = scrubbing,
+      actions: (): void => this.readerTools()
+    })
+      .width(Math.min(640, this.viewportWidth - 32))
+      .margin({ bottom: this.bottomSafeInset() + 10 })
+      .transition(TransitionEffect.OPACITY.combine(TransitionEffect.translate({ y: 12 }))
+        .animation({ curve: Curve.Friction, duration: 220 }))
   }
 
   @Builder
@@ -1083,11 +1140,11 @@ export struct ReadingPage {
         .padding({ left: 22, right: 22, top: 10, bottom: 20 })
       }
 
-      ForEach(this.reading.passages, (passage: ReadingPassage, index: number) => {
+      ForEach(this.catalogPages(), (index: number) => {
         ListItem() {
           this.catalogRow(this.passageTitle(index), index, () => this.jumpToPassage(index))
         }
-      }, (passage: ReadingPassage, index: number) => `${index}-${passage.text}`)
+      }, (index: number) => `${index}`)
     }
     .width('100%')
     .height('100%')
@@ -1130,19 +1187,23 @@ export struct ReadingPage {
     Scroll() {
       Column({ space: 22 }) {
         Column({ space: 9 }) {
-          Text('翻页方向')
+          Text('翻页方式')
             .width('100%')
             .fontSize(13)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.ink_muted'))
-          SegmentButton({
-            options: this.flipOptions,
-            selectedIndexes: this.flipIndexes,
-            onItemClicked: (index: number) => this.selectFlipMode(index)
-          })
-            .width('100%')
-            .height(44)
-            .clip(true)
+          Row() {
+            SegmentButton({
+              options: this.flipOptions,
+              selectedIndexes: this.flipIndexes,
+              onItemClicked: (index: number) => this.selectFlipMode(index)
+            })
+              .width('100%')
+              .height(44)
+          }
+          .width('100%')
+          .borderRadius(22)
+          .systemMaterial(FLOATING_ULTRA_THIN_MATERIAL)
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)
