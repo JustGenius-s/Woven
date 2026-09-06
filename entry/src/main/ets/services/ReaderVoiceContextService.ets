@@ -5,7 +5,8 @@ export class ReaderVoiceContextService {
   private path: string = '';
   private pages: string[] = [];
 
-  async read(path: string, title: string, pageIndex: number, cancelled: () => boolean): Promise<ReaderVoiceContext> {
+  async read(path: string, title: string, pageIndex: number, cancelled: () => boolean,
+    allowEmptyPage: boolean = false): Promise<ReaderVoiceContext> {
     if (path !== this.path) {
       const document = new pdfService.PdfDocument();
       const pages: string[] = [];
@@ -31,18 +32,20 @@ export class ReaderVoiceContextService {
       this.path = path;
       this.pages = pages;
     }
-    return ReaderVoiceContextService.compose(title, this.pages, pageIndex);
+    return ReaderVoiceContextService.compose(title, this.pages, pageIndex, allowEmptyPage);
   }
 
-  static compose(title: string, pages: string[], pageIndex: number): ReaderVoiceContext {
-    if (pageIndex < 0 || pageIndex >= pages.length || !pages[pageIndex]?.trim()) {
+  static compose(title: string, pages: string[], pageIndex: number,
+    allowEmptyPage: boolean = false): ReaderVoiceContext {
+    if (pageIndex < 0 || pageIndex >= pages.length || (!allowEmptyPage && !pages[pageIndex]?.trim())) {
       throw new Error('这一页没有可读取的文字，请翻到有正文的页面再试');
     }
     // Put the focus first, then nearby pages, then a bounded view of the rest
     // of the lesson. Page labels are PDF page numbers, never printed folios.
     let text: string = `日语教材：${title.slice(0, 160)}\n当前 PDF 第 ${pageIndex + 1} / ${pages.length} 页。` +
       '\n讲解围绕当前页解释语法、例句和使用场景。中文解释，保留日文例句；其他页只作背景。\n' +
-      `【当前页 ${pageIndex + 1}】\n${pages[pageIndex].slice(0, 6000)}\n`;
+      `【当前页 ${pageIndex + 1}】\n${pages[pageIndex].trim() ? pages[pageIndex].slice(0, 6000) :
+        '本页没有可提取文字，可能是空白页或扫描图片。不能识别其中的图文，请用户描述；不要把其他页当作当前页。'}\n`;
     const order: number[] = [];
     for (let distance: number = 1; distance < pages.length; distance++) {
       if (pageIndex - distance >= 0) { order.push(pageIndex - distance); }

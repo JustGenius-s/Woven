@@ -1,7 +1,7 @@
 import { webSocket } from '@kit.NetworkKit';
 import { util } from '@kit.ArkTS';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { RealtimeCredentials, RealtimeEvent, RealtimeSessionCreate } from '../model/RealtimeVoiceModels';
+import { RealtimeCredentials, RealtimeEvent, RealtimeSessionRequest } from '../model/RealtimeVoiceModels';
 
 /** Seeduplex 3.0 JSON protocol, official API revision 2026-09-04. One instance per call. */
 export class VolcengineRealtimeClient {
@@ -12,6 +12,9 @@ export class VolcengineRealtimeClient {
   private closed: boolean = false;
   private pendingSends: number = 0;
   private handshakeTimer: number = 0;
+  private updateTimer: number = 0;
+  private resolveUpdate?: () => void;
+  private rejectUpdate?: (error: Error) => void;
   private rejectStart?: (error: Error) => void;
   private finishClose?: () => void;
   private closingTask?: Promise<void>;
@@ -31,18 +34,7 @@ export class VolcengineRealtimeClient {
       socket.on('open', () => {
         if (this.closing || this.closed) { void socket.close().catch(() => {}); return; }
         this.opened = true;
-        const request: RealtimeSessionCreate = {
-          type: 'session.create', event_id: util.generateRandomUUID(),
-          session: { model: '1.2.6.1', instructions: instructions,
-            audio: {
-              input: { format: { type: 'pcm', rate: 16000 } },
-              // The official duplex demo plays output "pcm" as Float32.
-              // Select PCM16 here to match our S16LE AudioRenderer.
-              output: { format: { type: 'pcm_s16le', rate: 24000 }, voice: 'zh_female_vv_uranus_bigtts' }
-            }
-          }
-        };
-        void this.send(JSON.stringify(request)).catch(() => {});
+        void this.configure('session.create', instructions).catch(() => {});
       });
       socket.on('message', (error: BusinessError, data: string | ArrayBuffer) => {
         if (this.closed) { return; }
@@ -59,6 +51,7 @@ export class VolcengineRealtimeClient {
           }
           if (this.closing) { return; }
           if (event.type === 'error') { this.fail(VolcengineRealtimeClient.errorMessage(event)); return; }
+          if (event.type === 'session.updated') { this.finishUpdate(); return; }
           if (event.type === 'session.created' && !this.ready) {
             this.ready = true;
             clearTimeout(this.handshakeTimer);
@@ -78,6 +71,41 @@ export class VolcengineRealtimeClient {
         if (!connected) { this.fail('无法连接实时语音，请检查网络、API Key 或账号权限'); }
       }).catch(() => this.fail('无法连接实时语音，请检查网络、API Key 或账号权限'));
     });
+  }
+
+  private configure(type: 'session.create' | 'session.update', instructions: string): Promise<void> {
+    // Create and update share the required model/audio fields. In particular,
+    // a page update must never reset PCM16 output to the provider's Float32 default.
+    const request: RealtimeSessionRequest = {
+      type: type, event_id: util.generateRandomUUID(),
+      session: { model: '1.2.6.1', instructions: instructions,
+        audio: {
+          input: { format: { type: 'pcm', rate: 16000 } },
+          output: { format: { type: 'pcm_s16le', rate: 24000 }, voice: 'zh_female_vv_uranus_bigtts' }
+        }
+      }
+    };
+    return this.send(JSON.stringify(request));
+  }
+
+  updateInstructions(instructions: string): Promise<void> {
+    if (!this.ready || this.closing || this.closed) { return Promise.reject(new Error('通话已结束')); }
+    if (this.resolveUpdate !== undefined) { return Promise.reject(new Error('教材页面正在更新')); }
+    return new Promise<void>((resolve: () => void, reject: (error: Error) => void) => {
+      this.resolveUpdate = resolve;
+      this.rejectUpdate = reject;
+      this.updateTimer = setTimeout(() => this.fail('教材页面更新超时，请重新连接'), 20000);
+      void this.configure('session.update', instructions).catch((error: Error) => this.finishUpdate(error));
+    });
+  }
+
+  private finishUpdate(error?: Error): void {
+    const resolve = this.resolveUpdate;
+    const reject = this.rejectUpdate;
+    this.resolveUpdate = undefined;
+    this.rejectUpdate = undefined;
+    clearTimeout(this.updateTimer);
+    if (error !== undefined) { reject?.(error); } else { resolve?.(); }
   }
 
   private async send(json: string): Promise<void> {
@@ -129,6 +157,7 @@ export class VolcengineRealtimeClient {
     this.closing = true;
     this.ready = false;
     clearTimeout(this.handshakeTimer);
+    this.finishUpdate(new Error('通话已结束'));
     this.rejectStart?.(new Error('通话已取消'));
     this.rejectStart = undefined;
     const socket = this.socket;

@@ -238,7 +238,8 @@ export struct GrammarLessonPage {
           busy: this.audioBusy || this.downloading,
           positionMs: this.positionMs,
           durationMs: this.durationMs,
-          availableWidth: this.viewportWidth - 88,
+          availableWidth: this.viewportWidth - 32,
+          entryEndInset: 56,
           title: this.trackLabel(),
           previousLabel: '上一个课文音频',
           nextLabel: '下一个课文音频',
@@ -251,7 +252,7 @@ export struct GrammarLessonPage {
           onSeek: (position: number) => { void this.seekAudio(position); },
           onTrackList: () => this.trackSheetOpen = true
         })
-          .position({ right: 72, top: statusBarInset(this.avoidAreas) + 6 })
+          .position({ right: 16, top: statusBarInset(this.avoidAreas) + 6 })
           .hitTestBehavior(HitTestMode.Transparent)
       }
       GrammarRealtimeButton({

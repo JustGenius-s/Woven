@@ -10,7 +10,12 @@ import { ReadingNarrationService } from './ReadingNarrationService';
 import { MusicPlaybackService } from './MusicPlaybackService';
 import { VideoPlaybackService } from './VideoPlaybackService';
 
-/** One visible, foreground conversation. PDF page changes end it before replacing context. */
+interface PageInstructions {
+  version: number;
+  instructions: string;
+}
+
+/** One foreground conversation per PDF, with live page context updates. */
 export class GrammarRealtimeSession {
   private context: common.UIAbilityContext;
   private onChange: (snapshot: RealtimeSnapshot) => void;
@@ -20,6 +25,13 @@ export class GrammarRealtimeSession {
   private audio?: RealtimeDuplexAudio;
   private base64 = new util.Base64Helper();
   private revision: number = 0;
+  private documentPath: string = '';
+  private documentTitle: string = '';
+  private pageIndex: number = 0;
+  private contextVersion: number = 0;
+  private sentContextVersion: number = 0;
+  private contextUpdating: boolean = false;
+  private contextTimer: number = 0;
   private disposed: boolean = false;
   private stopping: Promise<void> = Promise.resolve();
   private muting: boolean = false;
@@ -50,6 +62,10 @@ export class GrammarRealtimeSession {
   async start(path: string, title: string, pageIndex: number): Promise<void> {
     if (this.disposed || this.state.connecting || this.state.connected) { return; }
     const revision: number = ++this.revision;
+    this.documentPath = path;
+    this.documentTitle = title;
+    this.pageIndex = pageIndex;
+    this.contextVersion++;
     this.state = emptyRealtimeSnapshot();
     this.state.connecting = true;
     this.state.status = '正在读取这一页…';
@@ -59,7 +75,7 @@ export class GrammarRealtimeSession {
       if (revision !== this.revision) { return; }
       const credentials = RealtimeVoicePreferences.read(this.context);
       if (!credentials.apiKey.trim()) { throw new Error('请先在设置页填写火山语音 API Key'); }
-      const page = await this.pdf.read(path, title, pageIndex, () => revision !== this.revision);
+      const page = await this.readPageInstructions(revision, false);
       if (revision !== this.revision) { return; }
       await ReadingNarrationService.pause();
       if (revision !== this.revision) { return; }
@@ -83,17 +99,81 @@ export class GrammarRealtimeSession {
       });
       if (revision !== this.revision) { return; }
       this.state.status = '正在连接实时语音…'; this.emit();
-      await client.connect(credentials, readerVoiceInstructions(page.text),
+      await client.connect(credentials, page.instructions,
         (event: RealtimeEvent) => this.event(event, revision), (message: string) => this.fail(message, revision));
       if (revision !== this.revision) { return; }
       this.state.connected = true;
+      this.sentContextVersion = page.version;
       this.state.muted = false;
       await audio.setMuted(false);
       if (revision !== this.revision) { return; }
+      // Keep live audio flowing while applying any turns made during extraction,
+      // microphone permission or handshake, then finish connecting on the latest page.
+      await this.updateContext(revision);
+      if (revision !== this.revision) { return; }
       this.state.connecting = false;
       this.updateStatus();
+      this.scheduleContextUpdate();
       await client.greet();
     } catch (error) { this.fail((error as Error).message || '无法开始语音对话，请重试', revision); }
+  }
+
+  updatePage(path: string, title: string, pageIndex: number): void {
+    if (this.disposed || (!this.state.connecting && !this.state.connected)) { return; }
+    if (path !== this.documentPath) { void this.stop(); return; }
+    if (pageIndex === this.pageIndex && title === this.documentTitle) { return; }
+    this.documentTitle = title;
+    this.pageIndex = pageIndex;
+    this.contextVersion++;
+    if (!this.state.connecting) { this.scheduleContextUpdate(); }
+  }
+
+  private scheduleContextUpdate(): void {
+    clearTimeout(this.contextTimer);
+    if (!this.state.connected || this.sentContextVersion === this.contextVersion) { return; }
+    const revision: number = this.revision;
+    // Coalesce slider scrubbing and quick page turns into the most recent page.
+    this.contextTimer = setTimeout(() => { void this.updateContext(revision); }, 200);
+  }
+
+  private async readPageInstructions(revision: number, allowEmptyPage: boolean): Promise<PageInstructions> {
+    while (revision === this.revision) {
+      const version: number = this.contextVersion;
+      try {
+        const page = await this.pdf.read(this.documentPath, this.documentTitle, this.pageIndex,
+          () => revision !== this.revision, allowEmptyPage);
+        if (revision !== this.revision) { break; }
+        if (version !== this.contextVersion) { continue; }
+        return { version: version, instructions: readerVoiceInstructions(page.text) };
+      } catch (error) {
+        if (revision !== this.revision) { break; }
+        if (version !== this.contextVersion) { continue; }
+        if (!allowEmptyPage) { throw new Error((error as Error).message || '暂时无法读取教材，请重新打开这一课'); }
+        // Reading a page must not terminate a healthy call or silently keep the
+        // old page as the current one. Tell the model that this page is unavailable.
+        this.state.error = '这一页的文字暂时无法读取，通话继续';
+        this.emit();
+        return { version: version, instructions: readerVoiceInstructions(
+          `当前 PDF 第 ${this.pageIndex + 1} 页。此页内容暂时无法读取，请用户描述，不要把之前的页面当作当前页。`) };
+      }
+    }
+    throw new Error('请求已取消');
+  }
+
+  private async updateContext(revision: number): Promise<void> {
+    if (revision !== this.revision || !this.state.connected || this.contextUpdating) { return; }
+    this.contextUpdating = true;
+    try {
+      while (revision === this.revision && this.sentContextVersion !== this.contextVersion) {
+        const page = await this.readPageInstructions(revision, true);
+        if (revision !== this.revision) { return; }
+        if (page.version !== this.contextVersion) { continue; }
+        await this.client?.updateInstructions(page.instructions);
+        if (revision !== this.revision) { return; }
+        this.sentContextVersion = page.version;
+      }
+    } catch (_error) { this.fail('教材页面更新失败，请重新连接', revision); }
+    finally { if (revision === this.revision) { this.contextUpdating = false; } }
   }
 
   private updateStatus(): void {
@@ -217,6 +297,10 @@ export class GrammarRealtimeSession {
 
   stop(clear: boolean = true): Promise<void> {
     this.revision++;
+    clearTimeout(this.contextTimer);
+    this.documentPath = '';
+    this.contextVersion++;
+    this.contextUpdating = false;
     clearTimeout(this.cancelTimer);
     const client = this.client; const audio = this.audio;
     this.client = undefined; this.audio = undefined;

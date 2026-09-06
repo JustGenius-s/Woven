@@ -12,6 +12,7 @@ export struct ReaderAudioControls {
   @Prop positionMs: number = 0;
   @Prop durationMs: number = 0;
   @Prop availableWidth: number = 320;
+  @Prop entryEndInset: number = 0;
   @Prop title: string = '原声朗读';
   @Prop previousLabel: string = '上一个';
   @Prop nextLabel: string = '下一个';
@@ -29,10 +30,6 @@ export struct ReaderAudioControls {
   @State private previewMs: number = 0;
 
   aboutToDisappear(): void { this.presentationChanged(); }
-
-  private panelWidth(): number {
-    return Math.min(360, this.availableWidth);
-  }
 
   private setExpanded(): void {
     this.expanded = !this.expanded;
@@ -172,7 +169,7 @@ export struct ReaderAudioControls {
     }
     // Popup owns the material. Its builder must not add a positioned/clipped root.
     .id('reader-audio-panel')
-    .width(this.panelWidth())
+    .width(this.availableWidth)
     .height(112)
     .padding({ left: 14, right: 14, top: 8, bottom: 16 })
   }
@@ -199,6 +196,7 @@ export struct ReaderAudioControls {
       .id('reader-audio-expand')
       .width(44)
       .height(44)
+      .position({ right: this.entryEndInset, top: 0 })
       .backgroundColor($r('app.color.immersive_plane'))
       .backgroundBlurStyle(BlurStyle.COMPONENT_ULTRA_THIN)
       .opacity(this.expanded ? 0 : 1)
@@ -207,15 +205,16 @@ export struct ReaderAudioControls {
       .accessibilityText(`展开音频播放条，${this.playing ? '正在播放' : '已暂停'}，${ReaderNavigation.time(this.positionMs)}`)
       .onClick(() => this.setExpanded())
     }
-    // Keep a visible layout anchor even while the entry icon is hidden.
-    .width(44)
+    // Align the popup to the page margin independently of adjacent entry buttons.
+    // Keep this anchor visible even while the audio entry icon is hidden.
+    .width(44 + this.entryEndInset)
     .height(44)
     .hitTestBehavior(HitTestMode.Transparent)
     .bindPopup(this.expanded && !this.overlayOpen, {
       builder: this.expandedPanel,
       placement: Placement.BottomRight,
       targetSpace: 12,
-      width: this.panelWidth(),
+      width: this.availableWidth,
       radius: 24,
       enableArrow: false,
       mask: false,

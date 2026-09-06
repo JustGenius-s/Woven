@@ -6,6 +6,7 @@ import { showImmersiveNotice } from '../../common/ImmersiveNotice';
 import { RealtimeLine, RealtimeSnapshot, emptyRealtimeSnapshot } from '../../model/RealtimeVoiceModels';
 import { GrammarRealtimeSession } from '../../services/GrammarRealtimeSession';
 import { RealtimeVoicePreferences } from '../../services/RealtimeVoicePreferences';
+import { VoiceActivityWaveform } from './VoiceActivityWaveform';
 
 @Component
 export struct GrammarRealtimeButton {
@@ -23,6 +24,7 @@ export struct GrammarRealtimeButton {
   @State private sheetOpen: boolean = false;
   @State private panelVisible: boolean = false;
   @State private floating: boolean = false;
+  @State private floatingVisible: boolean = false;
   @State private snapshot: RealtimeSnapshot = emptyRealtimeSnapshot();
   private session?: GrammarRealtimeSession;
   private scroller: Scroller = new Scroller();
@@ -56,6 +58,7 @@ export struct GrammarRealtimeButton {
   aboutToDisappear(): void {
     this.leaving = true;
     this.floating = false;
+    this.floatingVisible = false;
     void this.session?.dispose();
   }
 
@@ -63,7 +66,9 @@ export struct GrammarRealtimeButton {
     return this.getUIContext().getHostContext() as common.UIAbilityContext;
   }
 
-  private contextChanged(): void { void this.session?.stop(); }
+  private contextChanged(): void {
+    this.session?.updatePage(this.pdfPath, this.title, this.pageIndex);
+  }
 
   private startCall(): void {
     if (!this.ready || this.snapshot.connecting || this.snapshot.connected || this.leaving) { return; }
@@ -171,6 +176,7 @@ export struct GrammarRealtimeButton {
       transition: TransitionEffect.OPACITY
         .combine(TransitionEffect.translate({ y: -8 }))
         .animation({ duration: 250, curve: Curve.Friction }),
+      onStateChange: (event) => this.floatingVisible = event.isVisible && !this.leaving,
       onWillDismiss: (action: DismissPopupAction) => this.dismissFloating(action)
     })
     .bindSheet($$this.sheetOpen, this.panel(), appSheetOptions({
@@ -203,11 +209,13 @@ export struct GrammarRealtimeButton {
         Column({ space: 2 }) {
           if (this.snapshot.responding && !this.snapshot.speaking) {
             LoadingProgress().width(18).height(18).color($r('sys.color.icon_primary'))
+          } else if (this.snapshot.speaking) {
+            VoiceActivityWaveform({
+              active: this.floatingVisible && this.floating && !this.panelVisible && !this.overlayOpen
+            })
           } else {
-            SymbolGlyph(this.snapshot.speaking ? $r('sys.symbol.waveform') : $r('sys.symbol.message_fill'))
+            SymbolGlyph($r('sys.symbol.message_fill'))
               .fontSize(18).fontColor([$r('sys.color.icon_primary')])
-              .symbolEffect(new PulseSymbolEffect(),
-                this.snapshot.speaking && this.floating && !this.panelVisible && !this.overlayOpen)
           }
           Text(this.outputLabel()).fontSize(10).lineHeight(12)
             .fontColor($r('sys.color.font_primary')).maxLines(1)
