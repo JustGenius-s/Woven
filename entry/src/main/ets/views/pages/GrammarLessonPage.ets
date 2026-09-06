@@ -232,6 +232,7 @@ export struct GrammarLessonPage {
       if (this.lesson.audioTracks.length > 0) {
         ReaderAudioControls({
           expanded: this.audioExpanded,
+          overlayOpen: this.trackSheetOpen,
           playing: this.playing,
           ready: this.audioReady,
           busy: this.audioBusy || this.downloading,

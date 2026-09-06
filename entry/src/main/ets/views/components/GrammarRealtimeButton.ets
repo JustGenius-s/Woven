@@ -128,6 +128,10 @@ export struct GrammarRealtimeButton {
     }
   }
 
+  private outputLabel(): string {
+    return this.snapshot.speaking ? '讲解中' : (this.snapshot.responding ? '生成中' : '对话');
+  }
+
   build() {
     Stack({ alignContent: Alignment.TopEnd }) {
       Button({ type: ButtonType.Circle }) {
@@ -196,10 +200,24 @@ export struct GrammarRealtimeButton {
       .accessibilityDescription(this.snapshot.status)
       .onClick(() => { void this.session?.toggleMute(); })
       Button({ type: ButtonType.Circle }) {
-        SymbolGlyph($r('sys.symbol.message_fill')).fontSize(22).fontColor([$r('sys.color.icon_primary')])
+        Column({ space: 2 }) {
+          if (this.snapshot.responding && !this.snapshot.speaking) {
+            LoadingProgress().width(18).height(18).color($r('sys.color.icon_primary'))
+          } else {
+            SymbolGlyph(this.snapshot.speaking ? $r('sys.symbol.waveform') : $r('sys.symbol.message_fill'))
+              .fontSize(18).fontColor([$r('sys.color.icon_primary')])
+              .symbolEffect(new PulseSymbolEffect(),
+                this.snapshot.speaking && this.floating && !this.panelVisible && !this.overlayOpen)
+          }
+          Text(this.outputLabel()).fontSize(10).lineHeight(12)
+            .fontColor($r('sys.color.font_primary')).maxLines(1)
+        }.width(44).height(44).justifyContent(FlexAlign.Center)
       }
       .id('realtime-floating-panel').width(44).height(44).backgroundColor(Color.Transparent)
-      .accessibilityText('打开语音对话面板').onClick(() => this.openPanel())
+      .accessibilityText('打开语音对话面板')
+      .accessibilityDescription(this.snapshot.speaking ? 'AI 正在讲解' :
+        (this.snapshot.responding ? 'AI 正在生成回复' : this.snapshot.status))
+      .onClick(() => this.openPanel())
       Button({ type: ButtonType.Circle }) {
         SymbolGlyph($r('sys.symbol.phone_down_fill')).fontSize(22).fontColor([$r('app.color.danger')])
       }

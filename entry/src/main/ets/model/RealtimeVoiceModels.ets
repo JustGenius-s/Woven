@@ -19,6 +19,7 @@ export interface RealtimeSnapshot {
   connecting: boolean;
   connected: boolean;
   muted: boolean;
+  responding: boolean;
   speaking: boolean;
   lines: RealtimeLine[];
   error: string;
@@ -80,7 +81,7 @@ export interface RealtimeSessionCreate {
 
 export function emptyRealtimeSnapshot(): RealtimeSnapshot {
   return { status: '从这一页聊起', connecting: false, connected: false,
-    muted: false, speaking: false, lines: [], error: '' };
+    muted: false, responding: false, speaking: false, lines: [], error: '' };
 }
 
 export function readerVoiceInstructions(context: string): string {

@@ -1040,6 +1040,7 @@ export struct ReadingPage {
   private narrationControls() {
     ReaderAudioControls({
       expanded: this.narrationExpanded,
+      overlayOpen: this.panelOpen,
       playing: this.narrationPlaying,
       ready: this.narrationReady,
       busy: this.narrationBusy || this.downloading,

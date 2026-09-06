@@ -25,7 +25,6 @@ export class GrammarRealtimeSession {
   private muting: boolean = false;
   private responseId: string = '';
   private userId: string = '';
-  private responding: boolean = false;
   private cancelledIds: string[] = [];
   private cancelPending: boolean = false;
   private cancelTimer: number = 0;
@@ -43,7 +42,7 @@ export class GrammarRealtimeSession {
   private emit(): void {
     if (this.disposed) { return; }
     this.onChange({ status: this.state.status, connecting: this.state.connecting, connected: this.state.connected,
-      muted: this.state.muted, speaking: this.state.speaking,
+      muted: this.state.muted, responding: this.state.responding, speaking: this.state.speaking,
       lines: this.state.lines.map((line: RealtimeLine): RealtimeLine =>
         ({ id: line.id, speaker: line.speaker, text: line.text })), error: this.state.error });
   }
@@ -99,9 +98,17 @@ export class GrammarRealtimeSession {
 
   private updateStatus(): void {
     if (!this.state.connected) { return; }
-    this.state.status = this.state.muted ? '麦克风已静音' :
-      (this.state.speaking ? '正在讲解 · 可以直接插话' : '正在聆听 · 直接说话即可');
+    const microphone: string = this.state.muted ? '麦克风已静音' : '可以直接插话';
+    this.state.status = this.state.speaking ? `正在讲解 · ${microphone}` :
+      (this.state.responding ? `正在生成讲解 · ${microphone}` :
+        (this.state.muted ? '麦克风已静音' : '正在聆听 · 直接说话即可'));
     this.emit();
+  }
+
+  private setResponding(responding: boolean): void {
+    if (this.state.responding === responding) { return; }
+    this.state.responding = responding;
+    this.updateStatus();
   }
 
   private line(id: string, speaker: string, text: string, complete: boolean): void {
@@ -122,7 +129,7 @@ export class GrammarRealtimeSession {
       }
       if (type === 'conversation.item.input_audio_transcription.started') {
         this.userId = event.item_id || util.generateRandomUUID();
-        if (this.responding || this.state.speaking) { this.interrupt(); }
+        if (this.state.responding || this.state.speaking) { this.interrupt(); }
       } else if (type === 'conversation.item.input_audio_transcription.delta' ||
         type === 'conversation.item.input_audio_transcription.completed') {
         // started may have an empty item_id; adopt the first actual server ID.
@@ -138,20 +145,22 @@ export class GrammarRealtimeSession {
         if (event.response_id) { this.responseId = event.response_id; }
         if (!this.responseId) { this.responseId = util.generateRandomUUID(); }
         if (type === 'response.output_text.delta' || type === 'response.output_text.done') {
-          this.responding = true;
+          // A final transcript can arrive after audio.done; it must not restart
+          // the generation indicator after the voice response has completed.
+          if (type === 'response.output_text.delta') { this.setResponding(true); }
           this.line('assistant-' + this.responseId, '文法老师 · AI', event.text || event.delta || '', type.endsWith('.done'));
         } else if (type === 'response.output_audio.started') {
-          this.responding = true;
+          this.setResponding(true);
           this.state.error = ''; this.emit();
         } else if (type === 'response.output_audio.delta' && event.delta) {
-          this.responding = true;
+          this.setResponding(true);
           let bytes: Uint8Array;
           try { bytes = this.base64.decodeSync(event.delta); }
           catch (_error) { this.fail('实时语音音频无法解码，请重新连接', revision); return; }
           this.audio?.enqueue(bytes);
         } else if (type === 'response.output_audio.done') {
           this.audio?.finishOutput();
-          this.responding = false;
+          this.setResponding(false);
         }
       }
     } catch (error) {
@@ -172,7 +181,7 @@ export class GrammarRealtimeSession {
       if (this.cancelledIds.length > 40) { this.cancelledIds.shift(); }
     }
     this.responseId = '';
-    this.responding = false;
+    this.state.responding = false;
     this.cancelPending = true;
     const revision: number = this.revision;
     this.cancelTimer = setTimeout(() => this.fail('打断请求超时，请重新连接', revision), 5000);
@@ -211,7 +220,7 @@ export class GrammarRealtimeSession {
     clearTimeout(this.cancelTimer);
     const client = this.client; const audio = this.audio;
     this.client = undefined; this.audio = undefined;
-    this.responding = false; this.responseId = ''; this.userId = '';
+    this.state.responding = false; this.responseId = ''; this.userId = '';
     this.cancelledIds = []; this.cancelPending = false; this.muting = false;
     const previous = this.stopping;
     // Begin microphone shutdown synchronously. Wait for both native cleanup and server close acknowledgement.

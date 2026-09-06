@@ -1,10 +1,11 @@
-import { FLOATING_IMMERSIVE_SURFACE } from '../../common/ImmersiveMaterial';
+import { immersiveFloatingPopupSurface } from '../../common/ImmersiveMaterial';
 import { ReaderNavigation } from '../../services/ReaderNavigation';
 
 /** The parent pins this control to the header's top-right corner using position(). */
 @Component
 export struct ReaderAudioControls {
-  @Link @Watch('expansionChanged') expanded: boolean;
+  @Link @Watch('presentationChanged') expanded: boolean;
+  @Prop @Watch('presentationChanged') overlayOpen: boolean = false;
   @Prop playing: boolean = false;
   @Prop ready: boolean = false;
   @Prop busy: boolean = false;
@@ -26,11 +27,8 @@ export struct ReaderAudioControls {
 
   @State private scrubbing: boolean = false;
   @State private previewMs: number = 0;
-  @State private surfaceExpanded: boolean = false;
 
-  aboutToAppear(): void {
-    this.surfaceExpanded = this.expanded;
-  }
+  aboutToDisappear(): void { this.presentationChanged(); }
 
   private panelWidth(): number {
     return Math.min(360, this.availableWidth);
@@ -40,14 +38,15 @@ export struct ReaderAudioControls {
     this.expanded = !this.expanded;
   }
 
-  private expansionChanged(): void {
+  private presentationChanged(): void {
     this.scrubbing = false;
     this.onScrubbing(false);
-    // One persistent surface: size, position and corners travel together and
-    // reverse from their current values when the user interrupts the motion.
-    this.getUIContext().animateTo({ duration: 250, curve: Curve.Friction }, () => {
-      this.surfaceExpanded = this.expanded;
-    });
+  }
+
+  private dismissPopup(action: DismissPopupAction): void {
+    this.expanded = false;
+    this.presentationChanged();
+    action.dismiss();
   }
 
   private displayedPosition(): number {
@@ -55,6 +54,11 @@ export struct ReaderAudioControls {
   }
 
   private changePosition(value: number, mode: SliderChangeMode): void {
+    // Dismissal or an overlaid sheet can end a drag before Slider's final event.
+    if (!this.expanded || this.overlayOpen || !this.ready || this.busy || this.durationMs <= 0) {
+      this.presentationChanged();
+      return;
+    }
     this.previewMs = Math.max(0, Math.min(value, this.durationMs));
     if (mode === SliderChangeMode.Begin || mode === SliderChangeMode.Moving) {
       this.scrubbing = true;
@@ -128,101 +132,103 @@ export struct ReaderAudioControls {
     .layoutWeight(1)
   }
 
+  @Builder
+  private expandedPanel() {
+    Column() {
+      Row() {
+        Text(this.busy ? '正在准备音频…' : this.title)
+          .fontSize(12)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('sys.color.font_primary'))
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .layoutWeight(1)
+        if (this.hasTrackList) {
+          this.transportButton(0)
+        }
+        Button({ type: ButtonType.Circle }) {
+          SymbolGlyph($r('sys.symbol.chevron_up'))
+            .fontSize(18)
+            .fontColor([$r('sys.color.icon_primary')])
+        }
+        .id('reader-audio-collapse')
+        .width(44)
+        .height(44)
+        .backgroundColor(Color.Transparent)
+        .accessibilityText('收起音频播放条')
+        .onClick(() => this.setExpanded())
+      }
+      .width('100%')
+      .height(44)
+      Row({ space: 0 }) {
+        this.transportButton(1)
+        this.transportButton(2)
+        this.transportButton(3)
+        Blank().width(8)
+        this.timeline()
+      }
+      .width('100%')
+      .height(44)
+    }
+    // Popup owns the material. Its builder must not add a positioned/clipped root.
+    .id('reader-audio-panel')
+    .width(this.panelWidth())
+    .height(112)
+    .padding({ left: 14, right: 14, top: 8, bottom: 16 })
+  }
+
   build() {
     Stack({ alignContent: Alignment.TopEnd }) {
-      Stack({ alignContent: Alignment.TopEnd }) {
-        if (this.surfaceExpanded) {
-          Column() {
-            Row() {
-              Text(this.busy ? '正在准备音频…' : this.title)
-                .fontSize(12)
-                .fontWeight(FontWeight.Medium)
-                .fontColor($r('sys.color.font_primary'))
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                .layoutWeight(1)
-              if (this.hasTrackList) {
-                this.transportButton(0)
-              }
-              Button({ type: ButtonType.Circle }) {
-                SymbolGlyph($r('sys.symbol.chevron_up'))
-                  .fontSize(18)
-                  .fontColor([$r('sys.color.icon_primary')])
-              }
-              .id('reader-audio-collapse')
-              .width(44)
-              .height(44)
-              .backgroundColor(Color.Transparent)
-              .accessibilityText('收起音频播放条')
-              .onClick(() => this.setExpanded())
-            }
-            .width('100%')
-            .height(44)
-            Row({ space: 0 }) {
-              this.transportButton(1)
-              this.transportButton(2)
-              this.transportButton(3)
-              Blank().width(8)
-              this.timeline()
-            }
-            .width('100%')
-            .height(44)
-          }
-          .id('reader-audio-panel')
-          .width(this.panelWidth())
-          .height(112)
-          .padding({ left: 14, right: 14, top: 8, bottom: 16 })
-          .position({ right: 0, top: 0 })
-          // Keep text/icons at their final size while the container reveals them.
-          // Unlike the shared surface, these are entering / leaving elements.
-          .transition(TransitionEffect.asymmetric(
-            TransitionEffect.OPACITY.animation({ duration: 150, delay: 70, curve: Curve.Linear }),
-            TransitionEffect.OPACITY.animation({ duration: 80, curve: Curve.Linear })
-          ))
-        } else {
-          Button({ type: ButtonType.Circle }) {
-            Stack() {
-              Progress({ value: this.positionMs, total: Math.max(1, this.durationMs), type: ProgressType.Ring })
-                .width(44)
-                .height(44)
-                .color($r('sys.color.icon_primary'))
-                // The material already supplies the outline. Draw only the
-                // elapsed arc on that edge, rather than a second inset track.
-                .backgroundColor(Color.Transparent)
-                .style({ strokeWidth: 2, enableSmoothEffect: true })
-                .hitTestBehavior(HitTestMode.None)
-              SymbolGlyph(this.playing ? $r('sys.symbol.pause_fill') : $r('sys.symbol.play_fill'))
-                .fontSize(18)
-                .fontColor([$r('sys.color.icon_primary')])
-            }
+      Button({ type: ButtonType.Circle }) {
+        Stack() {
+          Progress({ value: this.positionMs, total: Math.max(1, this.durationMs), type: ProgressType.Ring })
             .width(44)
             .height(44)
-          }
-          .id('reader-audio-expand')
-          .width(44)
-          .height(44)
-          .backgroundColor(Color.Transparent)
-          .position({ top: 0, right: 0 })
-          .transition(TransitionEffect.asymmetric(
-            TransitionEffect.OPACITY.animation({ duration: 80, delay: 120, curve: Curve.Linear }),
-            TransitionEffect.OPACITY.animation({ duration: 80, curve: Curve.Linear })
-          ))
-          .accessibilityText(`展开音频播放条，${this.playing ? '正在播放' : '已暂停'}，${ReaderNavigation.time(this.positionMs)}`)
-          .onClick(() => this.setExpanded())
+            .color($r('sys.color.icon_primary'))
+            // Only the elapsed arc; no second ring track or decorative border.
+            .backgroundColor(Color.Transparent)
+            .style({ strokeWidth: 2, enableSmoothEffect: true })
+            .hitTestBehavior(HitTestMode.None)
+          SymbolGlyph(this.playing ? $r('sys.symbol.pause_fill') : $r('sys.symbol.play_fill'))
+            .fontSize(18)
+            .fontColor([$r('sys.color.icon_primary')])
         }
+        .width(44)
+        .height(44)
       }
-      .id('reader-audio-surface')
-      .width(this.surfaceExpanded ? this.panelWidth() : 44)
-      .height(this.surfaceExpanded ? 112 : 44)
-      .borderRadius(this.surfaceExpanded ? 24 : 22)
-      .attributeModifier(FLOATING_IMMERSIVE_SURFACE)
-      .clip(true)
-      .position({ right: 0, top: this.surfaceExpanded ? 56 : 0 })
-      .onClick(() => {})
+      .id('reader-audio-expand')
+      .width(44)
+      .height(44)
+      .backgroundColor($r('app.color.immersive_plane'))
+      .backgroundBlurStyle(BlurStyle.COMPONENT_ULTRA_THIN)
+      .opacity(this.expanded ? 0 : 1)
+      .hitTestBehavior(this.expanded ? HitTestMode.None : HitTestMode.Default)
+      .accessibilityLevel(this.expanded ? 'no-hide-descendants' : 'auto')
+      .accessibilityText(`展开音频播放条，${this.playing ? '正在播放' : '已暂停'}，${ReaderNavigation.time(this.positionMs)}`)
+      .onClick(() => this.setExpanded())
     }
-    // Reserve a stable overlay envelope; only the visible surface takes input.
-    .width(this.panelWidth())
-    .height(168)
+    // Keep a visible layout anchor even while the entry icon is hidden.
+    .width(44)
+    .height(44)
     .hitTestBehavior(HitTestMode.Transparent)
+    .bindPopup(this.expanded && !this.overlayOpen, {
+      builder: this.expandedPanel,
+      placement: Placement.BottomRight,
+      targetSpace: 12,
+      width: this.panelWidth(),
+      radius: 24,
+      enableArrow: false,
+      mask: false,
+      autoCancel: true,
+      focusable: false,
+      showInSubWindow: false,
+      systemMaterial: immersiveFloatingPopupSurface().material,
+      popupColor: immersiveFloatingPopupSurface().backgroundColor,
+      backgroundBlurStyle: immersiveFloatingPopupSurface().blurStyle,
+      transition: TransitionEffect.OPACITY
+        .combine(TransitionEffect.translate({ y: -8 }))
+        .animation({ duration: 250, curve: Curve.Friction }),
+      onWillDismiss: (action: DismissPopupAction) => this.dismissPopup(action)
+    })
   }
 }
