@@ -1,6 +1,7 @@
 import { BusinessError } from '@kit.BasicServicesKit';
 import { pdfService, pdfViewManager, PdfView } from '@kit.PDFKit';
 import { ReadingAudioRect } from '../../model/ContentModels';
+import { PdfFitMode } from '../../services/ReaderPreferences';
 
 const HIGHLIGHT_COLOR: number = 0x66F4C430;
 
@@ -10,6 +11,7 @@ export struct PdfReadingCanvas {
   startPage: number = 0;
   @Prop @Watch('applyViewStyle') flipMode: number = 0;
   @Prop @Watch('applyViewStyle') dualPage: boolean = false;
+  @Prop @Watch('applyPageFit') fitMode: PdfFitMode = PdfFitMode.WIDTH;
   @Prop @Watch('onJumpPage') jumpPage: number = 0;
   @Prop @Watch('onHighlightChange') highlightKey: string = '';
   @Prop highlightPage: number = 0;
@@ -112,7 +114,6 @@ export struct PdfReadingCanvas {
     if (!this.loaded) {
       return;
     }
-    this.controller.setPageFit(pdfService.PageFit.FIT_PAGE);
     this.controller.setPageContinuous(this.flipMode === 1);
     this.controller.setPageLayout(this.dualPage ?
       pdfService.PageLayout.LAYOUT_DOUBLE : pdfService.PageLayout.LAYOUT_SINGLE);
@@ -120,7 +121,17 @@ export struct PdfReadingCanvas {
       pdfViewManager.DisplayDirection.VERTICAL :
       pdfViewManager.DisplayDirection.HORIZONTAL);
     this.controller.setPageSpacing(0, 0);
+    this.applyPageFit();
+  }
 
+  private nativePageFit(): pdfService.PageFit {
+    return this.fitMode === PdfFitMode.HEIGHT ? pdfService.PageFit.FIT_HEIGHT : pdfService.PageFit.FIT_WIDTH;
+  }
+
+  private applyPageFit(): void {
+    if (!this.loaded || this.disposed) { return; }
+    // Resize the existing PDF view in place; do not reload it or reset its page.
+    this.controller.setPageFit(this.nativePageFit());
   }
 
   onJumpPage(_propertyName?: string): void {
@@ -190,7 +201,7 @@ export struct PdfReadingCanvas {
             pdfService.PageLayout.LAYOUT_DOUBLE : pdfService.PageLayout.LAYOUT_SINGLE,
           isContinuous: this.flipMode === 1,
           showScroll: false,
-          pageFit: pdfService.PageFit.FIT_PAGE
+          pageFit: this.nativePageFit()
         })
           .width('100%')
           .height('100%')

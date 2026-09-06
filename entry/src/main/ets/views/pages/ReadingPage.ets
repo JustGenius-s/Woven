@@ -30,10 +30,11 @@ import {
   ReadingNarrationService,
   ReadingNarrationSnapshot
 } from '../../services/ReadingNarrationService';
-import { ReaderPreferences, ReaderProgressSnapshot, ReaderStyleSnapshot } from '../../services/ReaderPreferences';
+import { PdfFitMode, ReaderPreferences, ReaderProgressSnapshot, ReaderStyleSnapshot } from '../../services/ReaderPreferences';
 import { ReaderNavigation } from '../../services/ReaderNavigation';
 import { aiTextSelectionMenu } from '../components/AiTextSelection';
 import { PdfReadingCanvas } from '../components/PdfReadingCanvas';
+import { PdfFitModeSelector } from '../components/PdfFitModeSelector';
 import { ReaderAudioControls } from '../components/ReaderAudioControls';
 import { ReaderPageProgress } from '../components/ReaderPageProgress';
 
@@ -84,6 +85,7 @@ export struct ReadingPage {
   @State private pdfFailed: boolean = false;
   @State private pdfFailReason: string = '';
   @State private pdfJumpPage: number = 0;
+  @State private pdfFitMode: PdfFitMode = PdfFitMode.WIDTH;
   @State private downloading: boolean = false;
   @State private downloadLabel: string = '';
   @State private localAudioPath: string = '';
@@ -137,6 +139,7 @@ export struct ReadingPage {
     this.lineHeight = Math.max(1.5, Math.min(style.lineHeight, 2.3));
     this.flipMode = Math.max(0, Math.min(style.flipMode, 1));
     this.flipIndexes = [this.flipMode];
+    this.pdfFitMode = ReaderPreferences.pdfFitMode(this.hostContext());
     const progress: ReaderProgressSnapshot = ReaderPreferences.progress(this.hostContext(), this.reading.id);
     this.currentPassageIndex = this.isPdfBook() ? Math.max(0, progress.resourceIndex) :
       this.safePassageIndex(progress.resourceIndex);
@@ -499,6 +502,11 @@ export struct ReadingPage {
     });
   }
 
+  private selectPdfFitMode(mode: PdfFitMode): void {
+    this.pdfFitMode = mode;
+    ReaderPreferences.savePdfFitMode(this.hostContext(), mode);
+  }
+
   private selectFlipMode(index: number): void {
     if (index < 0 || index > 1 || this.flipMode === index) {
       return;
@@ -826,6 +834,7 @@ export struct ReadingPage {
         startPage: this.currentPassageIndex,
         flipMode: this.flipMode,
         dualPage: this.dualPage,
+        fitMode: this.pdfFitMode,
         jumpPage: this.pdfJumpPage,
         highlightKey: this.highlightKey,
         highlightPage: this.highlightPage,
@@ -1205,6 +1214,10 @@ export struct ReadingPage {
         .alignItems(HorizontalAlign.Start)
 
         if (this.isPdfBook()) {
+          PdfFitModeSelector({
+            fitMode: this.pdfFitMode,
+            onChange: (mode: PdfFitMode) => this.selectPdfFitMode(mode)
+          })
           Text(this.hasNarrationCues() ?
             '绘本按官方电子书原页显示。朗读是官方未改动的音频，读到哪一句就翻到那一页并标出那一句。' :
             (this.hasAudio() ?

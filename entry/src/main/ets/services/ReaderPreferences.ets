@@ -6,6 +6,12 @@ const KEY_FONT_SIZE: string = 'style.font_size';
 const KEY_LINE_HEIGHT: string = 'style.line_height';
 const KEY_FLIP_MODE: string = 'style.flip_mode';
 const KEY_THEME_INDEX: string = 'style.theme_index';
+const KEY_PDF_FIT_MODE: string = 'style.pdf_fit_mode';
+
+export enum PdfFitMode {
+  WIDTH = 0,
+  HEIGHT = 1
+}
 
 export interface ReaderStyleSnapshot {
   fontSize: number;
@@ -68,6 +74,25 @@ export class ReaderPreferences {
       store.putSync(KEY_THEME_INDEX, style.themeIndex);
       store.flush();
     } catch (error) {
+      return;
+    }
+  }
+
+  static pdfFitMode(context: common.Context): PdfFitMode {
+    try {
+      return ReaderPreferences.store(context).getSync(KEY_PDF_FIT_MODE, PdfFitMode.WIDTH) === PdfFitMode.HEIGHT ?
+        PdfFitMode.HEIGHT : PdfFitMode.WIDTH;
+    } catch (_error) {
+      return PdfFitMode.WIDTH;
+    }
+  }
+
+  static savePdfFitMode(context: common.Context, mode: PdfFitMode): void {
+    try {
+      const store: preferences.Preferences = ReaderPreferences.store(context);
+      store.putSync(KEY_PDF_FIT_MODE, mode === PdfFitMode.HEIGHT ? PdfFitMode.HEIGHT : PdfFitMode.WIDTH);
+      store.flush();
+    } catch (_error) {
       return;
     }
   }

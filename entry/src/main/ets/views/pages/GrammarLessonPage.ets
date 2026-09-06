@@ -7,7 +7,7 @@ import { GrammarAudioTrack, GrammarWork } from '../../model/GrammarModels';
 import { GrammarBookService } from '../../services/GrammarBookService';
 import { GrammarRealtimeSession } from '../../services/GrammarRealtimeSession';
 import { ReaderNavigation } from '../../services/ReaderNavigation';
-import { ReaderPreferences } from '../../services/ReaderPreferences';
+import { PdfFitMode, ReaderPreferences } from '../../services/ReaderPreferences';
 import {
   ReadingNarrationListener,
   ReadingNarrationService,
@@ -15,6 +15,7 @@ import {
 } from '../../services/ReadingNarrationService';
 import { ImmersiveBackChrome } from '../components/ImmersiveBackChrome';
 import { PdfReadingCanvas } from '../components/PdfReadingCanvas';
+import { PdfFitModeSelector } from '../components/PdfFitModeSelector';
 import { ReaderAudioControls } from '../components/ReaderAudioControls';
 import { ReaderPageProgress } from '../components/ReaderPageProgress';
 import { GrammarRealtimeButton } from '../components/GrammarRealtimeButton';
@@ -42,7 +43,9 @@ export struct GrammarLessonPage {
   @State private pdfReady: boolean = false;
   @State private viewportWidth: number = 360;
   @State private trackIndex: number = 0;
-  @State private trackSheetOpen: boolean = false;
+  @State private panelOpen: boolean = false;
+  @State private panelKind: number = 0;
+  @State private pdfFitMode: PdfFitMode = PdfFitMode.WIDTH;
   @State private audioExpanded: boolean = false;
   @State private playing: boolean = false;
   @State private audioReady: boolean = false;
@@ -71,6 +74,7 @@ export struct GrammarLessonPage {
 
   aboutToAppear(): void {
     applyReaderPaper(true);
+    this.pdfFitMode = ReaderPreferences.pdfFitMode(this.hostContext());
     this.pageCount = this.lesson.pageCount;
     this.pageIndex = Math.max(0, ReaderPreferences.progress(this.hostContext(), this.progressId()).resourceIndex);
     this.jumpPage = this.pageIndex;
@@ -191,7 +195,7 @@ export struct GrammarLessonPage {
     if (index < 0 || index >= this.lesson.audioTracks.length || this.audioBusy || this.leaving) {
       return;
     }
-    this.trackSheetOpen = false;
+    this.panelOpen = false;
     this.audioBusy = true;
     try {
       await this.realtime?.stop();
@@ -232,7 +236,7 @@ export struct GrammarLessonPage {
       if (this.lesson.audioTracks.length > 0) {
         ReaderAudioControls({
           expanded: this.audioExpanded,
-          overlayOpen: this.trackSheetOpen,
+          overlayOpen: this.panelOpen,
           playing: this.playing,
           ready: this.audioReady,
           busy: this.audioBusy || this.downloading,
@@ -250,7 +254,7 @@ export struct GrammarLessonPage {
           onPrevious: () => { void this.selectTrack(this.trackIndex - 1, this.playing); },
           onNext: () => { void this.selectTrack(this.trackIndex + 1, this.playing); },
           onSeek: (position: number) => { void this.seekAudio(position); },
-          onTrackList: () => this.trackSheetOpen = true
+          onTrackList: () => this.openReaderPanel(0)
         })
           .position({ right: 16, top: statusBarInset(this.avoidAreas) + 6 })
           .hitTestBehavior(HitTestMode.Transparent)
@@ -262,7 +266,7 @@ export struct GrammarLessonPage {
         title: this.lesson.lessonNo === 0 ? this.lessonTitle() :
           `${this.lessonTitle()} · ${this.lesson.titleJa || this.lesson.title}`,
         ready: this.pdfReady && !this.failed && !this.downloading && !this.audioBusy,
-        overlayOpen: this.trackSheetOpen,
+        overlayOpen: this.panelOpen,
         onOpen: () => this.audioExpanded = false,
         onBack: this.onBack,
         onSettings: this.onSettings,
@@ -276,11 +280,11 @@ export struct GrammarLessonPage {
     .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
     .backgroundColor(Color.White)
     .onAreaChange((_oldArea: Area, area: Area) => this.viewportWidth = Number(area.width))
-    .bindSheet($$this.trackSheetOpen, this.trackSheet(), appSheetOptions({
-      height: SheetSize.LARGE,
-      title: { title: '课文音频' },
+    .bindSheet($$this.panelOpen, this.readerPanel(), appSheetOptions({
+      height: this.panelKind === 0 ? SheetSize.LARGE : SheetSize.MEDIUM,
+      title: { title: this.panelKind === 0 ? '课文音频' : '阅读设置' },
       showClose: true,
-      onDisappear: () => this.trackSheetOpen = false
+      onDisappear: () => this.panelOpen = false
     }))
   }
 
@@ -307,6 +311,7 @@ export struct GrammarLessonPage {
         PdfReadingCanvas({
           pdfPath: this.pdfPath,
           startPage: this.pageIndex,
+          fitMode: this.pdfFitMode,
           jumpPage: this.jumpPage,
           onPageCountChanged: (count: number) => {
             this.pageCount = count;
@@ -326,7 +331,8 @@ export struct GrammarLessonPage {
         pageIndex: this.pageIndex,
         pageCount: this.pageCount,
         ready: this.pdfReady && !this.failed && !this.downloading,
-        onJump: (index: number) => this.onPageChanged(index)
+        onJump: (index: number) => this.onPageChanged(index),
+        actions: (): void => this.readerTools()
       })
         .width(Math.min(640, this.viewportWidth - 32))
         .margin({ bottom: systemGestureInset(this.avoidAreas) + 10 })
@@ -334,6 +340,46 @@ export struct GrammarLessonPage {
     .width('100%')
     .height('100%')
     .backgroundColor(Color.White)
+  }
+
+  private openReaderPanel(kind: number): void {
+    this.panelKind = kind;
+    this.audioExpanded = false;
+    this.panelOpen = true;
+  }
+
+  private selectPdfFitMode(mode: PdfFitMode): void {
+    this.pdfFitMode = mode;
+    ReaderPreferences.savePdfFitMode(this.hostContext(), mode);
+  }
+
+  @Builder
+  private readerTools() {
+    Button({ type: ButtonType.Circle }) {
+      SymbolGlyph($r('sys.symbol.gearshape'))
+        .fontSize(21).fontColor([$r('sys.color.icon_primary')])
+    }
+    .id('grammar-reader-settings')
+    .width(44).height(44).backgroundColor(Color.Transparent)
+    .accessibilityText('阅读设置')
+    .onClick(() => this.openReaderPanel(1))
+  }
+
+  @Builder
+  private readerPanel() {
+    if (this.panelKind === 0) {
+      this.trackSheet()
+    } else {
+      Column() {
+        PdfFitModeSelector({
+          fitMode: this.pdfFitMode,
+          onChange: (mode: PdfFitMode) => this.selectPdfFitMode(mode)
+        })
+      }
+      .width('100%').height('100%')
+      .padding({ left: 22, right: 22, top: 14, bottom: 34 })
+      .alignItems(HorizontalAlign.Start)
+    }
   }
 
   @Builder
