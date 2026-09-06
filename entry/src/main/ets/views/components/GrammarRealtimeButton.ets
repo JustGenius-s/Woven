@@ -17,6 +17,7 @@ export struct GrammarRealtimeButton {
   @Prop ready: boolean = false;
   @Prop overlayOpen: boolean = false;
   onOpen: () => void = () => {};
+  onPanelVisibilityChanged: (visible: boolean) => void = (_visible: boolean) => {};
   onBack: () => void = () => {};
   onSettings: (section: 'deepseek' | 'realtime') => void = () => {};
   onSessionReady: (session: GrammarRealtimeSession) => void = () => {};
@@ -59,6 +60,7 @@ export struct GrammarRealtimeButton {
     this.leaving = true;
     this.floating = false;
     this.floatingVisible = false;
+    this.onPanelVisibilityChanged(false);
     void this.session?.dispose();
   }
 
@@ -90,6 +92,7 @@ export struct GrammarRealtimeButton {
   private openPanel(): void {
     this.onOpen();
     this.panelVisible = true;
+    this.onPanelVisibilityChanged(true);
     this.sheetOpen = true;
     setTimeout(() => {
       if (!this.leaving && this.sheetOpen) { this.scroller.scrollEdge(Edge.Bottom); }
@@ -119,6 +122,7 @@ export struct GrammarRealtimeButton {
   private panelDisappeared(): void {
     this.collapsePanel();
     this.panelVisible = false;
+    this.onPanelVisibilityChanged(false);
     const settings: boolean = this.pendingSettings;
     this.pendingSettings = false;
     if (settings && !this.leaving) { this.onSettings('realtime'); }

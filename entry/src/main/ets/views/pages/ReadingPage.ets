@@ -69,6 +69,7 @@ export struct ReadingPage {
 
   @State private controlsVisible: boolean = true;
   @State private panelOpen: boolean = false;
+  @State private panelVisible: boolean = false;
   @State private panelKind: number = 0;
   @State private currentPassageIndex: number = 0;
   @State private displayPageIndex: number = 0;
@@ -682,9 +683,7 @@ export struct ReadingPage {
     HdsNavigation() {
       Stack({ alignContent: Alignment.Bottom }) {
         this.readerCanvas()
-        if (this.controlsVisible) {
-          this.bottomControls()
-        }
+        this.bottomControls()
         if (this.pinching && !this.isPdfBook()) {
           Text(`${this.fontSize} fp`)
             .fontSize(16)
@@ -774,7 +773,11 @@ export struct ReadingPage {
       height: this.panelKind === 0 ? SheetSize.LARGE : SheetSize.MEDIUM,
       title: { title: this.panelKind === 0 ? '目录' : '阅读设置' },
       showClose: true,
-      onDisappear: () => this.panelOpen = false
+      onWillAppear: () => this.panelVisible = true,
+      onDisappear: () => {
+        this.panelOpen = false;
+        this.panelVisible = false;
+      }
     }))
     if (this.hasNarration()) {
       this.narrationControls()
@@ -1049,7 +1052,7 @@ export struct ReadingPage {
   private narrationControls() {
     ReaderAudioControls({
       expanded: this.narrationExpanded,
-      overlayOpen: this.panelOpen,
+      overlayOpen: this.panelOpen || this.panelVisible,
       playing: this.narrationPlaying,
       ready: this.narrationReady,
       busy: this.narrationBusy || this.downloading,
@@ -1100,14 +1103,15 @@ export struct ReadingPage {
       pageCount: this.readingLength(),
       pageSpan: this.pageStride(),
       ready: !this.downloading && !this.pdfFailed && (!this.isPdfBook() || this.actualPdfPageCount > 0),
+      visible: this.controlsVisible && !this.panelOpen && !this.panelVisible,
+      availableWidth: Math.min(640, this.viewportWidth - 32),
       onJump: (index: number) => this.jumpToPassage(index),
       onScrubbing: (scrubbing: boolean) => this.pageScrubbing = scrubbing,
+      onBack: this.onBack,
       actions: (): void => this.readerTools()
     })
       .width(Math.min(640, this.viewportWidth - 32))
       .margin({ bottom: this.bottomSafeInset() + 10 })
-      .transition(TransitionEffect.OPACITY.combine(TransitionEffect.translate({ y: 12 }))
-        .animation({ curve: Curve.Friction, duration: 220 }))
   }
 
   @Builder

@@ -44,6 +44,8 @@ export struct GrammarLessonPage {
   @State private viewportWidth: number = 360;
   @State private trackIndex: number = 0;
   @State private panelOpen: boolean = false;
+  @State private panelVisible: boolean = false;
+  @State private realtimePanelVisible: boolean = false;
   @State private panelKind: number = 0;
   @State private pdfFitMode: PdfFitMode = PdfFitMode.WIDTH;
   @State private audioExpanded: boolean = false;
@@ -236,7 +238,7 @@ export struct GrammarLessonPage {
       if (this.lesson.audioTracks.length > 0) {
         ReaderAudioControls({
           expanded: this.audioExpanded,
-          overlayOpen: this.panelOpen,
+          overlayOpen: this.panelOpen || this.panelVisible,
           playing: this.playing,
           ready: this.audioReady,
           busy: this.audioBusy || this.downloading,
@@ -266,8 +268,9 @@ export struct GrammarLessonPage {
         title: this.lesson.lessonNo === 0 ? this.lessonTitle() :
           `${this.lessonTitle()} · ${this.lesson.titleJa || this.lesson.title}`,
         ready: this.pdfReady && !this.failed && !this.downloading && !this.audioBusy,
-        overlayOpen: this.panelOpen,
+        overlayOpen: this.panelOpen || this.panelVisible,
         onOpen: () => this.audioExpanded = false,
+        onPanelVisibilityChanged: (visible: boolean) => this.realtimePanelVisible = visible,
         onBack: this.onBack,
         onSettings: this.onSettings,
         onSessionReady: (session: GrammarRealtimeSession) => this.realtime = session
@@ -284,7 +287,11 @@ export struct GrammarLessonPage {
       height: this.panelKind === 0 ? SheetSize.LARGE : SheetSize.MEDIUM,
       title: { title: this.panelKind === 0 ? '课文音频' : '阅读设置' },
       showClose: true,
-      onDisappear: () => this.panelOpen = false
+      onWillAppear: () => this.panelVisible = true,
+      onDisappear: () => {
+        this.panelOpen = false;
+        this.panelVisible = false;
+      }
     }))
   }
 
@@ -331,7 +338,10 @@ export struct GrammarLessonPage {
         pageIndex: this.pageIndex,
         pageCount: this.pageCount,
         ready: this.pdfReady && !this.failed && !this.downloading,
+        visible: !this.panelOpen && !this.panelVisible && !this.realtimePanelVisible,
+        availableWidth: Math.min(640, this.viewportWidth - 32),
         onJump: (index: number) => this.onPageChanged(index),
+        onBack: this.onBack,
         actions: (): void => this.readerTools()
       })
         .width(Math.min(640, this.viewportWidth - 32))

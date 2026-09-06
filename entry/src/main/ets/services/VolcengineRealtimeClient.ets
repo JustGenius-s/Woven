@@ -1,7 +1,14 @@
 import { webSocket } from '@kit.NetworkKit';
 import { util } from '@kit.ArkTS';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { RealtimeCredentials, RealtimeEvent, RealtimeSessionRequest } from '../model/RealtimeVoiceModels';
+import { hilog } from '@kit.PerformanceAnalysisKit';
+import {
+  READER_REALTIME_MODEL, READER_REALTIME_VOICE, READER_VOICE_PROMPT_VERSION,
+  RealtimeCredentials, RealtimeEvent, RealtimeSessionRequest
+} from '../model/RealtimeVoiceModels';
+
+const LOG_DOMAIN: number = 0x4b4f;
+const LOG_TAG: string = 'KotobaRealtime';
 
 /** Seeduplex 3.0 JSON protocol, official API revision 2026-09-04. One instance per call. */
 export class VolcengineRealtimeClient {
@@ -20,6 +27,7 @@ export class VolcengineRealtimeClient {
   private closingTask?: Promise<void>;
   private onFailure: (message: string) => void = () => {};
   private base64 = new util.Base64Helper();
+  private sessionId: string = 'unavailable';
 
   connect(credentials: RealtimeCredentials, instructions: string,
     onEvent: (event: RealtimeEvent) => void, onFailure: (message: string) => void): Promise<void> {
@@ -31,6 +39,14 @@ export class VolcengineRealtimeClient {
       const socket = webSocket.createWebSocket();
       this.socket = socket;
       this.handshakeTimer = setTimeout(() => this.fail('语音连接超时，请检查网络后重试'), 20000);
+      socket.on('headerReceive', (headers: webSocket.ResponseHeaders) => {
+        for (const key of Object.keys(headers)) {
+          if (key.toLowerCase() !== 'x-tt-logid') { continue; }
+          const value = headers[key];
+          const logId: string = VolcengineRealtimeClient.diagnosticToken(typeof value === 'string' ? value : undefined);
+          hilog.info(LOG_DOMAIN, LOG_TAG, 'Handshake logid=%{public}s', logId);
+        }
+      });
       socket.on('open', () => {
         if (this.closing || this.closed) { void socket.close().catch(() => {}); return; }
         this.opened = true;
@@ -50,6 +66,7 @@ export class VolcengineRealtimeClient {
             return;
           }
           if (this.closing) { return; }
+          this.logEvent(event);
           if (event.type === 'error') { this.fail(VolcengineRealtimeClient.errorMessage(event)); return; }
           if (event.type === 'session.updated') { this.finishUpdate(); return; }
           if (event.type === 'session.created' && !this.ready) {
@@ -78,18 +95,47 @@ export class VolcengineRealtimeClient {
     // a page update must never reset PCM16 output to the provider's Float32 default.
     const request: RealtimeSessionRequest = {
       type: type, event_id: util.generateRandomUUID(),
-      session: { model: '1.2.6.1', instructions: instructions,
+      session: { model: READER_REALTIME_MODEL, instructions: instructions,
         audio: {
           input: { format: { type: 'pcm', rate: 16000 } },
           output: { format: { type: 'pcm_s16le', rate: 24000 },
-            voice: 'zh_female_vv_uranus_bigtts', speed: 0, loudness: 0 }
+            voice: READER_REALTIME_VOICE, speed: 0, loudness: 0 }
         }
       },
       // Official duplex example: normalize output loudness across utterances.
       // Keep this profile on page updates as well as initial connection.
       extension: { dialog: { extra: { enable_loudness_norm: true } } }
     };
+    hilog.info(LOG_DOMAIN, LOG_TAG,
+      '%{public}s event=%{public}s session=%{public}s requestedModel=%{public}s requestedVoice=%{public}s prompt=%{public}s',
+      type, request.event_id, this.sessionId, READER_REALTIME_MODEL, READER_REALTIME_VOICE, READER_VOICE_PROMPT_VERSION);
     return this.send(JSON.stringify(request));
+  }
+
+  private static diagnosticToken(value?: string): string {
+    return typeof value === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(value) ? value : 'unavailable';
+  }
+
+  private logEvent(event: RealtimeEvent): void {
+    // Never log raw frames, credentials, audio, transcripts, or PDF instructions.
+    if (event.type === 'session.created' || event.type === 'session.updated') {
+      if (event.session?.id) {
+        this.sessionId = VolcengineRealtimeClient.diagnosticToken(event.session.id);
+      }
+      hilog.info(LOG_DOMAIN, LOG_TAG,
+        '%{public}s session=%{public}s reportedModel=%{public}s reportedVoice=%{public}s',
+        event.type, this.sessionId, VolcengineRealtimeClient.diagnosticToken(event.session?.model),
+        VolcengineRealtimeClient.diagnosticToken(event.session?.audio?.output?.voice));
+    } else if (event.type === 'response.output_audio.started') {
+      const source: string = ['default', 'chat_tts_text', 'network', 'audit_content_risky'].includes(event.tts_type || '') ?
+        event.tts_type! : 'unavailable';
+      hilog.info(LOG_DOMAIN, LOG_TAG, 'Audio session=%{public}s response=%{public}s source=%{public}s',
+        this.sessionId, VolcengineRealtimeClient.diagnosticToken(event.response_id), source);
+    } else if (event.type === 'error') {
+      const code: string = String(event.error?.code ?? event.status_code ?? '');
+      hilog.warn(LOG_DOMAIN, LOG_TAG, 'Service error session=%{public}s code=%{public}s',
+        this.sessionId, /^\d{3,8}$/.test(code) ? code : 'unavailable');
+    }
   }
 
   updateInstructions(instructions: string): Promise<void> {

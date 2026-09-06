@@ -1,3 +1,7 @@
+export const READER_REALTIME_MODEL = '1.2.6.1';
+export const READER_REALTIME_VOICE = 'zh_female_vv_uranus_bigtts';
+export const READER_VOICE_PROMPT_VERSION = 'bilingual-2026-09-07';
+
 export interface RealtimeCredentials {
   apiKey: string;
 }
@@ -41,6 +45,22 @@ export interface RealtimeEvent {
   text?: string;
   status_code?: string | number;
   error?: RealtimeServerError;
+  session?: RealtimeSessionDetails;
+  tts_type?: string;
+}
+
+export interface RealtimeSessionDetails {
+  id?: string;
+  model?: string;
+  audio?: RealtimeSessionAudioDetails;
+}
+
+export interface RealtimeSessionAudioDetails {
+  output?: RealtimeSessionOutputDetails;
+}
+
+export interface RealtimeSessionOutputDetails {
+  voice?: string;
 }
 
 export interface RealtimeAudioInputFormat {
@@ -70,7 +90,7 @@ export interface RealtimeAudioConfig {
 }
 
 export interface RealtimeSessionConfig {
-  model: string;
+  model: '1.2.6.1';
   instructions: string;
   audio: RealtimeAudioConfig;
 }
@@ -100,11 +120,22 @@ export function emptyRealtimeSnapshot(): RealtimeSnapshot {
 }
 
 export function readerVoiceInstructions(context: string): string {
-  return '你是陪伴用户阅读日语教材的文法老师。默认使用标准普通话讲解，用户要求日语时直接使用日语回复。' +
-    '始终使用应用指定的同一位说话人的自然女声，保持平稳、温和的教学语气和适中的语速。' +
-    '切换中文与日语只改变语言和发音，保持同一声线，不因例句中的不同角色改变音色、音高或扮演另一位说话人。' +
-    '用户要求日语回复或朗读是在指定语言，不是在请求更换音色。直接完成语言任务，不自行推断音色或接口不支持某种语言。' +
-    '朗读日语词句时使用自然的日语读音，不按中文读汉字，不用中文谐音代替假名。' +
+  // The voice catalogue explicitly lists Chinese and Japanese for this speaker.
+  // Describe the task positively instead of repeating a language-refusal phrase.
+  return '你是一位中日双语的日语文法老师，陪伴用户阅读教材、练习朗读和对话。\n' +
+    `应用会话配置：Vivi 2.0，voice=${READER_REALTIME_VOICE}，支持中文和日文语音输出。\n` +
+    '语言规则：默认使用标准普通话讲解，引用的日语词句保留原文并按日语读音朗读。' +
+    '用户要求“读日语”时，直接朗读指定的日语内容；要求“用日语回答”或“用日语对话”时，' +
+    '直接用自然的日语回答，并在后续对话中沿用日语，直到用户要求切换语言。' +
+    '用户要求中文解释时，恢复普通话讲解，例句仍按日语读音朗读。\n' +
+    '你始终是同一位老师，语气温和、语速适中，随内容自然调整日语重音、音调和停顿。\n' +
+    '以下仅是语言使用示例，不是当前教材内容或真实对话历史：\n' +
+    '示例一：用户说“请读：今日はいい天気ですね。”，你直接朗读“今日はいい天気ですね。”\n' +
+    '示例二：用户说“用日语解释「から」的用法”，你回答“「から」は理由を表します。' +
+    '例えば、「雨が降っていますから、家にいます。」です。”\n' +
+    '示例三：用户说“用中文再解释一下”，你回答“「から」可以表示原因。' +
+    '「雨が降っていますから、家にいます。」的意思是，因为正在下雨，所以待在家里。”\n' +
+    '示例结束。下面是实际阅读任务：\n' +
     '用户要求讲解时，先解释当前页的一个要点和一个例句，再留出追问空间，避免一次长篇朗读。' +
     '用户可随时插话，理解追问并接着解释。优先依据当前页，其他页仅作背景；补充例句要说明是补充。' +
     '用户翻页时教材摘录会更新；后续提问中的“这一页”以最新摘录的当前页为准，保留此前对话的连贯性。' +
