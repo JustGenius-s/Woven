@@ -16,7 +16,9 @@ import {
   TitleSize
 } from '@kit.UIDesignKit';
 import { applyReaderPaper, statusBarInset, systemGestureInset } from '../../common/AppTheme';
-import { FLOATING_ULTRA_THIN_MATERIAL, preferredImmersiveMaterial } from '../../common/ImmersiveMaterial';
+import {
+  FLOATING_IMMERSIVE_SURFACE, immersiveSheetSurface, preferredImmersiveMaterial
+} from '../../common/ImmersiveMaterial';
 import { showImmersiveNotice } from '../../common/ImmersiveNotice';
 import { ReadingAudioCue, ReadingAudioRect, ReadingPassage, ReadingWork } from '../../model/ContentModels';
 import { AiInquiryContext } from '../../model/DeepSeekModels';
@@ -682,8 +684,7 @@ export struct ReadingPage {
             .fontColor($r('sys.color.font_primary'))
             .padding({ left: 18, right: 18, top: 10, bottom: 10 })
             .borderRadius(22)
-            .backgroundColor(Color.Transparent)
-            .systemMaterial(FLOATING_ULTRA_THIN_MATERIAL)
+            .attributeModifier(FLOATING_IMMERSIVE_SURFACE)
             .position({ x: '50%', y: '48%' })
             .translate({ x: '-50%', y: '-50%' })
         }
@@ -768,8 +769,9 @@ export struct ReadingPage {
       dragBar: true,
       showClose: true,
       radius: LengthMetrics.vp(28),
-      backgroundColor: Color.Transparent,
-      systemMaterial: FLOATING_ULTRA_THIN_MATERIAL,
+      backgroundColor: immersiveSheetSurface().backgroundColor,
+      blurStyle: immersiveSheetSurface().blurStyle,
+      systemMaterial: immersiveSheetSurface().material,
       maskColor: '#33202124',
       onDisappear: () => this.panelOpen = false
     })
@@ -1203,7 +1205,7 @@ export struct ReadingPage {
           }
           .width('100%')
           .borderRadius(22)
-          .systemMaterial(FLOATING_ULTRA_THIN_MATERIAL)
+          .attributeModifier(FLOATING_IMMERSIVE_SURFACE)
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)

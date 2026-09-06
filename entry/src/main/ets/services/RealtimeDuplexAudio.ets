@@ -12,6 +12,7 @@ export class RealtimeDuplexAudio {
   private outputPrefix = new Uint8Array(4);
   private outputPrefixLength: number = 0;
   private outputFormatChecked: boolean = false;
+  private pendingOutputByte: number = -1;
   private closed: boolean = false;
   private muted: boolean = true;
   private timer: number = 0;
@@ -125,9 +126,8 @@ export class RealtimeDuplexAudio {
   }
 
   enqueue(bytes: Uint8Array): void {
-    if (this.closed) { return; }
-    if (bytes.length % 2 !== 0) { throw new Error('实时语音 PCM 数据不完整'); }
-    if (this.outputFormatChecked) { this.output.append(bytes); return; }
+    if (this.closed || bytes.length === 0) { return; }
+    if (this.outputFormatChecked) { this.appendOutputSamples(bytes); return; }
     // Check the stream header before any bytes reach the speaker, even when
     // that header spans chunks. Ogg/Opus and WAV containers are not raw PCM.
     const count: number = Math.min(4 - this.outputPrefixLength, bytes.length);
@@ -141,17 +141,37 @@ export class RealtimeDuplexAudio {
       return;
     }
     this.outputFormatChecked = true;
-    this.output.append(this.outputPrefix);
-    this.output.append(bytes.subarray(count));
+    this.appendOutputSamples(this.outputPrefix);
+    this.appendOutputSamples(bytes.subarray(count));
     this.outputPrefixLength = 0;
   }
 
+  private appendOutputSamples(bytes: Uint8Array): void {
+    if (bytes.length === 0) { return; }
+    let offset: number = 0;
+    // Transport chunks need not end at a PCM16 sample boundary.
+    if (this.pendingOutputByte >= 0) {
+      this.output.append(new Uint8Array([this.pendingOutputByte, bytes[0]]));
+      this.pendingOutputByte = -1;
+      offset = 1;
+    }
+    const completeLength: number = (bytes.length - offset) - (bytes.length - offset) % 2;
+    this.output.append(bytes.subarray(offset, offset + completeLength));
+    if (offset + completeLength < bytes.length) { this.pendingOutputByte = bytes[bytes.length - 1]; }
+  }
+
   finishOutput(): void {
+    if (this.closed) { return; }
     // A response shorter than the four-byte format probe can still contain
     // one valid PCM sample. Release it only at the explicit audio boundary.
-    if (!this.closed && this.outputPrefixLength > 0 && this.outputPrefixLength < 4) {
-      this.output.append(this.outputPrefix.slice(0, this.outputPrefixLength));
+    if (this.outputPrefixLength > 0 && this.outputPrefixLength < 4) {
+      this.appendOutputSamples(this.outputPrefix.subarray(0, this.outputPrefixLength));
       this.outputPrefixLength = 0;
+    }
+    if (this.pendingOutputByte >= 0) {
+      this.pendingOutputByte = -1;
+      this.onFailure('实时语音音频数据不完整，请重新连接');
+      return;
     }
     this.output.finish();
     this.outputFormatChecked = false;
@@ -161,6 +181,7 @@ export class RealtimeDuplexAudio {
     this.output.clear();
     this.outputPrefixLength = 0;
     this.outputFormatChecked = false;
+    this.pendingOutputByte = -1;
     this.lastRendered = 0;
     if (this.speaking) { this.speaking = false; this.onSpeaking(false); }
     const renderer = this.renderer;
@@ -177,6 +198,7 @@ export class RealtimeDuplexAudio {
     clearTimeout(this.timer);
     this.input.clear(); this.output.clear();
     this.outputPrefixLength = 0;
+    this.pendingOutputByte = -1;
     this.closeTask = this.release();
     return this.closeTask;
   }

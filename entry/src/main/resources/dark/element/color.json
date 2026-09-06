@@ -17,6 +17,14 @@
       "value": "#99000000"
     },
     {
+      "name": "immersive_control_tint",
+      "value": "#3324262A"
+    },
+    {
+      "name": "immersive_panel_tint",
+      "value": "#5924262A"
+    },
+    {
       "name": "immersive_plane",
       "value": "#B8282B30"
     },

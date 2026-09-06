@@ -1,6 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { LengthMetrics } from '@kit.ArkUI';
-import { FLOATING_ULTRA_THIN_MATERIAL } from '../../common/ImmersiveMaterial';
+import { FLOATING_IMMERSIVE_SURFACE, immersiveSheetSurface } from '../../common/ImmersiveMaterial';
 import { showImmersiveNotice } from '../../common/ImmersiveNotice';
 import { RealtimeLine, RealtimeSnapshot, emptyRealtimeSnapshot } from '../../model/RealtimeVoiceModels';
 import { GrammarRealtimeSession } from '../../services/GrammarRealtimeSession';
@@ -134,7 +134,7 @@ export struct GrammarRealtimeButton {
       .id('realtime-floating-surface')
       .width(this.floating ? 52 : 44).height(this.floating ? 152 : 44)
       .borderRadius(this.floating ? 26 : 22)
-      .backgroundColor(Color.Transparent).systemMaterial(FLOATING_ULTRA_THIN_MATERIAL)
+      .attributeModifier(FLOATING_IMMERSIVE_SURFACE)
       .clip(true).position({ right: 0, top: this.floating ? 56 : 0 })
       .opacity(this.sheetOpen ? 0 : 1)
       .hitTestBehavior(this.sheetOpen ? HitTestMode.None : HitTestMode.Default)
@@ -146,7 +146,9 @@ export struct GrammarRealtimeButton {
       height: SheetSize.LARGE, preferType: SheetType.BOTTOM,
       title: { title: '语音伴读', subtitle: `PDF 第 ${this.pageIndex + 1} / ${this.pageCount} 页` },
       dragBar: true, showClose: false, radius: LengthMetrics.vp(28),
-      systemMaterial: FLOATING_ULTRA_THIN_MATERIAL,
+      systemMaterial: immersiveSheetSurface().material,
+      backgroundColor: immersiveSheetSurface().backgroundColor,
+      blurStyle: immersiveSheetSurface().blurStyle,
       maskColor: '#33202124',
       onWillDisappear: () => this.collapsePanel(),
       onDisappear: () => this.panelDisappeared()
@@ -246,23 +248,21 @@ export struct GrammarRealtimeButton {
       Row({ space: 12 }) {
         Button(this.snapshot.muted ? '打开麦克风' : '静音')
           .id('realtime-mute').height(48).layoutWeight(1).fontSize(15)
-          .fontColor($r('sys.color.font_primary')).backgroundColor(Color.Transparent)
-          .systemMaterial(FLOATING_ULTRA_THIN_MATERIAL)
+          .fontColor($r('sys.color.font_primary')).attributeModifier(FLOATING_IMMERSIVE_SURFACE)
           .onClick(() => { void this.session?.toggleMute(); })
         Button('打断').id('realtime-interrupt').height(48).layoutWeight(1).fontSize(15)
-          .fontColor($r('sys.color.font_primary')).backgroundColor(Color.Transparent)
-          .systemMaterial(FLOATING_ULTRA_THIN_MATERIAL).enabled(this.snapshot.speaking)
+          .fontColor($r('sys.color.font_primary')).attributeModifier(FLOATING_IMMERSIVE_SURFACE)
+          .enabled(this.snapshot.speaking)
           .onClick(() => this.session?.interrupt())
         Button('挂断').id('realtime-end').height(48).layoutWeight(1).fontSize(15)
-          .fontColor($r('app.color.danger')).backgroundColor(Color.Transparent)
-          .systemMaterial(FLOATING_ULTRA_THIN_MATERIAL)
+          .fontColor($r('app.color.danger')).attributeModifier(FLOATING_IMMERSIVE_SURFACE)
           .accessibilityText('挂断语音通话').onClick(() => this.endCall())
       }.width('100%')
     } else {
       Button(this.snapshot.connecting ? '取消连接' : '开始语音对话')
         .id('realtime-start').height(48).width('100%').fontSize(15)
-        .fontColor($r('sys.color.font_primary')).backgroundColor(Color.Transparent)
-        .systemMaterial(FLOATING_ULTRA_THIN_MATERIAL).enabled(this.ready || this.snapshot.connecting)
+        .fontColor($r('sys.color.font_primary')).attributeModifier(FLOATING_IMMERSIVE_SURFACE)
+        .enabled(this.ready || this.snapshot.connecting)
         .onClick(() => {
           if (this.snapshot.connecting) { this.endCall(); }
           else { this.startCall(); }

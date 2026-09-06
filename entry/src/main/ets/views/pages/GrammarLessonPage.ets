@@ -1,7 +1,7 @@
 import { common } from '@kit.AbilityKit';
 import { LengthMetrics, window } from '@kit.ArkUI';
 import { applyReaderPaper, statusBarInset, systemGestureInset } from '../../common/AppTheme';
-import { FLOATING_ULTRA_THIN_MATERIAL } from '../../common/ImmersiveMaterial';
+import { immersiveSheetSurface } from '../../common/ImmersiveMaterial';
 import { showImmersiveNotice } from '../../common/ImmersiveNotice';
 import { GrammarAudioTrack, GrammarWork } from '../../model/GrammarModels';
 import { GrammarBookService } from '../../services/GrammarBookService';
@@ -279,8 +279,9 @@ export struct GrammarLessonPage {
       dragBar: true,
       showClose: true,
       radius: LengthMetrics.vp(28),
-      backgroundColor: Color.Transparent,
-      systemMaterial: FLOATING_ULTRA_THIN_MATERIAL,
+      backgroundColor: immersiveSheetSurface().backgroundColor,
+      blurStyle: immersiveSheetSurface().blurStyle,
+      systemMaterial: immersiveSheetSurface().material,
       maskColor: '#33202124',
       onDisappear: () => this.trackSheetOpen = false
     })

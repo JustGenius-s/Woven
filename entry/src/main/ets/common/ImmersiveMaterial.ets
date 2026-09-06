@@ -50,14 +50,96 @@ export const FLOATING_CHROME_MATERIAL: uiMaterial.Material = new uiMaterial.Imme
 });
 
 /**
- * Most transparent immersive light grade. Title-bar menus sit on this so the
- * chrome stays visible without a plate.
+ * Keep the thinnest native filter, with a small theme-aware tint inside the
+ * material. A transparent background on the host is not a material fallback.
  */
 export const FLOATING_ULTRA_THIN_MATERIAL: uiMaterial.Material = new uiMaterial.ImmersiveMaterial({
   style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
+  materialColor: $r('app.color.immersive_control_tint'),
   colorInvert: true,
   interactive: true,
   lightEffect: {
     color: Color.White
   }
 });
+
+const SHEET_MATERIAL: uiMaterial.Material = new uiMaterial.ImmersiveMaterial({
+  style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
+  materialColor: $r('app.color.immersive_panel_tint'),
+  colorInvert: true
+});
+
+export interface ImmersiveSurfaceStyle {
+  material?: uiMaterial.Material;
+  backgroundColor?: ResourceColor;
+  blurStyle?: BlurStyle;
+}
+
+let cachedFloatingSurface: ImmersiveSurfaceStyle | undefined = undefined;
+let cachedSheetSurface: ImmersiveSurfaceStyle | undefined = undefined;
+
+function resolveArkUISurfaces(): void {
+  let supported: boolean = false;
+  let smooth: boolean = false;
+  try {
+    supported = uiMaterial.isImmersiveMaterialSupported() &&
+      uiMaterial.getMaterialInfo().state !== uiMaterial.MaterialState.DISABLE;
+    smooth = supported && uiMaterial.getGlobalMaterialLevel() === uiMaterial.MaterialLevel.SMOOTH;
+  } catch (_error) {
+    supported = false;
+  }
+  if (supported) {
+    // SMOOTH uses materialColor as its background, without the refractive filter.
+    // Give that native grade enough fill to keep controls and transcript legible.
+    cachedFloatingSurface = {
+      material: smooth ? new uiMaterial.ImmersiveMaterial({
+        style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
+        materialColor: $r('app.color.immersive_plane'),
+        colorInvert: true,
+        interactive: true,
+        lightEffect: { color: Color.White }
+      }) : FLOATING_ULTRA_THIN_MATERIAL
+    };
+    cachedSheetSurface = {
+      material: smooth ? new uiMaterial.ImmersiveMaterial({
+        style: uiMaterial.ImmersiveStyle.ULTRA_THIN,
+        materialColor: $r('app.color.immersive_plane_strong'),
+        colorInvert: true
+      }) : SHEET_MATERIAL
+    };
+  } else {
+    // Unsupported/disabled ArkUI material must not leave a transparent host.
+    cachedFloatingSurface = {
+      backgroundColor: $r('app.color.immersive_plane'),
+      blurStyle: BlurStyle.COMPONENT_ULTRA_THIN
+    };
+    cachedSheetSurface = {
+      backgroundColor: $r('app.color.immersive_plane_strong'),
+      blurStyle: BlurStyle.COMPONENT_REGULAR
+    };
+  }
+}
+
+function floatingSurface(): ImmersiveSurfaceStyle {
+  if (cachedFloatingSurface === undefined) { resolveArkUISurfaces(); }
+  return cachedFloatingSurface!;
+}
+
+/** One material on the outer surface; inner transport buttons share its rim. */
+export class FloatingImmersiveSurface implements AttributeModifier<CommonAttribute> {
+  applyNormalAttribute(instance: CommonAttribute): void {
+    const surface: ImmersiveSurfaceStyle = floatingSurface();
+    // Undefined clears conflicting overrides on the native material path.
+    instance.backgroundColor(surface.backgroundColor);
+    instance.backgroundBlurStyle(surface.blurStyle);
+    instance.systemMaterial(surface.material);
+  }
+}
+
+export const FLOATING_IMMERSIVE_SURFACE: FloatingImmersiveSurface = new FloatingImmersiveSurface();
+
+/** Sheets use their own native backplate, without whole-panel press deformation. */
+export function immersiveSheetSurface(): ImmersiveSurfaceStyle {
+  if (cachedSheetSurface === undefined) { resolveArkUISurfaces(); }
+  return cachedSheetSurface!;
+}

@@ -1,4 +1,4 @@
-import { FLOATING_ULTRA_THIN_MATERIAL } from '../../common/ImmersiveMaterial';
+import { FLOATING_IMMERSIVE_SURFACE } from '../../common/ImmersiveMaterial';
 import { ReaderNavigation } from '../../services/ReaderNavigation';
 
 /** The parent pins this control to the header's top-right corner using position(). */
@@ -215,8 +215,7 @@ export struct ReaderAudioControls {
       .width(this.surfaceExpanded ? this.panelWidth() : 44)
       .height(this.surfaceExpanded ? 112 : 44)
       .borderRadius(this.surfaceExpanded ? 24 : 22)
-      .backgroundColor(Color.Transparent)
-      .systemMaterial(FLOATING_ULTRA_THIN_MATERIAL)
+      .attributeModifier(FLOATING_IMMERSIVE_SURFACE)
       .clip(true)
       .position({ right: 0, top: this.surfaceExpanded ? 56 : 0 })
       .onClick(() => {})

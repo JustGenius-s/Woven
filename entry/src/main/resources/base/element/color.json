@@ -17,6 +17,14 @@
       "value": "#CCF2F4F7"
     },
     {
+      "name": "immersive_control_tint",
+      "value": "#33FFFFFF"
+    },
+    {
+      "name": "immersive_panel_tint",
+      "value": "#59FFFFFF"
+    },
+    {
       "name": "immersive_plane",
       "value": "#D9FFFFFF"
     },

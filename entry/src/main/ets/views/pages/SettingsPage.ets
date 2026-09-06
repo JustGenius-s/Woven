@@ -1,7 +1,7 @@
 import { common } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { systemGestureInset } from '../../common/AppTheme';
-import { FLOATING_ULTRA_THIN_MATERIAL } from '../../common/ImmersiveMaterial';
+import { FLOATING_IMMERSIVE_SURFACE, immersiveSheetSurface } from '../../common/ImmersiveMaterial';
 import { showImmersiveNotice } from '../../common/ImmersiveNotice';
 import { ReadingWork } from '../../model/ContentModels';
 import { GrammarWork } from '../../model/GrammarModels';
@@ -424,9 +424,10 @@ export struct SettingsPage {
         (this.activeSheet === 'minimax' ? 'MiniMax 语音' : '火山引擎 · 实时语音') },
       dragBar: true,
       showClose: true,
-      blurStyle: this.activeSheet === 'realtime' ? undefined : BlurStyle.COMPONENT_REGULAR,
-      backgroundColor: this.activeSheet === 'realtime' ? Color.Transparent : $r('app.color.surface_raised'),
-      systemMaterial: this.activeSheet === 'realtime' ? FLOATING_ULTRA_THIN_MATERIAL : undefined,
+      blurStyle: this.activeSheet === 'realtime' ? immersiveSheetSurface().blurStyle : BlurStyle.COMPONENT_REGULAR,
+      backgroundColor: this.activeSheet === 'realtime' ?
+        immersiveSheetSurface().backgroundColor : $r('app.color.surface_raised'),
+      systemMaterial: this.activeSheet === 'realtime' ? immersiveSheetSurface().material : undefined,
       maskColor: this.activeSheet === 'realtime' ? '#33202124' : '#52000000',
       onDisappear: () => this.sheetOpen = false
     })
@@ -763,7 +764,7 @@ export struct SettingsPage {
       .id('settings-realtime')
       .width('100%').constraintSize({ minHeight: 72 })
       .padding({ left: 18, right: 18, top: 10, bottom: 10 }).borderRadius(24)
-      .backgroundColor(Color.Transparent).systemMaterial(FLOATING_ULTRA_THIN_MATERIAL)
+      .attributeModifier(FLOATING_IMMERSIVE_SURFACE)
       .accessibilityText(this.hasSavedRealtime() ? '火山实时语音，已配置' : '火山实时语音，未配置')
       .onClick(() => this.openRealtimeSheet())
       Text('使用豆包实时语音 3.0，围绕当前教材讲解和对话，支持随时插话。')
@@ -780,7 +781,7 @@ export struct SettingsPage {
         .id('realtime-api-key').type(InputType.Password).showPasswordIcon(true)
         .height(52).fontSize(16).maxLength(500)
         .fontColor($r('sys.color.font_primary')).placeholderColor($r('sys.color.font_secondary'))
-        .backgroundColor(Color.Transparent).systemMaterial(FLOATING_ULTRA_THIN_MATERIAL)
+        .attributeModifier(FLOATING_IMMERSIVE_SURFACE)
         .borderRadius(14).padding({ left: 14, right: 14 }).enabled(!this.realtimeSaving)
         .onChange((value: string) => this.realtimeApiKey = value)
       Text('从火山语音控制台获取 API Key，填写并保存后即可发起实时语音连接。')
@@ -795,7 +796,7 @@ export struct SettingsPage {
       }
       Button(this.realtimeSaving ? '正在保存…' : '保存')
         .id('realtime-save-settings').width('100%').height(48)
-        .backgroundColor(Color.Transparent).systemMaterial(FLOATING_ULTRA_THIN_MATERIAL)
+        .attributeModifier(FLOATING_IMMERSIVE_SURFACE)
         .fontColor($r('sys.color.font_primary')).enabled(this.canSaveRealtime())
         .accessibilityText('保存火山实时语音配置').onClick(() => { void this.saveRealtime(); })
       if (this.hasSavedRealtime()) {

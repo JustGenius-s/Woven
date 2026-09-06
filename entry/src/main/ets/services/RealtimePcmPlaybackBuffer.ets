@@ -1,8 +1,16 @@
 import { RealtimePcmQueue } from './RealtimePcmQueue';
 
+export class RealtimePlaybackCapacityError extends Error {
+  constructor() { super('本次讲解过长，已停止播放，可以继续提问'); }
+}
+
+// Synthesized speech can arrive faster than real time. Bound pending audio
+// independently of the 80 ms startup buffer without limiting a normal reply to 10 s.
+const MAX_PENDING_AUDIO_BYTES: number = 24000 * 2 * 120;
+
 /** Mono PCM16 at 24 kHz. Absorb packet jitter before feeding the native renderer. */
 export class RealtimePcmPlaybackBuffer {
-  private queue = new RealtimePcmQueue(480000);
+  private queue = new RealtimePcmQueue(MAX_PENDING_AUDIO_BYTES);
   private playing: boolean = false;
   private finished: boolean = false;
   private fadeInRemaining: number = 0;
@@ -15,6 +23,9 @@ export class RealtimePcmPlaybackBuffer {
 
   append(bytes: Uint8Array): void {
     if (bytes.length === 0) { return; }
+    if (this.queue.length + bytes.length > MAX_PENDING_AUDIO_BYTES) {
+      throw new RealtimePlaybackCapacityError();
+    }
     if (!this.playing && this.queue.length === 0) { this.readyAt = Date.now() + this.prefillMs; }
     this.queue.append(bytes);
     this.finished = false;

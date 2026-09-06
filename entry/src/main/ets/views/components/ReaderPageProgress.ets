@@ -1,4 +1,4 @@
-import { FLOATING_ULTRA_THIN_MATERIAL } from '../../common/ImmersiveMaterial';
+import { FLOATING_IMMERSIVE_SURFACE } from '../../common/ImmersiveMaterial';
 import { ReaderNavigation } from '../../services/ReaderNavigation';
 
 /** Shared page progress for books and grammar PDFs. Only commit a jump on release. */
@@ -79,8 +79,7 @@ export struct ReaderPageProgress {
     .width('100%')
     .padding({ left: 16, right: 16, top: 10, bottom: 6 })
     .borderRadius(24)
-    .backgroundColor(Color.Transparent)
-    .systemMaterial(FLOATING_ULTRA_THIN_MATERIAL)
+    .attributeModifier(FLOATING_IMMERSIVE_SURFACE)
     .onClick(() => {})
   }
 }

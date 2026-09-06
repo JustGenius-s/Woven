@@ -5,6 +5,7 @@ import { RealtimeVoicePreferences } from './RealtimeVoicePreferences';
 import { ReaderVoiceContextService } from './ReaderVoiceContextService';
 import { VolcengineRealtimeClient } from './VolcengineRealtimeClient';
 import { RealtimeDuplexAudio } from './RealtimeDuplexAudio';
+import { RealtimePlaybackCapacityError } from './RealtimePcmPlaybackBuffer';
 import { ReadingNarrationService } from './ReadingNarrationService';
 import { MusicPlaybackService } from './MusicPlaybackService';
 import { VideoPlaybackService } from './VideoPlaybackService';
@@ -144,13 +145,23 @@ export class GrammarRealtimeSession {
           this.state.error = ''; this.emit();
         } else if (type === 'response.output_audio.delta' && event.delta) {
           this.responding = true;
-          this.audio?.enqueue(this.base64.decodeSync(event.delta));
+          let bytes: Uint8Array;
+          try { bytes = this.base64.decodeSync(event.delta); }
+          catch (_error) { this.fail('实时语音音频无法解码，请重新连接', revision); return; }
+          this.audio?.enqueue(bytes);
         } else if (type === 'response.output_audio.done') {
           this.audio?.finishOutput();
           this.responding = false;
         }
       }
-    } catch (_error) { this.fail('实时语音内容异常，请重新连接', revision); }
+    } catch (error) {
+      if (error instanceof RealtimePlaybackCapacityError) {
+        // A long response must not tear down the conversation or microphone.
+        this.interrupt();
+        this.state.error = '本次讲解过长，已停止播放，可以继续提问';
+        this.emit();
+      } else { this.fail('实时语音内容异常，请重新连接', revision); }
+    }
   }
 
   interrupt(): void {
