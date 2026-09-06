@@ -1,13 +1,17 @@
 import { abilityAccessCtrl, common } from '@kit.AbilityKit';
 import { audio } from '@kit.AudioKit';
 import { RealtimePcmQueue } from './RealtimePcmQueue';
+import { RealtimePcmPlaybackBuffer } from './RealtimePcmPlaybackBuffer';
 
 /** Native voice communication input/output together enable the platform's AEC/3A. */
 export class RealtimeDuplexAudio {
   private capturer?: audio.AudioCapturer;
   private renderer?: audio.AudioRenderer;
   private input = new RealtimePcmQueue(16000);
-  private output = new RealtimePcmQueue(480000);
+  private output = new RealtimePcmPlaybackBuffer();
+  private outputPrefix = new Uint8Array(4);
+  private outputPrefixLength: number = 0;
+  private outputFormatChecked: boolean = false;
   private closed: boolean = false;
   private muted: boolean = true;
   private timer: number = 0;
@@ -123,11 +127,40 @@ export class RealtimeDuplexAudio {
   enqueue(bytes: Uint8Array): void {
     if (this.closed) { return; }
     if (bytes.length % 2 !== 0) { throw new Error('实时语音 PCM 数据不完整'); }
-    this.output.append(bytes);
+    if (this.outputFormatChecked) { this.output.append(bytes); return; }
+    // Check the stream header before any bytes reach the speaker, even when
+    // that header spans chunks. Ogg/Opus and WAV containers are not raw PCM.
+    const count: number = Math.min(4 - this.outputPrefixLength, bytes.length);
+    this.outputPrefix.set(bytes.subarray(0, count), this.outputPrefixLength);
+    this.outputPrefixLength += count;
+    if (this.outputPrefixLength < 4) { return; }
+    const header: string = String.fromCharCode(this.outputPrefix[0], this.outputPrefix[1],
+      this.outputPrefix[2], this.outputPrefix[3]);
+    if (header === 'OggS' || header === 'RIFF') {
+      this.onFailure('服务端音频格式与播放器不一致，已停止播放，请重新连接');
+      return;
+    }
+    this.outputFormatChecked = true;
+    this.output.append(this.outputPrefix);
+    this.output.append(bytes.subarray(count));
+    this.outputPrefixLength = 0;
+  }
+
+  finishOutput(): void {
+    // A response shorter than the four-byte format probe can still contain
+    // one valid PCM sample. Release it only at the explicit audio boundary.
+    if (!this.closed && this.outputPrefixLength > 0 && this.outputPrefixLength < 4) {
+      this.output.append(this.outputPrefix.slice(0, this.outputPrefixLength));
+      this.outputPrefixLength = 0;
+    }
+    this.output.finish();
+    this.outputFormatChecked = false;
   }
 
   clearOutput(): void {
     this.output.clear();
+    this.outputPrefixLength = 0;
+    this.outputFormatChecked = false;
     this.lastRendered = 0;
     if (this.speaking) { this.speaking = false; this.onSpeaking(false); }
     const renderer = this.renderer;
@@ -143,6 +176,7 @@ export class RealtimeDuplexAudio {
     this.muted = true;
     clearTimeout(this.timer);
     this.input.clear(); this.output.clear();
+    this.outputPrefixLength = 0;
     this.closeTask = this.release();
     return this.closeTask;
   }

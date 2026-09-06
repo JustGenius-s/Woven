@@ -146,6 +146,7 @@ export class GrammarRealtimeSession {
           this.responding = true;
           this.audio?.enqueue(this.base64.decodeSync(event.delta));
         } else if (type === 'response.output_audio.done') {
+          this.audio?.finishOutput();
           this.responding = false;
         }
       }

@@ -42,17 +42,22 @@ export interface RealtimeEvent {
   error?: RealtimeServerError;
 }
 
-export interface RealtimeAudioFormat {
-  type: string;
-  rate: number;
+export interface RealtimeAudioInputFormat {
+  type: 'pcm';
+  rate: 16000;
+}
+
+export interface RealtimeAudioOutputFormat {
+  type: 'pcm_s16le';
+  rate: 24000;
 }
 
 export interface RealtimeAudioInput {
-  format: RealtimeAudioFormat;
+  format: RealtimeAudioInputFormat;
 }
 
 export interface RealtimeAudioOutput {
-  format: RealtimeAudioFormat;
+  format: RealtimeAudioOutputFormat;
   voice: string;
 }
 

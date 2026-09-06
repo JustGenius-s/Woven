@@ -36,7 +36,9 @@ export class VolcengineRealtimeClient {
           session: { model: '1.2.6.1', instructions: instructions,
             audio: {
               input: { format: { type: 'pcm', rate: 16000 } },
-              output: { format: { type: 'pcm', rate: 24000 }, voice: 'zh_female_vv_jupiter_bigtts' }
+              // The official duplex demo plays output "pcm" as Float32.
+              // Select PCM16 here to match our S16LE AudioRenderer.
+              output: { format: { type: 'pcm_s16le', rate: 24000 }, voice: 'zh_female_vv_jupiter_bigtts' }
             }
           }
         };
