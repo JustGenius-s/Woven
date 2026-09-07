@@ -14,6 +14,7 @@ import { VideoItem, videoSourceLabel } from '../../model/VideoModels';
 import { ContentRepository } from '../../services/ContentRepository';
 import { ContentShelfDataSource } from '../../services/ContentShelfDataSource';
 import { ReadingBookService } from '../../services/ReadingBookService';
+import { NativeReaderParams, NativeReaderTrial } from '../../services/NativeReaderTrial';
 import { VideoLibraryStore } from '../../services/VideoLibraryStore';
 import { VideoCoverService } from '../../services/VideoCoverService';
 import { FloatingBarScrollTracker } from '../components/FloatingBarScrollTracker';
@@ -534,7 +535,9 @@ export struct ExplorePage {
 
   @Builder
   private exploreContent() {
-    if (this.loadError.length > 0) {
+    if (this.activeExploreTab() === 1) {
+      this.readingPage()
+    } else if (this.loadError.length > 0) {
       Text(this.loadError)
         .width('100%')
         .height('100%')
@@ -544,8 +547,6 @@ export struct ExplorePage {
         .padding(28)
     } else if (this.activeExploreTab() === 0) {
       this.videoPage()
-    } else if (this.activeExploreTab() === 1) {
-      this.readingPage()
     } else {
       this.scenarioPage()
     }
@@ -632,40 +633,86 @@ export struct ExplorePage {
 
   @Builder
   private readingPage() {
-    if (this.readingsLoading && this.readingWorks.length === 0) {
-      Column({ space: 8 }) {
-        LoadingProgress()
-          .width(28)
-          .height(28)
-          .color($r('app.color.ink'))
-        Text('正在拉取绘本…')
-          .fontSize(15)
-          .fontColor($r('app.color.ink_muted'))
+    List({ space: 8, scroller: this.readingScroller }) {
+      ListItem() {
+        this.nativeReaderTrialCard()
       }
-      .width('100%')
-      .height('100%')
-      .justifyContent(FlexAlign.Center)
-      .padding({ bottom: FLOATING_TAB_CONTENT_INSET })
-    } else {
-      List({ space: 8, scroller: this.readingScroller }) {
+      .padding({ left: 16, right: 16 })
+      if (this.readingsLoading && this.readingWorks.length === 0) {
+        ListItem() {
+          Column({ space: 8 }) {
+            LoadingProgress()
+              .width(28)
+              .height(28)
+              .color($r('app.color.ink'))
+            Text('正在拉取绘本…')
+              .fontSize(15)
+              .fontColor($r('app.color.ink_muted'))
+          }
+          .width('100%')
+          .justifyContent(FlexAlign.Center)
+          .padding(32)
+        }
+      } else {
+        if (this.loadError.length > 0) {
+          ListItem() {
+            Text(this.loadError).fontSize(14).fontColor($r('app.color.ink_muted')).padding(20)
+          }
+        }
         ForEach(this.visibleReadingCategories(), (category: string) => {
           ListItem() {
             this.readingShelf(category)
           }
         }, (category: string) => category)
-        ListItem() {
-          Column()
-            .height(FLOATING_TAB_CONTENT_INSET)
-        }
       }
-      .width('100%')
-      .height('100%')
-      .scrollBar(BarState.Off)
-      .edgeEffect(EdgeEffect.Spring)
-      .clip(false)
-      .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) =>
-        this.readingFloatingBarTracker.update(this.readingScroller, this.onFloatingBarCompactChange))
+      ListItem() {
+        Column().height(FLOATING_TAB_CONTENT_INSET)
+      }
     }
+    .width('100%')
+    .height('100%')
+    .scrollBar(BarState.Off)
+    .edgeEffect(EdgeEffect.Spring)
+    .clip(false)
+    .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) =>
+      this.readingFloatingBarTracker.update(this.readingScroller, this.onFloatingBarCompactChange))
+  }
+
+  private openNativeReader(editionId: string): void {
+    const reason: string = NativeReaderTrial.unavailableReason();
+    if (reason.length > 0) {
+      showImmersiveNotice(this.getUIContext(), '原生阅读试用', reason);
+      return;
+    }
+    const params: NativeReaderParams = { editionId: editionId };
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/NativeReaderPage', params: params })
+      .catch(() => showImmersiveNotice(this.getUIContext(), '暂时无法打开', '请确认设备支持 Reader Kit 阅读服务。'));
+  }
+
+  @Builder
+  private nativeReaderTrialCard() {
+    Column({ space: 12 }) {
+      Text('原生阅读试用').fontSize(12).fontColor($r('app.color.accent')).width('100%')
+      Text('やらまいか日本語').fontSize(22).fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.ink')).width('100%')
+      Text('同一份教材，两种排版。可重排版体验字号与行距，原版布局对照图文位置。')
+        .fontSize(14).lineHeight(22).fontColor($r('app.color.ink_muted')).width('100%')
+      Row({ space: 12 }) {
+        Button('打开可重排版').layoutWeight(1).fontSize(14)
+          .id('native-reader-reflow')
+          .backgroundColor($r('app.color.accent'))
+          .onClick(() => this.openNativeReader('yaramaika-reflow'))
+        Button('打开原版布局').layoutWeight(1).fontSize(14)
+          .id('native-reader-fixed')
+          .backgroundColor($r('app.color.accent_soft')).fontColor($r('app.color.accent'))
+          .onClick(() => this.openNativeReader('yaramaika-fixed'))
+      }.width('100%')
+      Text('Reader Kit · 本地教材 · 需鸿蒙真机')
+        .fontSize(11).fontColor($r('app.color.ink_muted')).width('100%')
+    }
+    .width('100%').alignItems(HorizontalAlign.Start).padding(20)
+    .backgroundColor($r('app.color.surface_raised')).borderRadius(24)
+    .margin({ top: 8, bottom: 16 })
   }
 
   @Builder
