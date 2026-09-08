@@ -1,9 +1,9 @@
 import { displaySync } from '@kit.ArkGraphics2D';
-import { FujiSplashScene, SPLASH_DURATION, SPLASH_REVEAL_START, SPLASH_WHISTLE_AT } from './FujiSplashScene';
+import { FujiSplashScene, SPLASH_DURATION, SPLASH_TITLE_HIDE_AT, SPLASH_WHISTLE_AT } from './FujiSplashScene';
 import { SplashSoundService } from '../../services/SplashSoundService';
 
 /**
- * A painted scene with an independent train; the spiral reveals the live app.
+ * The painted landscape and approaching train fade to the live app.
  */
 @Component
 export struct LaunchSplash {
@@ -15,6 +15,9 @@ export struct LaunchSplash {
   private backdrop: ImageBitmap | undefined = undefined;
   private landscape: ImageBitmap | undefined = undefined;
   private train: ImageBitmap | undefined = undefined;
+  private trainFront: ImageBitmap | undefined = undefined;
+  private treeFrame: ImageBitmap | undefined = undefined;
+  private trees: ImageBitmap | undefined = undefined;
   private frames: displaySync.DisplaySync | undefined = undefined;
   private startedAt: number = -1;
   private elapsed: number = 0;
@@ -54,6 +57,12 @@ export struct LaunchSplash {
     this.landscape = undefined;
     this.train?.close();
     this.train = undefined;
+    this.trainFront?.close();
+    this.trainFront = undefined;
+    this.treeFrame?.close();
+    this.treeFrame = undefined;
+    this.trees?.close();
+    this.trees = undefined;
   }
 
   private finish(): void {
@@ -76,12 +85,22 @@ export struct LaunchSplash {
       new OffscreenCanvasRenderingContext2D(width, height, new RenderingContextSettings(true));
     this.scene.paintBackdrop(buffer, this.landscape, width, height);
     this.backdrop = buffer.transferToImageBitmap();
+    if (this.trees === undefined && this.treeFrame !== undefined) {
+      const border: OffscreenCanvasRenderingContext2D = new OffscreenCanvasRenderingContext2D(
+        this.treeFrame.width, this.treeFrame.height, new RenderingContextSettings(true));
+      this.scene.paintCurtainLayer(border, this.treeFrame, this.treeFrame.width, this.treeFrame.height);
+      this.trees = border.transferToImageBitmap();
+      this.treeFrame.close();
+      this.treeFrame = undefined;
+    }
     this.paint();
   }
 
   private paint(): void {
-    if (this.backdrop !== undefined && this.train !== undefined) {
-      this.scene.paintFrame(this.context, this.backdrop, this.train, this.context.width, this.context.height, this.elapsed);
+    if (this.backdrop !== undefined && this.train !== undefined &&
+      this.trainFront !== undefined && this.trees !== undefined) {
+      this.scene.paintFrame(this.context, this.backdrop, this.train, this.trainFront, this.trees,
+        this.context.width, this.context.height, this.elapsed);
     }
   }
 
@@ -92,7 +111,10 @@ export struct LaunchSplash {
     try {
       this.landscape = new ImageBitmap($r('app.media.splash_fuji_painted'));
       this.train = new ImageBitmap($r('app.media.splash_train_painted'));
-      if (this.landscape.width <= 0 || this.train.width <= 0) {
+      this.trainFront = new ImageBitmap($r('app.media.music_morning_train'));
+      this.treeFrame = new ImageBitmap($r('app.media.splash_sakura_frame'));
+      if (this.landscape.width <= 0 || this.train.width <= 0 ||
+        this.trainFront.width <= 0 || this.treeFrame.width <= 0) {
         this.finish();
         return;
       }
@@ -113,7 +135,7 @@ export struct LaunchSplash {
       // Vsync timestamps are monotonic nanoseconds. Never advance by frame count.
       this.elapsed = (info.timestamp - this.startedAt) / 1000000;
       this.sound.update(this.elapsed - SPLASH_WHISTLE_AT);
-      const showTitle: boolean = this.elapsed >= 160 && this.elapsed < SPLASH_REVEAL_START - 180;
+      const showTitle: boolean = this.elapsed >= 160 && this.elapsed < SPLASH_TITLE_HIDE_AT;
       if (showTitle !== this.titleVisible) {
         this.getUIContext().animateTo({ duration: showTitle ? 650 : 280, curve: Curve.EaseInOut }, () => {
           this.titleVisible = showTitle;

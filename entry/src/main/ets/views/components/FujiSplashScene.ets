@@ -1,18 +1,31 @@
-// Native splash painter using the generated landscape and train assets.
-export const SPLASH_REVEAL_START: number = 2320;
-export const SPLASH_REVEAL_DURATION: number = 700;
-export const SPLASH_DURATION: number = SPLASH_REVEAL_START + SPLASH_REVEAL_DURATION;
-export const SPLASH_WHISTLE_AT: number = 720;
+import { RailPlacement, SplashRailway } from './SplashRailway';
 
-interface ScenePlacement {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+// Independent painted layers reveal the live app as the train passes the viewer.
+export const SPLASH_REVEAL_START: number = 2120;
+export const SPLASH_REVEAL_DURATION: number = 980;
+export const SPLASH_DURATION: number = SPLASH_REVEAL_START + SPLASH_REVEAL_DURATION;
+export const SPLASH_WHISTLE_AT: number = 920;
+export const SPLASH_TITLE_HIDE_AT: number = 1780;
+
+export interface SplashMotion {
+  trainDistance: number;
+  trainOpacity: number;
+  landscapeOpacity: number;
+  curtainProgress: number;
+  curtainOpacity: number;
 }
 
 export class FujiSplashScene {
-  private wheelCenters: number[] = [138, 249, 509, 616, 773, 881, 1175, 1279, 1444, 1553, 1810, 1935];
+  private railway: SplashRailway = new SplashRailway();
+  motionAt(elapsed: number): SplashMotion {
+    return {
+      trainDistance: this.railway.distanceAt(elapsed),
+      trainOpacity: this.ease(elapsed / 260) * (1 - this.ease((elapsed - 2080) / 520)),
+      landscapeOpacity: 1 - this.ease((elapsed - SPLASH_REVEAL_START) / 740),
+      curtainProgress: this.ease((elapsed - 2180) / 920),
+      curtainOpacity: 1 - this.ease((elapsed - 2440) / 660)
+    };
+  }
 
   private clamp(value: number): number {
     return Math.max(0, Math.min(1, value));
@@ -23,7 +36,7 @@ export class FujiSplashScene {
     return t * t * (3 - 2 * t);
   }
 
-  private placement(width: number, height: number): ScenePlacement {
+  private placement(width: number, height: number): RailPlacement {
     const scale: number = Math.max(width / 859, height / 1831);
     const artWidth: number = 859 * scale;
     const artHeight: number = 1831 * scale;
@@ -31,8 +44,9 @@ export class FujiSplashScene {
   }
 
   paintBackdrop(ctx: CanvasRenderer, landscape: ImageBitmap, width: number, height: number): void {
-    const art: ScenePlacement = this.placement(width, height);
+    const art: RailPlacement = this.placement(width, height);
     ctx.drawImage(landscape, art.x, art.y, art.width, art.height);
+    this.railway.paintTrack(ctx, art);
     // A restrained native scrim keeps the brand legible over detailed artwork.
     const shade: CanvasGradient = ctx.createLinearGradient(0, height * 0.68, 0, height);
     shade.addColorStop(0, 'rgba(13,37,80,0)');
@@ -41,66 +55,35 @@ export class FujiSplashScene {
     ctx.fillRect(0, height * 0.68, width, height * 0.32);
   }
 
-  private train(ctx: CanvasRenderer, sprite: ImageBitmap, elapsed: number, width: number, height: number): void {
-    const art: ScenePlacement = this.placement(width, height);
-    const trainWidth: number = art.width * 1.12;
-    // Sample the painted train, excluding the source image's transparent margin.
-    // Fractions also work with ImageBitmap's density-adjusted native dimensions.
-    const sourceX: number = sprite.width * 10 / 2172;
-    const sourceY: number = sprite.height * 180 / 724;
-    const sourceWidth: number = sprite.width * 2152 / 2172;
-    const sourceHeight: number = sprite.height * 364 / 724;
-    const trainHeight: number = trainWidth * 364 / 2152;
-    const travel: number = this.clamp((elapsed - 100) / 2210);
-    const x: number = -trainWidth - 12 + (width + trainWidth + 24) * travel;
-    const railY: number = art.y + art.height * 1152 / 1831;
-    const suspension: number = Math.sin(elapsed * 0.032) * art.width / 1700;
-    ctx.drawImage(sprite, sourceX, sourceY, sourceWidth, sourceHeight,
-      x, railY - trainHeight + suspension, trainWidth, trainHeight);
-    const paintScale: number = trainWidth / 2152;
-    const distance: number = (width + trainWidth + 24) * travel;
-    // Rotate the painted wheel hubs themselves, retaining the original texture
-    // and fixed undercarriage. Angular velocity follows distance / wheel radius.
-    for (let i: number = 0; i < this.wheelCenters.length; i++) {
-      const wheelX: number = this.wheelCenters[i];
-      ctx.save();
-      ctx.translate(x + (wheelX - 10) * paintScale, railY - 42 * paintScale);
-      ctx.scale(paintScale, paintScale);
-      ctx.rotate(distance / (36 * paintScale));
-      ctx.beginPath();
-      ctx.arc(0, 0, 27, 0, Math.PI * 2);
-      ctx.clip();
-      ctx.drawImage(sprite, (wheelX - 27) / 2172 * sprite.width, 475 / 724 * sprite.height,
-        54 / 2172 * sprite.width, 54 / 724 * sprite.height, -27, -27, 54, 54);
-      ctx.strokeStyle = 'rgba(219,231,249,0.72)';
-      ctx.lineWidth = 2.8;
-      for (let spoke: number = 0; spoke < 3; spoke++) {
-        ctx.rotate(Math.PI * 2 / 3);
-        ctx.beginPath();
-        ctx.moveTo(9, 0);
-        ctx.lineTo(23, 0);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-    // A warm running light and two fading sound-wave pulses accompany the horn.
-    const headX: number = x + trainWidth * 0.965;
-    const headY: number = railY - trainHeight * 0.41;
-    this.glow(ctx, headX, headY, art.width * 0.036, 0.48, true);
-    for (let pulse: number = 0; pulse < 2; pulse++) {
-      const phase: number = (elapsed - SPLASH_WHISTLE_AT - 20 - pulse * 500) / 420;
-      if (phase > 0 && phase < 1) {
-        ctx.save();
-        ctx.strokeStyle = `rgba(255,241,210,${0.6 * Math.sin(phase * Math.PI)})`;
-        ctx.lineWidth = 1.2 * width / 390;
-        for (let ring: number = 0; ring < 3; ring++) {
-          ctx.beginPath();
-          ctx.arc(headX + 5, headY, (8 + ring * 8 + phase * 17) * width / 390, -0.75, 0.5);
-          ctx.stroke();
-        }
-        ctx.restore();
-      }
-    }
+  paintCurtainLayer(ctx: CanvasRenderer, frame: ImageBitmap, width: number, height: number): void {
+    ctx.save();
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(frame, 0, 0, width, height);
+    // Feather the painted border into a transparent central opening. This is
+    // cached once; only the two finished border halves move during playback.
+    const edges: CanvasGradient = ctx.createLinearGradient(0, 0, width, 0);
+    edges.addColorStop(0, '#000000');
+    edges.addColorStop(0.09, '#000000');
+    edges.addColorStop(0.25, 'rgba(0,0,0,0.7)');
+    edges.addColorStop(0.39, 'rgba(0,0,0,0)');
+    edges.addColorStop(0.61, 'rgba(0,0,0,0)');
+    edges.addColorStop(0.80, 'rgba(0,0,0,0.65)');
+    edges.addColorStop(0.92, '#000000');
+    edges.addColorStop(1, '#000000');
+    ctx.globalCompositeOperation = 'destination-in';
+    ctx.fillStyle = edges;
+    ctx.fillRect(0, 0, width, height);
+    // The border painting's former horizontal railway must never appear over
+    // the new perspective track or move sideways with the foreground branches.
+    const trackGap: CanvasGradient = ctx.createLinearGradient(0, height * 0.55, 0, height * 0.76);
+    trackGap.addColorStop(0, 'rgba(0,0,0,0)');
+    trackGap.addColorStop(0.24, '#000000');
+    trackGap.addColorStop(0.72, '#000000');
+    trackGap.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = trackGap;
+    ctx.fillRect(0, height * 0.55, width, height * 0.21);
+    ctx.restore();
   }
 
   private seed(index: number, salt: number): number {
@@ -119,7 +102,7 @@ export class FujiSplashScene {
     ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
   }
 
-  private atmosphere(ctx: CanvasRenderer, elapsed: number, art: ScenePlacement): void {
+  private atmosphere(ctx: CanvasRenderer, elapsed: number, art: RailPlacement): void {
     const t: number = elapsed / 1000;
     ctx.save();
     ctx.translate(art.x, art.y);
@@ -170,7 +153,7 @@ export class FujiSplashScene {
     ctx.restore();
   }
 
-  private water(ctx: CanvasRenderer, elapsed: number, art: ScenePlacement): void {
+  private water(ctx: CanvasRenderer, elapsed: number, art: RailPlacement): void {
     const t: number = elapsed / 1000;
     ctx.save();
     ctx.translate(art.x, art.y);
@@ -206,7 +189,8 @@ export class FujiSplashScene {
     ctx.restore();
   }
 
-  private petals(ctx: CanvasRenderer, elapsed: number, art: ScenePlacement, foreground: boolean): void {
+  private petals(ctx: CanvasRenderer, elapsed: number, art: RailPlacement, foreground: boolean,
+    opening: number = 0): void {
     const t: number = elapsed / 1000;
     const count: number = foreground ? 32 : 24;
     ctx.save();
@@ -219,10 +203,12 @@ export class FujiSplashScene {
       const y: number = startY + t * fallSpeed;
       const breeze: number = Math.sin(t * 1.8 + seed) * (foreground ? 31 : 14);
       const wake: number = this.ease((t - 0.5) / 0.9) * Math.exp(-Math.pow((startY - 1020) / 200, 2)) * 90;
-      const x: number = this.seed(seed, 1) * 1000 - 80 + t * 32 + breeze + wake;
+      const originX: number = this.seed(seed, 1) * 1000 - 80;
+      const outward: number = (originX < 429 ? -1 : 1) * opening * (foreground ? 420 : 180);
+      const x: number = originX + t * 32 + breeze + wake + outward;
       const size: number = foreground ? 8 + this.seed(seed, 4) * 8 : 3 + this.seed(seed, 4) * 4;
       ctx.save();
-      ctx.globalAlpha = foreground ? 0.88 : 0.56;
+      ctx.globalAlpha = ctx.globalAlpha * (foreground ? 0.88 : 0.56);
       ctx.translate(x, y);
       ctx.rotate(seed * 1.4 + t * (0.9 + this.seed(seed, 5) * 1.6));
       ctx.scale(size / 10 * Math.cos(t * 2.3 + seed), size / 10);
@@ -243,61 +229,52 @@ export class FujiSplashScene {
     ctx.restore();
   }
 
-  private spiral(ctx: CanvasRenderer, width: number, height: number, progress: number): void {
-    if (progress <= 0) {
+  private cherryCurtains(ctx: CanvasRenderer, trees: ImageBitmap, elapsed: number,
+    art: RailPlacement, motion: SplashMotion): void {
+    if (motion.curtainOpacity <= 0) {
       return;
     }
-    const p: number = this.ease(progress);
-    const radius: number = Math.sqrt(width * width + height * height) * 0.76 * p;
-    const cx: number = width * 0.51;
-    const cy: number = height * 0.47;
-    const turn: number = -0.8 + p * 1.5;
-    // Two broad curved ribbons unfurl from the same center; the landscape
-    // stays level. Translucent erasure softens the aperture's edges.
-    for (let arm: number = 0; arm < 2; arm++) {
-      ctx.beginPath();
-      for (let step: number = 0; step <= 72; step++) {
-        const u: number = step / 72;
-        const angle: number = turn + arm * Math.PI + u * 3.8;
-        const r: number = radius * u;
-        const x: number = cx + Math.cos(angle) * r;
-        const y: number = cy + Math.sin(angle) * r;
-        if (step === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      }
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.globalCompositeOperation = 'destination-out';
-      for (let edge: number = 4; edge >= 0; edge--) {
-        ctx.lineWidth = Math.max(0.1, radius * (0.22 + p * 0.75) + edge * 3);
-        ctx.strokeStyle = edge === 0 ? '#000000' : 'rgba(0,0,0,0.094)';
-        ctx.stroke();
-      }
+    for (let side: number = 0; side < 2; side++) {
+      const direction: number = side === 0 ? -1 : 1;
+      const open: number = motion.curtainProgress;
+      const breeze: number = Math.sin(elapsed / 1300 + side * 1.7) * 0.002;
+      ctx.save();
+      ctx.globalAlpha = motion.curtainOpacity;
+      ctx.translate(art.x + side * art.width + direction * open * art.width * 0.54,
+        art.y + art.height * 0.54 + open * art.height * 0.012);
+      ctx.rotate(breeze + direction * open * 0.018);
+      ctx.scale(1 + open * 0.025, 1 + open * 0.025);
+      // The sprite has an empty central gutter: splitting it cannot sever a
+      // branch or carry an opaque piece of mountain into the opening curtains.
+      ctx.drawImage(trees, side * trees.width / 2, 0, trees.width / 2, trees.height,
+        side === 0 ? 0 : -art.width / 2, -art.height * 0.54, art.width / 2, art.height);
+      ctx.restore();
     }
-    // Fade the final corners to transparency before the component unmounts.
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.fillStyle = `rgba(0,0,0,${this.ease((progress - 0.56) / 0.44)})`;
-    ctx.fillRect(0, 0, width, height);
-    ctx.globalCompositeOperation = 'source-over';
   }
 
-  paintFrame(ctx: CanvasRenderer, backdrop: ImageBitmap, train: ImageBitmap,
+  paintFrame(ctx: CanvasRenderer, backdrop: ImageBitmap, train: ImageBitmap, front: ImageBitmap, trees: ImageBitmap,
     width: number, height: number, elapsed: number): void {
+    // The first browser frame can predate the playback request slightly.
+    // Clamp before calculating particle ages or fractional opacity powers.
+    elapsed = Math.max(0, elapsed);
     ctx.clearRect(0, 0, width, height);
     if (elapsed >= SPLASH_DURATION) {
       return;
     }
+    const art: RailPlacement = this.placement(width, height);
+    const motion: SplashMotion = this.motionAt(elapsed);
+    ctx.save();
+    ctx.globalAlpha = motion.landscapeOpacity;
     ctx.drawImage(backdrop, 0, 0, width, height);
-    const art: ScenePlacement = this.placement(width, height);
     this.atmosphere(ctx, elapsed, art);
     this.water(ctx, elapsed, art);
     this.petals(ctx, elapsed, art, false);
-    this.train(ctx, train, elapsed, width, height);
-    this.petals(ctx, elapsed, art, true);
-    const reveal: number = this.clamp((elapsed - SPLASH_REVEAL_START) / SPLASH_REVEAL_DURATION);
-    this.spiral(ctx, width, height, reveal);
+    ctx.restore();
+    this.railway.paintTrain(ctx, train, front, elapsed, motion.trainOpacity, art);
+    this.cherryCurtains(ctx, trees, elapsed, art, motion);
+    ctx.save();
+    ctx.globalAlpha = motion.curtainOpacity;
+    this.petals(ctx, elapsed, art, true, motion.curtainProgress);
+    ctx.restore();
   }
 }
