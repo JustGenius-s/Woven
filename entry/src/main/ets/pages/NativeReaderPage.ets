@@ -3,12 +3,9 @@ import { display, window } from '@kit.ArkUI';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { bookParser, ReadPageComponent, readerCore } from '@kit.ReaderKit';
 import { showImmersiveNotice } from '../common/ImmersiveNotice';
-import { NativeReaderEdition, NativeReaderParams, NativeReaderTrial } from '../services/NativeReaderTrial';
-import { READERKIT_TRIAL_ID, READERKIT_TRIAL_TITLES } from '../services/ReaderKitTrialContent';
-import { READERKIT_ID, READERKIT_TITLES, READERKIT_CHAPTERS } from '../services/ReaderKitContent';
-import { WEB_REFLOW_PROGRESS, WEB_REFLOW_CHAPTERS } from '../services/WebReflowContent';
+import { NativeReaderEdition, NativeReaderTrial } from '../services/NativeReaderTrial';
+import { READERKIT_TITLES } from '../services/ReaderKitContent';
 import { ReaderPreferences, ReaderProgressSnapshot } from '../services/ReaderPreferences';
-import { FixedLayoutReaderParams } from '../services/FixedLayoutBook';
 import { ImmersiveBackChrome } from '../views/components/ImmersiveBackChrome';
 
 // Do not import this page from Index/ExplorePage: its system HSP is unavailable
@@ -17,7 +14,7 @@ import { ImmersiveBackChrome } from '../views/components/ImmersiveBackChrome';
 @Component
 struct NativeReaderPage {
   @Env(SystemProperties.WINDOW_AVOID_AREA) private avoidAreas: window.UIEnvWindowAvoidAreaInfoVP;
-  @State private edition: NativeReaderEdition = NativeReaderTrial.edition(READERKIT_ID);
+  @State private edition: NativeReaderEdition = NativeReaderTrial.edition();
   @State private loading: boolean = true;
   @State private errorMessage: string = '';
   @State private resourceIndex: number = 0;
@@ -43,26 +40,13 @@ struct NativeReaderPage {
     (page: readerCore.PageDataInfo) => this.handlePageShow(page);
 
   aboutToAppear(): void {
-    const params: NativeReaderParams | undefined = this.getUIContext().getRouter().getParams() as
-      NativeReaderParams | undefined;
-    this.edition = NativeReaderTrial.edition(params?.editionId ?? READERKIT_ID);
     const style = ReaderPreferences.style(this.context());
     this.fontSize = Math.max(16, Math.min(style.fontSize, 32));
     this.lineHeight = Math.max(1.2, Math.min(style.lineHeight, 2.4));
     this.progress = ReaderPreferences.progress(this.context(), NativeReaderTrial.progressId(this.edition));
-    if (this.edition.id === READERKIT_ID &&
-      !ReaderPreferences.hasProgress(this.context(), NativeReaderTrial.progressId(this.edition)) &&
-      ReaderPreferences.hasProgress(this.context(), WEB_REFLOW_PROGRESS)) {
-      // Keep the last chapter when moving from ArkWeb. Its HTML anchor/scroll
-      // offset is not a Reader Kit DOM position and must not be reused.
-      const previous: ReaderProgressSnapshot = ReaderPreferences.progress(this.context(), WEB_REFLOW_PROGRESS);
-      const chapterId: string = WEB_REFLOW_CHAPTERS[previous.resourceIndex] ?? '';
-      const index: number = READERKIT_CHAPTERS.indexOf(chapterId);
-      this.progress = { resourceIndex: Math.max(0, index), domPos: '', pageOffset: 0 };
-    }
     this.timeoutId = setTimeout(() => {
       if (this.loading && !this.disposed) {
-        this.fail('阅读器响应超时，请返回后重试，或换另一个排版版本。');
+        this.fail('阅读器响应超时，请返回后重试。');
       }
     }, 45000);
   }
@@ -206,7 +190,7 @@ struct NativeReaderPage {
       return;
     }
     if (page.state === readerCore.PageState.OPEN_BOOK_FAIL) {
-      this.fail('Reader Kit 无法排版当前内容，请返回后尝试另一个版本。');
+      this.fail('Reader Kit 无法排版当前内容，请返回后重试。');
     } else if (page.state === readerCore.PageState.PAGE_ON_SHOW) {
       this.loading = false;
       this.clearTimeout();
@@ -251,15 +235,6 @@ struct NativeReaderPage {
     } catch (error) {
       showImmersiveNotice(this.getUIContext(), '无法跳转', this.errorDetail(error as BusinessError));
     }
-  }
-
-  private openOriginalPage(): void {
-    this.settingsOpen = false;
-    const params: FixedLayoutReaderParams = {
-      pageIndex: NativeReaderTrial.sourcePageIndex(this.edition, this.resourceIndex)
-    };
-    this.getUIContext().getRouter().pushUrl({ url: 'pages/FixedLayoutReaderPage', params: params })
-      .catch(() => showImmersiveNotice(this.getUIContext(), '暂时无法打开原版', '请返回后重试。'));
   }
 
   private bottomInset(): number {
@@ -315,31 +290,27 @@ struct NativeReaderPage {
   private readerSettings() {
     Scroll() {
       Column({ space: 20 }) {
-        if (this.edition.reflow) {
-          if (this.edition.id === READERKIT_TRIAL_ID || this.edition.id === READERKIT_ID) {
-            Text('正文和句型框可调字号；图中的标注随图片整体缩放。')
-              .fontSize(13).lineHeight(20).fontColor($r('app.color.ink_muted')).width('100%')
-          }
-          Column({ space: 8 }) {
-            Text(`字号  ${this.fontSize}`).width('100%').fontSize(15)
-            Slider({ value: this.fontSize, min: 16, max: 32, step: 1 })
-              .onChange((value: number, mode: SliderChangeMode) => {
-                this.fontSize = value;
-                if (mode === SliderChangeMode.End || mode === SliderChangeMode.Click) {
-                  this.applySettings();
-                }
-              })
-            Text(`行距  ${this.lineHeight.toFixed(1)} 倍`).width('100%').fontSize(15)
-            Slider({ value: this.lineHeight, min: 1.2, max: 2.4, step: 0.1 })
-              .onChange((value: number, mode: SliderChangeMode) => {
-                this.lineHeight = value;
-                if (mode === SliderChangeMode.End || mode === SliderChangeMode.Click) {
-                  this.applySettings();
-                }
-              })
-          }
-          .width('100%')
+        Text('正文和句型框可调字号；图中的标注随图片整体缩放。')
+          .fontSize(13).lineHeight(20).fontColor($r('app.color.ink_muted')).width('100%')
+        Column({ space: 8 }) {
+          Text(`字号  ${this.fontSize}`).width('100%').fontSize(15)
+          Slider({ value: this.fontSize, min: 16, max: 32, step: 1 })
+            .onChange((value: number, mode: SliderChangeMode) => {
+              this.fontSize = value;
+              if (mode === SliderChangeMode.End || mode === SliderChangeMode.Click) {
+                this.applySettings();
+              }
+            })
+          Text(`行距  ${this.lineHeight.toFixed(1)} 倍`).width('100%').fontSize(15)
+          Slider({ value: this.lineHeight, min: 1.2, max: 2.4, step: 0.1 })
+            .onChange((value: number, mode: SliderChangeMode) => {
+              this.lineHeight = value;
+              if (mode === SliderChangeMode.End || mode === SliderChangeMode.Click) {
+                this.applySettings();
+              }
+            })
         }
+        .width('100%')
         Column({ space: 10 }) {
           Text('翻页方式').width('100%').fontSize(15)
           Row({ space: 12 }) {
@@ -364,22 +335,12 @@ struct NativeReaderPage {
                 void this.jump(value);
               }
             })
-          if (this.edition.id === READERKIT_TRIAL_ID) {
-            ForEach(READERKIT_TRIAL_TITLES, (title: string, index: number) => {
-              Button(title).width('100%')
-                .onClick(() => { void this.jump(index); })
-            }, (title: string) => title)
-          } else if (this.edition.id === READERKIT_ID) {
-            ForEach(READERKIT_TITLES, (title: string, index: number) => {
-              Button(title).width('100%').fontSize(14)
-                .onClick(() => { void this.jump(index); })
-            }, (title: string) => title)
-          } else {
-            Button('课堂用语').width('100%')
-              .onClick(() => { void this.jump(this.edition.classroomIndex); })
-          }
-          Button('本章原版').width('100%')
-            .onClick(() => this.openOriginalPage())
+          ForEach(READERKIT_TITLES, (title: string, index: number) => {
+            Button(title).width('100%').fontSize(14)
+              .onClick(() => { void this.jump(index); })
+          }, (title: string) => title)
+          Button('课堂用语').width('100%')
+            .onClick(() => { void this.jump(this.edition.classroomIndex); })
         }.width('100%')
       }
       .width('100%').padding({ left: 24, right: 24, top: 16, bottom: 36 })

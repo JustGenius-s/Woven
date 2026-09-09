@@ -1,8 +1,6 @@
 {
   "src": [
     "pages/Index",
-    "pages/NativeReaderPage",
-    "pages/ReflowReaderPage",
-    "pages/FixedLayoutReaderPage"
+    "pages/NativeReaderPage"
   ]
 }

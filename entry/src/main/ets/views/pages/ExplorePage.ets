@@ -14,7 +14,7 @@ import { VideoItem, videoSourceLabel } from '../../model/VideoModels';
 import { ContentRepository } from '../../services/ContentRepository';
 import { ContentShelfDataSource } from '../../services/ContentShelfDataSource';
 import { ReadingBookService } from '../../services/ReadingBookService';
-import { NativeReaderParams, NativeReaderTrial } from '../../services/NativeReaderTrial';
+import { NativeReaderTrial } from '../../services/NativeReaderTrial';
 import { VideoLibraryStore } from '../../services/VideoLibraryStore';
 import { VideoCoverService } from '../../services/VideoCoverService';
 import { FloatingBarScrollTracker } from '../components/FloatingBarScrollTracker';
@@ -678,19 +678,14 @@ export struct ExplorePage {
       this.readingFloatingBarTracker.update(this.readingScroller, this.onFloatingBarCompactChange))
   }
 
-  private openNativeReader(editionId: string): void {
-    const fixed: boolean = editionId === 'yaramaika-fixed';
-    const webReflow: boolean = editionId === 'yaramaika-reflow';
-    const reason: string = fixed || webReflow ? '' : NativeReaderTrial.unavailableReason();
+  private openNativeReader(): void {
+    const reason: string = NativeReaderTrial.unavailableReason();
     if (reason.length > 0) {
-      showImmersiveNotice(this.getUIContext(), '原生阅读试用', reason);
+      showImmersiveNotice(this.getUIContext(), '教材阅读', reason);
       return;
     }
-    const params: NativeReaderParams = { editionId: editionId };
-    this.getUIContext().getRouter().pushUrl({
-      url: fixed ? 'pages/FixedLayoutReaderPage' :
-        (webReflow ? 'pages/ReflowReaderPage' : 'pages/NativeReaderPage'), params: params
-    }).catch(() => showImmersiveNotice(this.getUIContext(), '暂时无法打开', '请返回后重试。'));
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/NativeReaderPage' })
+      .catch(() => showImmersiveNotice(this.getUIContext(), '暂时无法打开', '请返回后重试。'));
   }
 
   @Builder
@@ -701,24 +696,10 @@ export struct ExplorePage {
         .fontColor($r('app.color.ink')).width('100%')
       Text('完整教材包含 12 课与附录，可调整字号与行距。')
         .fontSize(14).lineHeight(22).fontColor($r('app.color.ink_muted')).width('100%')
-      Row({ space: 12 }) {
-        Button('打开重排版').layoutWeight(1).fontSize(14)
-          .id('native-reader-reflow')
-          .backgroundColor($r('app.color.accent'))
-          .onClick(() => this.openNativeReader('yaramaika-readerkit'))
-        Button('打开原版布局').layoutWeight(1).fontSize(14)
-          .id('native-reader-fixed')
-          .backgroundColor($r('app.color.accent_soft')).fontColor($r('app.color.accent'))
-          .onClick(() => this.openNativeReader('yaramaika-fixed'))
-      }.width('100%')
-      Button('打开网页版').width('100%').fontSize(14)
-        .id('reader-web-reflow')
-        .backgroundColor($r('app.color.accent_soft')).fontColor($r('app.color.accent'))
-        .onClick(() => this.openNativeReader('yaramaika-reflow'))
-      Button('Reader Kit 试版 · 11、17 页').width('100%').fontSize(14)
-        .id('native-reader-semantic-trial')
-        .backgroundColor($r('app.color.accent_soft')).fontColor($r('app.color.accent'))
-        .onClick(() => this.openNativeReader('yaramaika-readerkit-trial'))
+      Button('打开重排版').width('100%').fontSize(14)
+        .id('native-reader-reflow')
+        .backgroundColor($r('app.color.accent'))
+        .onClick(() => this.openNativeReader())
       Text('本地教材 · 支持离线阅读')
         .fontSize(11).fontColor($r('app.color.ink_muted')).width('100%')
     }

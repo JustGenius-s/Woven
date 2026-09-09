@@ -39,10 +39,6 @@ Reader Kit 中由原生引擎分页，表格列适配内容宽度，单元格文
 
     node scripts/build-readerkit-full.cjs --python 'E:/Lib/Python/python.exe'
 
-需要更新网页版时：
-
-    node scripts/build-reader-web.cjs
-
 独立重建两页基准预览，不替换应用书籍：
 
     node scripts/rebuild-reader-semantic-trial.cjs --pdf 'C:/Users/justg/Downloads/PDF_yaramaikanihongo_print_ver.2.pdf' --python 'E:/Lib/Python/python.exe'
@@ -52,17 +48,17 @@ Reader Kit 中由原生引擎分页，表格列适配内容宽度，单元格文
 
 ## 输出与应用
 
-- entry/src/main/resources/rawfile/reader/yaramaika-readerkit.epub：当前主入口的完整原生教材。
+- entry/src/main/resources/rawfile/reader/yaramaika-readerkit.epub：当前唯一入口的完整原生教材。
 - entry/src/main/ets/services/ReaderKitContent.ets：原生全书的资源字节数、缓存哈希、章节及原页映射。
 - .cache/readerkit-full-package/：原生转换的模型、图片及 audit.json，不纳入源码管理。
-- entry/src/main/resources/rawfile/reader/yaramaika-semantic.zip：应用内置的完整 HTML、字体、图片、样式和脚本书籍包。
-- entry/src/main/ets/services/WebReflowContent.ets：应用必需的生成元数据；以上两项继续纳入项目。
 - docs/previews/reader-semantic-full.html：自包含离线全书预览。
 - 同目录的 reader-semantic-full.json、reader-semantic-full-config.json、reader-semantic-full-audit.json：模型、导出配置和转换记录。
 
 预览与 JSON 生成物保留在本地，但由 .gitignore 排除，不与手工维护的源配置重复管理。
-当前完整教材主入口由 Reader Kit 分页与渲染，网页版保留 ArkWeb 的滚动翻页及动态图示布局。
-两者均按实际可用阅读区域排版，不按原 PDF 页强制分页。原版与两页试版保留，详见 [教材阅读](NATIVE_READER_TRIAL.md)。
+当前完整教材由 Reader Kit 分页与渲染，按实际可用阅读区域排版，不按原 PDF 页强制分页。
+网页版书籍包、原版布局与两页试版已从应用移除，详见 [教材阅读](NATIVE_READER_TRIAL.md)。
+`rebuild-reader-semantic-full.cjs` 仍会写出 `yaramaika-semantic.zip` 与 `WebReflowContent.ets`，
+应用已不再打包这两项，下次生成可忽略它们。
 
 旧版模板流程、旧教材配置及历史两页覆盖生成器已归档，不再是当前构建的依赖。
 归档与恢复说明见 [整理记录](READER_CLEANUP.md)。用户要求不自行测试：只整理源内容、生成资源和按需编译签名，效果由用户验收。

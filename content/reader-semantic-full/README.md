@@ -16,8 +16,8 @@
 # 首次生成或修改字体提取规则后，重建源缓存：
 node scripts/rebuild-reader-semantic-full.cjs --refresh-source --pdf 'C:/Users/justg/Downloads/PDF_yaramaikanihongo_print_ver.2.pdf' --python 'E:/Lib/Python/python.exe'
 
-# 已有匹配缓存时，修改配置/渲染后直接生成：
-node scripts/build-reader-web.cjs
+# 已有匹配缓存时，生成应用使用的原生全书 EPUB：
+node scripts/build-readerkit-full.cjs --python 'E:/Lib/Python/python.exe'
 ```
 
 Node 需要 `pdfjs-dist`、`jszip`、`pngjs`；源导入的 Python 需要 `lxml`、`fontTools`。
@@ -45,14 +45,17 @@ Node 需要 `pdfjs-dist`、`jszip`、`pngjs`；源导入的 Python 需要 `lxml`
 - `docs/previews/reader-semantic-full.html`：自包含离线全书预览。
 - `docs/previews/reader-semantic-full.json`：完整语义模型。
 - `docs/previews/reader-semantic-full-audit.json`：转换记录，包含正文归属、剩余普通段落和图片对象归属。
-- `entry/src/main/resources/rawfile/reader/yaramaika-semantic.zip`：应用完整书籍包，包含全部图片、字体、HTML、CSS 和脚本。
-- `WebReflowContent.ets`：自动生成章节、缓存和进度版本信息。
+- `entry/src/main/resources/rawfile/reader/yaramaika-readerkit.epub`：应用内置的唯一教材，由 Reader Kit 渲染。
+- `ReaderKitContent.ets`：自动生成章节、缓存和进度版本信息。
+
+`rebuild-reader-semantic-full.cjs` 仍会写出 `yaramaika-semantic.zip` 与 `WebReflowContent.ets`，
+但网页版已从应用移除，这两项不再打包，下次生成可忽略。
 
 生成器核对实际渲染字段中的源字符归属，遗漏或重复会中止生成。这是转换完整性约束，
 不等于浏览器、真机或布局效果验收。按照用户要求不执行测试，不自行查看生成页面效果，不安装设备。
 
-应用直接解包完整语义资源，不再拼接旧版章节，也不依赖旧 EPUB 的图片。
-升级时保留之前的章节位置，重新建立本版本的位置锚点。阅读区域内连续排版，不按原 PDF 页强制分页。
+应用由 Reader Kit 直接解析 EPUB，不再拼接旧版章节。
+升级时保留之前的章节位置。阅读区域内连续排版，不按原 PDF 页强制分页。
 
 旧版模板与教材 JSON 已归档，位置及恢复说明见 `docs/READER_CLEANUP.md`。
-预览和转换记录留在原路径供查看，通过 `.gitignore` 排除；应用必需的书籍 ZIP 和 ArkTS 元数据继续保留。
+预览和转换记录留在原路径供查看，通过 `.gitignore` 排除；应用必需的 EPUB 和 ArkTS 元数据继续保留。

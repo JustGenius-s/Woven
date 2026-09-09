@@ -22,7 +22,8 @@ semantic-layout.cjs 恢复相连的句型单元格和局部图示锚点，渲染
 
 源 PDF 按 SHA-256 校验，缓存位于 .cache/reader-semantic-source/。
 该命令只生成两页 HTML 和模型，不替换应用全书。预览与模型留在本地，通过 .gitignore 排除。
-当前应用全书由 scripts/build-reader-web.cjs 生成，详见 [全书配置](../reader-semantic-full/README.md)。
+当前应用全书由 scripts/build-readerkit-full.cjs 生成，详见 [全书配置](../reader-semantic-full/README.md)。
+本目录的两页区域定义仍是全书的输入；除此之外它只用于独立重建预览，不再生成应用内的试版 EPUB。
 
 早期“仅替换两页、叠加旧 EPUB”的应用生成流程已归档；配置中的历史替换位置保留作为记录，
 当前全书不使用这部分字段。恢复说明见 [整理记录](../../docs/READER_CLEANUP.md)。
