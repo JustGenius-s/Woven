@@ -15,6 +15,14 @@
 local.properties
 /.codegenie/
 /.cache/
+# Local recovery snapshots; never a build input.
+/.archives/
+# Reader previews and exported models/configurations are generated locally.
+/docs/previews/reader-*.html
+/docs/previews/reader-*.json
+# Python bytecode remains local.
+**/__pycache__/
+*.py[cod]
 # Piper 日语模型本地文件，不进仓库。
 /entry/src/main/resources/rawfile/tts/vits-piper-ja/
 # Tadoku 官方 PDF / MP3 / 封面已上云，不再打进安装包。

@@ -4,7 +4,11 @@ import { BusinessError } from '@kit.BasicServicesKit';
 import { bookParser, ReadPageComponent, readerCore } from '@kit.ReaderKit';
 import { showImmersiveNotice } from '../common/ImmersiveNotice';
 import { NativeReaderEdition, NativeReaderParams, NativeReaderTrial } from '../services/NativeReaderTrial';
+import { READERKIT_TRIAL_ID, READERKIT_TRIAL_TITLES } from '../services/ReaderKitTrialContent';
+import { READERKIT_ID, READERKIT_TITLES, READERKIT_CHAPTERS } from '../services/ReaderKitContent';
+import { WEB_REFLOW_PROGRESS, WEB_REFLOW_CHAPTERS } from '../services/WebReflowContent';
 import { ReaderPreferences, ReaderProgressSnapshot } from '../services/ReaderPreferences';
+import { FixedLayoutReaderParams } from '../services/FixedLayoutBook';
 import { ImmersiveBackChrome } from '../views/components/ImmersiveBackChrome';
 
 // Do not import this page from Index/ExplorePage: its system HSP is unavailable
@@ -13,7 +17,7 @@ import { ImmersiveBackChrome } from '../views/components/ImmersiveBackChrome';
 @Component
 struct NativeReaderPage {
   @Env(SystemProperties.WINDOW_AVOID_AREA) private avoidAreas: window.UIEnvWindowAvoidAreaInfoVP;
-  @State private edition: NativeReaderEdition = NativeReaderTrial.edition('yaramaika-reflow');
+  @State private edition: NativeReaderEdition = NativeReaderTrial.edition(READERKIT_ID);
   @State private loading: boolean = true;
   @State private errorMessage: string = '';
   @State private resourceIndex: number = 0;
@@ -27,6 +31,7 @@ struct NativeReaderPage {
   private controller: readerCore.ReaderComponentController = new readerCore.ReaderComponentController();
   private parser: bookParser.BookParserHandler | undefined = undefined;
   private initialized: boolean = false;
+  private componentReady: boolean = false;
   private opening: boolean = false;
   private disposed: boolean = false;
   private viewportWidth: number = 0;
@@ -40,11 +45,21 @@ struct NativeReaderPage {
   aboutToAppear(): void {
     const params: NativeReaderParams | undefined = this.getUIContext().getRouter().getParams() as
       NativeReaderParams | undefined;
-    this.edition = NativeReaderTrial.edition(params?.editionId ?? 'yaramaika-reflow');
+    this.edition = NativeReaderTrial.edition(params?.editionId ?? READERKIT_ID);
     const style = ReaderPreferences.style(this.context());
     this.fontSize = Math.max(16, Math.min(style.fontSize, 32));
     this.lineHeight = Math.max(1.2, Math.min(style.lineHeight, 2.4));
-    this.progress = ReaderPreferences.progress(this.context(), this.edition.id);
+    this.progress = ReaderPreferences.progress(this.context(), NativeReaderTrial.progressId(this.edition));
+    if (this.edition.id === READERKIT_ID &&
+      !ReaderPreferences.hasProgress(this.context(), NativeReaderTrial.progressId(this.edition)) &&
+      ReaderPreferences.hasProgress(this.context(), WEB_REFLOW_PROGRESS)) {
+      // Keep the last chapter when moving from ArkWeb. Its HTML anchor/scroll
+      // offset is not a Reader Kit DOM position and must not be reused.
+      const previous: ReaderProgressSnapshot = ReaderPreferences.progress(this.context(), WEB_REFLOW_PROGRESS);
+      const chapterId: string = WEB_REFLOW_CHAPTERS[previous.resourceIndex] ?? '';
+      const index: number = READERKIT_CHAPTERS.indexOf(chapterId);
+      this.progress = { resourceIndex: Math.max(0, index), domPos: '', pageOffset: 0 };
+    }
     this.timeoutId = setTimeout(() => {
       if (this.loading && !this.disposed) {
         this.fail('阅读器响应超时，请返回后重试，或换另一个排版版本。');
@@ -102,6 +117,7 @@ struct NativeReaderPage {
       return;
     }
     this.controller = controller;
+    this.componentReady = true;
     void this.openBook();
   }
 
@@ -113,6 +129,8 @@ struct NativeReaderPage {
     }
     this.viewportWidth = Math.round(this.getUIContext().vp2px(width));
     this.viewportHeight = Math.round(this.getUIContext().vp2px(height));
+    // Pagination always uses the live reading surface, including resizing and
+    // rotation. The conversion script's PDF canvas is unrelated to this size.
     if (!this.initialized) {
       void this.openBook();
     } else {
@@ -135,7 +153,7 @@ struct NativeReaderPage {
   }
 
   private async openBook(): Promise<void> {
-    if (this.opening || this.initialized || this.disposed ||
+    if (!this.componentReady || this.opening || this.initialized || this.disposed ||
       this.errorMessage.length > 0 || this.viewportWidth <= 0 || this.viewportHeight <= 0) {
       return;
     }
@@ -180,7 +198,7 @@ struct NativeReaderPage {
   }
 
   private safeIndex(index: number): number {
-    return Math.max(0, Math.min(Math.round(index), this.resourceCount - 1));
+    return Number.isFinite(index) ? Math.max(0, Math.min(Math.round(index), this.resourceCount - 1)) : 0;
   }
 
   private handlePageShow(page: readerCore.PageDataInfo): void {
@@ -197,7 +215,7 @@ struct NativeReaderPage {
       this.progress = {
         resourceIndex: this.resourceIndex, domPos: page.startDomPos, pageOffset: page.pageOffset
       };
-      ReaderPreferences.saveProgress(this.context(), this.edition.id, this.progress);
+      ReaderPreferences.saveProgress(this.context(), NativeReaderTrial.progressId(this.edition), this.progress);
     }
   }
 
@@ -207,6 +225,10 @@ struct NativeReaderPage {
     }
     try {
       this.controller.setPageConfig(this.pageConfig());
+      const style = ReaderPreferences.style(this.context());
+      style.fontSize = this.fontSize;
+      style.lineHeight = this.lineHeight;
+      ReaderPreferences.saveStyle(this.context(), style);
     } catch (error) {
       showImmersiveNotice(this.getUIContext(), '阅读设置未生效', this.errorDetail(error as BusinessError));
     }
@@ -229,6 +251,15 @@ struct NativeReaderPage {
     } catch (error) {
       showImmersiveNotice(this.getUIContext(), '无法跳转', this.errorDetail(error as BusinessError));
     }
+  }
+
+  private openOriginalPage(): void {
+    this.settingsOpen = false;
+    const params: FixedLayoutReaderParams = {
+      pageIndex: NativeReaderTrial.sourcePageIndex(this.edition, this.resourceIndex)
+    };
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/FixedLayoutReaderPage', params: params })
+      .catch(() => showImmersiveNotice(this.getUIContext(), '暂时无法打开原版', '请返回后重试。'));
   }
 
   private bottomInset(): number {
@@ -268,10 +299,6 @@ struct NativeReaderPage {
       .clip(true)
       .onAreaChange((_old: Area, area: Area) => this.updateViewport(area))
       Column({ space: 8 }) {
-        if (this.resourceCount > 0) {
-          Text(`内容 ${this.resourceIndex + 1} / ${this.resourceCount}`)
-            .fontSize(12).fontColor('#6B7078')
-        }
         Row({ space: 10 }) {
           Button('上一页').onClick(() => this.flip(false)).layoutWeight(1)
           Button('阅读设置').onClick(() => this.settingsOpen = true).layoutWeight(1)
@@ -288,10 +315,11 @@ struct NativeReaderPage {
   private readerSettings() {
     Scroll() {
       Column({ space: 20 }) {
-        Text(this.edition.reflow ? '可重排版可调整字号与行距；转换造成的图文、注音错位仍需整理。' :
-          '原版布局保留固定坐标，用来对照教材的图文位置。')
-          .fontSize(13).lineHeight(21).fontColor($r('app.color.ink_muted')).width('100%')
         if (this.edition.reflow) {
+          if (this.edition.id === READERKIT_TRIAL_ID || this.edition.id === READERKIT_ID) {
+            Text('正文和句型框可调字号；图中的标注随图片整体缩放。')
+              .fontSize(13).lineHeight(20).fontColor($r('app.color.ink_muted')).width('100%')
+          }
           Column({ space: 8 }) {
             Text(`字号  ${this.fontSize}`).width('100%').fontSize(15)
             Slider({ value: this.fontSize, min: 16, max: 32, step: 1 })
@@ -326,8 +354,8 @@ struct NativeReaderPage {
           }.width('100%')
         }.width('100%')
         Column({ space: 10 }) {
-          Text(`内容定位  ${this.positionDraft + 1} / ${this.resourceCount}`).width('100%').fontSize(15)
-          Text('按转换后的内容段定位，序号不代表原 PDF 页码。')
+          Text('章节').width('100%').fontSize(15)
+          Text(NativeReaderTrial.chapterTitle(this.edition, this.positionDraft))
             .width('100%').fontSize(12).fontColor($r('app.color.ink_muted'))
           Slider({ value: this.positionDraft, min: 0, max: Math.max(1, this.resourceCount - 1), step: 1 })
             .onChange((value: number, mode: SliderChangeMode) => {
@@ -336,8 +364,22 @@ struct NativeReaderPage {
                 void this.jump(value);
               }
             })
-          Button('跳到「课堂用语」对照排版').width('100%')
-            .onClick(() => { void this.jump(this.edition.classroomIndex); })
+          if (this.edition.id === READERKIT_TRIAL_ID) {
+            ForEach(READERKIT_TRIAL_TITLES, (title: string, index: number) => {
+              Button(title).width('100%')
+                .onClick(() => { void this.jump(index); })
+            }, (title: string) => title)
+          } else if (this.edition.id === READERKIT_ID) {
+            ForEach(READERKIT_TITLES, (title: string, index: number) => {
+              Button(title).width('100%').fontSize(14)
+                .onClick(() => { void this.jump(index); })
+            }, (title: string) => title)
+          } else {
+            Button('课堂用语').width('100%')
+              .onClick(() => { void this.jump(this.edition.classroomIndex); })
+          }
+          Button('本章原版').width('100%')
+            .onClick(() => this.openOriginalPage())
         }.width('100%')
       }
       .width('100%').padding({ left: 24, right: 24, top: 16, bottom: 36 })
@@ -349,7 +391,7 @@ struct NativeReaderPage {
     Stack() {
       ImmersiveBackChrome({
         title: 'やらまいか日本語',
-        subtitle: `${this.edition.label} · Reader Kit`,
+        subtitle: this.edition.label,
         paper: true,
         onBack: () => this.getUIContext().getRouter().back(),
         pageContent: (): void => { this.readerBody(); }

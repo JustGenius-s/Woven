@@ -1,0 +1,7 @@
+html{margin:0;padding:0;background:#fff;overflow-x:hidden}
+body#reading{margin:0;padding:1em 3% 1.5em;font-size:22px;line-height:1.7;text-indent:0;overflow-x:hidden}
+#reading>.chapter{max-width:40em;margin:0 auto}
+#reading p{text-indent:0}
+#reading .semantic-content{max-width:30em;margin:0 auto 1em}
+#reading .semantic-content .speaker{width:auto;height:auto;margin:0}
+#reading img{height:auto}

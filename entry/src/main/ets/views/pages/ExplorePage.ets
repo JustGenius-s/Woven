@@ -679,35 +679,47 @@ export struct ExplorePage {
   }
 
   private openNativeReader(editionId: string): void {
-    const reason: string = NativeReaderTrial.unavailableReason();
+    const fixed: boolean = editionId === 'yaramaika-fixed';
+    const webReflow: boolean = editionId === 'yaramaika-reflow';
+    const reason: string = fixed || webReflow ? '' : NativeReaderTrial.unavailableReason();
     if (reason.length > 0) {
       showImmersiveNotice(this.getUIContext(), '原生阅读试用', reason);
       return;
     }
     const params: NativeReaderParams = { editionId: editionId };
-    this.getUIContext().getRouter().pushUrl({ url: 'pages/NativeReaderPage', params: params })
-      .catch(() => showImmersiveNotice(this.getUIContext(), '暂时无法打开', '请确认设备支持 Reader Kit 阅读服务。'));
+    this.getUIContext().getRouter().pushUrl({
+      url: fixed ? 'pages/FixedLayoutReaderPage' :
+        (webReflow ? 'pages/ReflowReaderPage' : 'pages/NativeReaderPage'), params: params
+    }).catch(() => showImmersiveNotice(this.getUIContext(), '暂时无法打开', '请返回后重试。'));
   }
 
   @Builder
   private nativeReaderTrialCard() {
     Column({ space: 12 }) {
-      Text('原生阅读试用').fontSize(12).fontColor($r('app.color.accent')).width('100%')
+      Text('教材阅读').fontSize(12).fontColor($r('app.color.accent')).width('100%')
       Text('やらまいか日本語').fontSize(22).fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.ink')).width('100%')
-      Text('同一份教材，两种排版。可重排版体验字号与行距，原版布局对照图文位置。')
+      Text('完整教材包含 12 课与附录，可调整字号与行距。')
         .fontSize(14).lineHeight(22).fontColor($r('app.color.ink_muted')).width('100%')
       Row({ space: 12 }) {
-        Button('打开可重排版').layoutWeight(1).fontSize(14)
+        Button('打开重排版').layoutWeight(1).fontSize(14)
           .id('native-reader-reflow')
           .backgroundColor($r('app.color.accent'))
-          .onClick(() => this.openNativeReader('yaramaika-reflow'))
+          .onClick(() => this.openNativeReader('yaramaika-readerkit'))
         Button('打开原版布局').layoutWeight(1).fontSize(14)
           .id('native-reader-fixed')
           .backgroundColor($r('app.color.accent_soft')).fontColor($r('app.color.accent'))
           .onClick(() => this.openNativeReader('yaramaika-fixed'))
       }.width('100%')
-      Text('Reader Kit · 本地教材 · 需鸿蒙真机')
+      Button('打开网页版').width('100%').fontSize(14)
+        .id('reader-web-reflow')
+        .backgroundColor($r('app.color.accent_soft')).fontColor($r('app.color.accent'))
+        .onClick(() => this.openNativeReader('yaramaika-reflow'))
+      Button('Reader Kit 试版 · 11、17 页').width('100%').fontSize(14)
+        .id('native-reader-semantic-trial')
+        .backgroundColor($r('app.color.accent_soft')).fontColor($r('app.color.accent'))
+        .onClick(() => this.openNativeReader('yaramaika-readerkit-trial'))
+      Text('本地教材 · 支持离线阅读')
         .fontSize(11).fontColor($r('app.color.ink_muted')).width('100%')
     }
     .width('100%').alignItems(HorizontalAlign.Start).padding(20)

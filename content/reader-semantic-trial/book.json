@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "title": "やらまいか日本語 · 转换试版",
+  "fixedEpub": "entry/src/main/resources/rawfile/reader/yaramaika-fixed.epub",
+  "pdfSha256": "b41ff392f7720ac135563b513849b1ba7accec94e367058b3a417db65cbf4958",
+  "referenceDpi": 100,
+  "omitFonts": ["ff5", "ffa", "ffb"],
+  "application": {
+    "revision": 1,
+    "replacements": [
+      {"sourcePage":11,"chapter":"introduction","firstBlock":0,"kinds":["heading","conversation","grammar"],"includesChapterHeading":true},
+      {"sourcePage":17,"chapter":"places","firstBlock":7,"kinds":["heading","conversation","grammar","paragraph","diagram"]}
+    ]
+  },
+  "pages": [
+    {
+      "number": 11,
+      "id": "conversation",
+      "navTitle": "句型与对话",
+      "regions": [
+        {"kind": "heading", "rect": [90, 80, 770, 205]},
+        {"kind": "heading", "rect": [90, 240, 770, 315]},
+        {"kind": "conversation", "rect": [95, 320, 770, 590]},
+        {"kind": "figure", "rect": [200, 590, 655, 880], "alt": "初対面で名刺を交換する二人"},
+        {"kind": "panel", "rect": [140, 875, 735, 1065]}
+      ]
+    },
+    {
+      "number": 17,
+      "id": "map",
+      "navTitle": "地图标注",
+      "regions": [
+        {"kind": "heading", "rect": [95, 85, 770, 160]},
+        {"kind": "conversation", "rect": [95, 175, 780, 430]},
+        {"kind": "panel", "rect": [85, 430, 770, 575]},
+        {"kind": "paragraph", "rect": [95, 580, 780, 645]},
+        {"kind": "diagram", "rect": [95, 650, 772, 1098], "alt": "デパート、銀行、郵便局などの位置を示す街区の地図"}
+      ]
+    }
+  ]
+}

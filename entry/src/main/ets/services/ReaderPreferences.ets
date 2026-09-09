@@ -111,6 +111,14 @@ export class ReaderPreferences {
     }
   }
 
+  static hasProgress(context: common.Context, readingId: string): boolean {
+    try {
+      return ReaderPreferences.store(context).hasSync(ReaderPreferences.progressKey(readingId, 'resource_index'));
+    } catch (_error) {
+      return false;
+    }
+  }
+
   static saveProgress(context: common.Context, readingId: string,
     progress: ReaderProgressSnapshot): void {
     try {
