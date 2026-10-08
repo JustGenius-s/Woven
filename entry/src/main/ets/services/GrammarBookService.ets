@@ -204,6 +204,22 @@ export class GrammarBookService {
     };
   }
 
+  // Reflow editions only need the selected audio; reading never waits for a PDF download.
+  static async ensureTrack(context: common.Context, work: GrammarWork,
+    track: GrammarAudioTrack): Promise<string> {
+    const path: string = GrammarBookService.localTrackPath(context, work, track);
+    if (await GrammarBookService.fileReadyAsync(path, track.bytes)) {
+      return path;
+    }
+    await GrammarBookService.ensureDirectoryAsync(`${GrammarBookService.lessonDirectory(context, work.id)}/audio`);
+    const bytes: ArrayBuffer = await GrammarCloudStore.downloadObject(track.key);
+    if (track.bytes > 0 && bytes.byteLength !== track.bytes) {
+      throw new Error('音频下载不完整，请重试');
+    }
+    await GrammarBookService.writeBufferAsync(path, bytes);
+    return path;
+  }
+
   private static coverFileReady(path: string, work: GrammarWork): boolean {
     if (!GrammarBookService.fileReady(path, work.coverBytes ?? 0)) {
       return false;

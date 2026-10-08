@@ -29,6 +29,7 @@ const EMPTY_LESSON: GrammarWork = {
 export struct GrammarLessonPage {
   @Env(SystemProperties.WINDOW_AVOID_AREA) private avoidAreas: window.UIEnvWindowAvoidAreaInfoVP;
   lesson: GrammarWork = EMPTY_LESSON;
+  @Prop routeActive: boolean = true;
   onBack: () => void = () => {};
   onSettings: (section: 'deepseek' | 'realtime') => void = () => {};
 
@@ -238,7 +239,7 @@ export struct GrammarLessonPage {
       if (this.lesson.audioTracks.length > 0) {
         ReaderAudioControls({
           expanded: this.audioExpanded,
-          overlayOpen: this.panelOpen || this.panelVisible,
+          overlayOpen: this.panelOpen || this.panelVisible || !this.routeActive,
           playing: this.playing,
           ready: this.audioReady,
           busy: this.audioBusy || this.downloading,
@@ -268,7 +269,7 @@ export struct GrammarLessonPage {
         title: this.lesson.lessonNo === 0 ? this.lessonTitle() :
           `${this.lessonTitle()} · ${this.lesson.titleJa || this.lesson.title}`,
         ready: this.pdfReady && !this.failed && !this.downloading && !this.audioBusy,
-        overlayOpen: this.panelOpen || this.panelVisible,
+        overlayOpen: this.panelOpen || this.panelVisible || !this.routeActive,
         onOpen: () => this.audioExpanded = false,
         onPanelVisibilityChanged: (visible: boolean) => this.realtimePanelVisible = visible,
         onBack: this.onBack,
@@ -338,7 +339,7 @@ export struct GrammarLessonPage {
         pageIndex: this.pageIndex,
         pageCount: this.pageCount,
         ready: this.pdfReady && !this.failed && !this.downloading,
-        visible: !this.panelOpen && !this.panelVisible && !this.realtimePanelVisible,
+        visible: this.routeActive && !this.panelOpen && !this.panelVisible && !this.realtimePanelVisible,
         availableWidth: Math.min(640, this.viewportWidth - 32),
         onJump: (index: number) => this.onPageChanged(index),
         onBack: this.onBack,

@@ -1,0 +1,89 @@
+html,body{margin:0;padding:0;background:#fff;color:#231f20}
+body{font-family:sans-serif;text-indent:0;text-align:left}
+.chapter{padding:.3em .3em .6em}
+p{margin:0;text-indent:0;text-align:left;line-height:1.45;orphans:2;widows:2}
+span{letter-spacing:normal;word-spacing:normal}
+ruby{ruby-align:center}
+rt{font-size:1em!important;line-height:1}
+.zh{line-height:1.3;margin:.12em 0}
+.roman{line-height:1.3}
+.band{background:#bd001e;color:#fff;padding:.3em .45em;margin:.8em 0 0}
+.band p{color:#fff}
+.intro{border:1px solid #c91c34;border-top:0;padding:.5em .65em;margin:0 0 .8em}
+.intro-table,.goal-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.intro-table td,.goal-table td{border:0;padding:0;vertical-align:top}
+.intro-table .icon{width:12%;padding-right:.4em}
+.goal-table .icon{width:12%;padding-right:.4em}
+.center-card{width:50%;margin:.2em auto}
+.cards .center-card{width:100%}
+.exercise-label span{white-space:pre}
+.goal{background:#fffbc9;padding:.3em .5em;margin-bottom:.7em}
+.instruction{margin:.7em 0 .5em}
+.banner{display:block;width:100%;height:auto;margin:0}
+.cards{width:100%;border-collapse:collapse;table-layout:fixed;margin:.4em 0 .8em}
+.cards td{vertical-align:top;padding:.2em;border:0}
+.cards img{display:block;width:100%;height:auto}
+.cards .caption{background:#fbdcc3;border-radius:.35em;padding:.3em}
+.cards p{line-height:1.2}
+.exercise{width:100%;border-collapse:collapse;table-layout:fixed;margin:.5em 0 .8em}
+.exercise td{width:50%;padding:.15em;border:1px solid #ffd0a5;vertical-align:top}
+.exercise img{width:100%;height:auto;display:block}
+.exercise-label{background:#fffcd1;padding:.15em;text-align:center;line-height:1.2}
+.exercise-label p{text-align:center;font-size:.75em!important;white-space:nowrap!important}
+.dialogue-row{width:100%;border-collapse:collapse;table-layout:fixed;margin:.4em 0 .9em;page-break-inside:avoid;break-inside:avoid}
+.dialogue-row td{vertical-align:top;border:0;padding:0}
+.dialogue-row .arrow-cell{width:7%;text-align:center;vertical-align:middle;color:#222}
+.dialogue-row .speech-cell{width:46.5%}
+.speech{background:#fbdcc3;border-radius:.4em;padding:.45em .4em}
+.bubble{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0}
+.bubble td{padding:0;vertical-align:top}
+.bubble .tail{width:.7em;padding-top:.6em}
+.bubble .tail img{display:block;width:100%;height:auto}
+.bubble td.reply{border:1px solid #f4a466}
+.bubble .speech{padding:.4em .35em}
+.bubble .roman{font-size:.85em!important}
+.response{padding-top:1em}
+.arrow-cell img{display:block;width:100%;height:auto;margin:0}
+.sound-icon{width:.8em;height:.8em;vertical-align:middle;margin-right:.12em}
+.reply{background:#fffcd1;border:1px solid #f4a466;margin-top:0}
+.variant{border-top:1px dashed #f4a466;margin-top:.3em;padding-top:.3em}
+.audio-code{white-space:nowrap;display:inline-block;border:1px solid #bbb;padding:0 .15em;margin:0 .1em;line-height:1.1}
+.track{margin:.1em 0}
+.footer{text-align:center;border-top:1px solid #eee;margin-top:1em;padding-top:.4em}
+.header{margin:0 0 .8em}
+.answer{white-space:pre}
+.goal,.goal-table,.goal-table tr,.exercise tr,.cards tr{page-break-inside:avoid;break-inside:avoid}
+.keep{page-break-inside:avoid;break-inside:avoid}
+/* Remaining lesson pages: keep local source graphics alongside live text. */
+.choice{background:#e5e5e5;border-radius:.4em;padding:.45em .6em;margin:.45em .4em}
+.choice .roman{font-size:.85em!important}
+.vocabulary{border:1px solid #f69ac3;padding:.5em;margin:.6em 0}
+.vocabulary>div{margin:.35em 0}
+.subhead{background:#888;color:#fff;border-radius:.35em;padding:.1em .5em;margin:.6em 0}
+.subhead .instruction{margin:.1em 0}
+.exercise td.empty,.word-cards td.empty{border:0;background:#fff}
+.small-illustration{width:48%;margin:.6em auto}
+.tips-badge{width:35%;margin:.3em 0 .8em}
+.dialogue-stack{margin:.6em 0 1em}
+.prompt-bubble{width:55%}
+.answer-bubble{width:92%;margin-left:8%}
+.stack-arrow{width:9%;margin:.15em 0 .15em 38%}
+.script-block{border-bottom:1px solid #bbb;padding:.5em 0 .7em;margin:.3em 0 .8em}
+.script-label{margin-bottom:.45em;background:#fffcd1;padding:.2em .35em}
+.script-turn{margin:.35em 0}
+.kana{width:100%;table-layout:fixed;border-collapse:collapse;margin:.5em 0 1em}
+.kana td{border:1px solid #555;vertical-align:middle;padding:.15em .05em;text-align:center}
+.kana p{text-align:center;line-height:1.2;white-space:nowrap}
+.kana-heading{background:#fffcd1}
+.kana tr{page-break-inside:avoid;break-inside:avoid}
+.syllabic-n{width:18%;border:1px solid #555;margin:.3em 0 .8em auto;padding:.2em;text-align:center}
+.syllabic-n p{text-align:center;line-height:1.2}
+.input-note{border:1px dashed #fa541c;border-radius:.8em;padding:.65em;margin:.7em 0}
+.word-cards{width:100%;table-layout:fixed;border-collapse:collapse;margin:.5em 0}
+.word-cards td{vertical-align:top;border:0;padding:.4em .2em;width:50%}
+.word-cards tr{page-break-inside:avoid;break-inside:avoid}
+.word-cards img{display:block;width:100%;height:auto}
+.culture-title{border-bottom:3px solid #bc0022;padding-bottom:.4em;margin:.8em 0}
+.prose{margin:.65em 0}
+.prose p{line-height:1.6;text-align:left}
+.japanese-prose{padding-left:.4em;border-left:2px solid #f3dfd6}

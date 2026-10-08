@@ -20,6 +20,7 @@ local.properties
 # Reader previews and exported models/configurations are generated locally.
 /docs/previews/reader-*.html
 /docs/previews/reader-*.json
+/docs/IRODORI_STARTER_AUDIT.json
 # Python bytecode remains local.
 **/__pycache__/
 *.py[cod]

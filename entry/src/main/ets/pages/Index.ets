@@ -17,6 +17,8 @@ import {
 } from '../common/AppTheme';
 import { appSheetOptions, bottomBarImmersiveMaterial } from '../common/ImmersiveMaterial';
 import { AppSection, LearningJourney, PracticeScenario, ReadingWork } from '../model/ContentModels';
+import { TextbookReaderService } from '../services/TextbookReaderService';
+import { showImmersiveNotice } from '../common/ImmersiveNotice';
 import { GrammarWork } from '../model/GrammarModels';
 import { AiInquiryContext } from '../model/DeepSeekModels';
 import { VideoItem } from '../model/VideoModels';
@@ -59,6 +61,12 @@ import { KanaLookupSheet } from '../views/components/KanaLookupSheet';
 @Entry
 @Component
 struct Index {
+  @State private routeActive: boolean = true;
+
+  onPageShow(): void { this.routeActive = true; }
+
+  onPageHide(): void { this.routeActive = false; }
+
   @Env(SystemProperties.WINDOW_AVOID_AREA) private avoidAreas: window.UIEnvWindowAvoidAreaInfoVP;
   @State private section: number = AppSection.LEARN;
   @State private deepSeekApiKey: string = '';
@@ -263,11 +271,33 @@ struct Index {
       this.getUIContext().getHostContext() as common.Context, lesson.id);
   }
 
+  private nativeLessonOpening: boolean = false;
+
   private openGrammar(lesson: GrammarWork): void {
     this.saveGrammarLesson(lesson);
+    // Keep Reader Kit behind a lazy route so unsupported devices can use PDF.
+    const editionId: string = TextbookReaderService.editionIdForLesson(lesson.id);
+    if (editionId.length > 0 && TextbookReaderService.unavailableReason().length === 0) {
+      void this.openNativeLesson(lesson, editionId);
+      return;
+    }
     this.getUIContext().animateTo({ curve: curves.springMotion(0.42, 0.84, 0.18) }, () => {
       this.activeGrammar = lesson;
     });
+  }
+
+  private async openNativeLesson(lesson: GrammarWork, editionId: string): Promise<void> {
+    if (this.nativeLessonOpening) { return; }
+    this.nativeLessonOpening = true;
+    try {
+      await this.getUIContext().getRouter().pushUrl({
+        url: 'pages/NativeReaderPage', params: { editionId: editionId, lesson: lesson }
+      });
+    } catch (_error) {
+      showImmersiveNotice(this.getUIContext(), '暂时无法阅读', '请稍后重试。');
+    } finally {
+      this.nativeLessonOpening = false;
+    }
   }
 
   private closeGrammar(): void {
@@ -508,6 +538,7 @@ struct Index {
             .animation({ curve: curves.springMotion(0.42, 0.84, 0.18) }))
         } else if (this.activeGrammar !== undefined) {
           GrammarLessonPage({
+            routeActive: this.routeActive,
             lesson: this.activeGrammar,
             onBack: () => this.closeGrammar(),
             onSettings: (section: 'deepseek' | 'realtime') => this.openReaderSettings(section)

@@ -2,11 +2,19 @@ import { common } from '@kit.AbilityKit';
 import { display, window } from '@kit.ArkUI';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { bookParser, ReadPageComponent, readerCore } from '@kit.ReaderKit';
+import { statusBarInset } from '../common/AppTheme';
+import { GrammarWork } from '../model/GrammarModels';
+import { GrammarReaderAudio } from '../views/components/GrammarReaderAudio';
+import { ReadingNarrationService } from '../services/ReadingNarrationService';
 import { showImmersiveNotice } from '../common/ImmersiveNotice';
 import { NativeReaderEdition, TextbookReaderService } from '../services/TextbookReaderService';
-import { READERKIT_TITLES } from '../services/ReaderKitContent';
 import { ReaderPreferences, ReaderProgressSnapshot } from '../services/ReaderPreferences';
 import { ImmersiveBackChrome } from '../views/components/ImmersiveBackChrome';
+
+interface NativeReaderParams {
+  editionId?: string;
+  lesson?: GrammarWork;
+}
 
 // Do not import this page from Index/BasicsPage: its system HSP is unavailable
 // on simulators. Navigation uses the lazy page route after a capability check.
@@ -15,6 +23,9 @@ import { ImmersiveBackChrome } from '../views/components/ImmersiveBackChrome';
 struct NativeReaderPage {
   @Env(SystemProperties.WINDOW_AVOID_AREA) private avoidAreas: window.UIEnvWindowAvoidAreaInfoVP;
   @State private edition: NativeReaderEdition = TextbookReaderService.edition();
+  @State private lesson: GrammarWork | undefined = undefined;
+  @State private pageActive: boolean = true;
+  @State private audioWidth: number = 320;
   @State private loading: boolean = true;
   @State private errorMessage: string = '';
   @State private resourceIndex: number = 0;
@@ -40,6 +51,9 @@ struct NativeReaderPage {
     (page: readerCore.PageDataInfo) => this.handlePageShow(page);
 
   aboutToAppear(): void {
+    const params = this.getUIContext().getRouter().getParams() as NativeReaderParams | undefined;
+    this.edition = TextbookReaderService.edition(params?.editionId);
+    this.lesson = params?.lesson;
     const style = ReaderPreferences.style(this.context());
     this.fontSize = Math.max(16, Math.min(style.fontSize, 32));
     this.lineHeight = Math.max(1.2, Math.min(style.lineHeight, 2.4));
@@ -49,6 +63,13 @@ struct NativeReaderPage {
         this.fail('阅读器响应超时，请返回后重试。');
       }
     }, 45000);
+  }
+
+  onPageShow(): void { this.pageActive = true; }
+
+  onPageHide(): void {
+    this.pageActive = false;
+    if (this.lesson !== undefined) { void ReadingNarrationService.pause(); }
   }
 
   aboutToDisappear(): void {
@@ -165,8 +186,7 @@ struct NativeReaderPage {
       }
       this.controller.registerBookParser(parser);
       this.controller.on('pageShow', this.pageCallback);
-      // BookParser resolves the EPUB's own images, styles and fonts. The
-      // resourceRequest hook is only needed for additional custom resources.
+      // BookParser resolves this EPUB's images, styles and embedded fonts.
       this.controller.setPageConfig(this.pageConfig());
       const target: number = this.safeIndex(this.progress.resourceIndex);
       this.resourceIndex = target;
@@ -290,7 +310,7 @@ struct NativeReaderPage {
   private readerSettings() {
     Scroll() {
       Column({ space: 20 }) {
-        Text('正文和句型框可调字号；图中的标注随图片整体缩放。')
+        Text('正文可调字号；图中的文字和标注随图片整体缩放。')
           .fontSize(13).lineHeight(20).fontColor($r('app.color.ink_muted')).width('100%')
         Column({ space: 8 }) {
           Text(`字号  ${this.fontSize}`).width('100%').fontSize(15)
@@ -335,12 +355,14 @@ struct NativeReaderPage {
                 void this.jump(value);
               }
             })
-          ForEach(READERKIT_TITLES, (title: string, index: number) => {
+          ForEach(this.edition.titles, (title: string, index: number) => {
             Button(title).width('100%').fontSize(14)
               .onClick(() => { void this.jump(index); })
           }, (title: string) => title)
-          Button('课堂用语').width('100%')
-            .onClick(() => { void this.jump(this.edition.classroomIndex); })
+          if (this.edition.classroomIndex >= 0) {
+            Button('课堂用语').width('100%')
+              .onClick(() => { void this.jump(this.edition.classroomIndex); })
+          }
         }.width('100%')
       }
       .width('100%').padding({ left: 24, right: 24, top: 16, bottom: 36 })
@@ -351,13 +373,24 @@ struct NativeReaderPage {
   build() {
     Stack() {
       ImmersiveBackChrome({
-        title: 'やらまいか日本語',
-        subtitle: this.edition.label,
+        title: this.lesson !== undefined ? (this.lesson.lessonNo === 0 ? '教室用语' : `第 ${this.lesson.lessonNo} 课`) : this.edition.title,
+        subtitle: this.lesson !== undefined ? `${this.lesson.level} · ${this.lesson.titleJa}` : this.edition.label,
+        trailingSpace: (this.lesson?.audioTracks.length ?? 0) > 0 ? 72 : 0,
         paper: true,
         onBack: () => this.getUIContext().getRouter().back(),
         pageContent: (): void => { this.readerBody(); }
       })
+      if (this.lesson !== undefined && this.lesson.audioTracks.length > 0) {
+        GrammarReaderAudio({
+          lesson: this.lesson,
+          overlayOpen: this.settingsOpen || !this.pageActive,
+          availableWidth: this.audioWidth - 32
+        })
+          .position({ right: 16, top: statusBarInset(this.avoidAreas) + 6 })
+          .hitTestBehavior(HitTestMode.Transparent)
+      }
     }
+      .onAreaChange((_old: Area, area: Area) => { this.audioWidth = Number(area.width); })
       .width('100%')
       .height('100%')
       .bindSheet($$this.settingsOpen, this.readerSettings(), {

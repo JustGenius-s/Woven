@@ -1,0 +1,38 @@
+html,body{margin:0;padding:0;background:#fff;color:#202124}
+body{font-family:sans-serif;text-indent:0;text-align:left}
+.chapter{padding:.3em .3em .6em}
+p{margin:.3em 0;line-height:1.65;text-indent:0;text-align:left;orphans:2;widows:2;overflow-wrap:anywhere;line-break:strict}
+span{font-weight:normal!important;overflow-wrap:anywhere;letter-spacing:normal;word-spacing:normal}
+ruby{ruby-align:center}rt{font-size:1em!important;line-height:1}
+.figure{max-width:100%;margin:.45em auto;break-inside:avoid;page-break-inside:avoid}
+.figure img{display:block;width:100%;height:auto;max-width:100%}
+.source-box{box-sizing:border-box;max-width:100%;border-radius:.5em;padding:.5em .65em;margin:.65em 0;break-inside:avoid;page-break-inside:avoid}
+.source-box p{line-height:1.5;margin:.2em 0}
+.source-table{width:100%;table-layout:fixed;border-collapse:collapse;margin:.7em 0;font-size:.85em}
+.source-table td{border:1px solid #777;padding:.2em .15em;vertical-align:middle;overflow-wrap:anywhere}
+.source-table p{margin:.12em 0;line-height:1.4;text-align:left}
+.source-table .shade{background:#fffbd1}.source-table .empty{border:0}
+.source-table tr{break-inside:avoid;page-break-inside:avoid}
+.columns{width:100%;table-layout:fixed;border-collapse:collapse;margin:.3em 0}
+.columns>tbody>tr>td{width:50%;vertical-align:top;border:0;padding:.2em}
+.columns .figure,.columns .source-box{width:100%!important;max-width:100%}
+.footer{margin:.3em 0 0;padding-top:.2em;border-top:1px solid #eee;text-align:center}
+
+.inline-art{display:inline;vertical-align:middle;margin:0 .12em;max-width:100%}
+.kana td{padding:.1em}.kana p{text-align:center;line-height:1.2}
+
+.caption p{text-align:center;font-size:.85em;line-height:1.4;margin:.1em 0 .3em}
+
+.kanji-forms{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:.2em .45em;margin:.6em 0}
+.kanji-forms td{width:22%;text-align:center;vertical-align:middle;padding:.2em}
+.kanji-forms .kanji-label{width:34%;background:#fffbd1;border:1px solid #efa668;border-radius:.25em}
+.kanji-forms p{text-align:center;margin:.2em 0;line-height:1.6}
+
+.vocabulary{width:100%;table-layout:fixed;border-collapse:collapse;margin:.4em 0}
+.vocabulary td{width:50%;padding:.4em;vertical-align:top}
+.vocabulary tr{break-inside:avoid;page-break-inside:avoid}
+
+.intro-question{margin:.7em 0;padding:.6em;border-left:.2em solid #eeb45e;background:#fffbef}
+.can-do{padding:.4em .6em;background:#ffffa9;margin:0 0 .8em}
+
+.kanji-forms.long-word{font-size:.78em}.kanji-forms.long-word td{width:25%}
