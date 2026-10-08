@@ -6,6 +6,7 @@ semantic-diagram.js. This deliberately scales map labels with their map.
 """
 import argparse
 import json
+import math
 from pathlib import Path
 
 from fontTools.ttLib import TTFont
@@ -48,6 +49,67 @@ def prepare(model, source, output):
 
     diagrams = {}
     face_cache = {}
+    # Reader Kit drops CSS text strokes on the device. Paint only decorative
+    # TOC labels with the embedded source fonts; examples remain reflowable text.
+    toc_labels = {}
+
+    def label_image(key, glyphs, solid=False):
+        glyphs = [g for g in glyphs if g.get('text', '').strip()]
+        if not glyphs:
+            return
+        scale = 4
+        left = min(g['x'] for g in glyphs)
+        baseline = min(g['y'] for g in glyphs)
+        bounds = []
+        runs = []
+        for glyph in glyphs:
+            size = max(1, round(glyph['size'] * scale))
+            cache_key = (glyph['font'], size)
+            if cache_key not in face_cache:
+                face_cache[cache_key] = ImageFont.truetype(str(output / fonts[glyph['font']]), size)
+            face = face_cache[cache_key]
+            stroke = glyph['stroke']
+            stroke_width = max(1, round(glyph['strokeEm'] * size / 2)) if stroke != 'transparent' and glyph['strokeEm'] else 0
+            fill = glyph['fill']
+            if solid and fill == 'transparent':
+                fill = stroke if stroke != 'transparent' else '#626163'
+            fill = ImageColor.getcolor(fill, 'RGBA') if fill != 'transparent' else (0, 0, 0, 0)
+            outline = ImageColor.getcolor(stroke, 'RGBA') if stroke_width else fill
+            x, y = (glyph['x'] - left) * scale, (glyph['y'] - baseline) * scale
+            box = face.getbbox(glyph['text'], anchor='ls', stroke_width=stroke_width)
+            bounds.append((x + box[0], y + box[1], x + box[2], y + box[3]))
+            runs.append((x, y, glyph['text'], face, fill, stroke_width, outline))
+        x0 = math.floor(min(b[0] for b in bounds)) - 4
+        y0 = math.floor(min(b[1] for b in bounds)) - 4
+        x1 = math.ceil(max(b[2] for b in bounds)) + 4
+        y1 = math.ceil(max(b[3] for b in bounds)) + 4
+        canvas = Image.new('RGBA', (x1 - x0, y1 - y0), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(canvas)
+        for x, y, text, face, fill, width, outline in runs:
+            draw.text((x - x0, y - y0), text, font=face, anchor='ls', fill=fill,
+                      stroke_width=width, stroke_fill=outline)
+        filename = f'images/{key}-label.png'
+        canvas.save(output / filename)
+        toc_labels[key] = {'asset': filename, 'width': canvas.width / scale,
+                           'alt': ''.join(g.get('text', '') for g in glyphs)}
+
+    def prepare_toc(value):
+        if value['kind'] == 'source-section':
+            for block in value['blocks']:
+                prepare_toc(block)
+        elif value['kind'] == 'paragraph':
+            for row in value['rows']:
+                if ''.join(g.get('text', '') for g in row).replace(' ', '').replace('\u3000', '') == 'もくじ':
+                    label_image(value['id'], row, solid=True)
+        elif value['kind'] == 'toc':
+            for index, item in enumerate(value['items']):
+                for field, glyphs in [('number', item['number']), ('title', item['rows'][0]), ('page', item['page'])]:
+                    label_image(f"{value['id']}-{index}-{field}", glyphs)
+
+    for chapter in model['chapters']:
+        if chapter['id'] == 'contents':
+            for block in chapter['blocks']:
+                prepare_toc(block)
     for block in blocks:
             if block['kind'] != 'diagram':
                 continue
@@ -108,7 +170,7 @@ def prepare(model, source, output):
             filename = f"images/{card['id']}-frame.png"
             frame.save(output / filename)
             cards[card['id']] = filename
-    (output / 'prepared.json').write_text(json.dumps({'fonts': fonts, 'diagrams': diagrams, 'cards': cards}), encoding='utf-8')
+    (output / 'prepared.json').write_text(json.dumps({'fonts': fonts, 'diagrams': diagrams, 'cards': cards, 'tocLabels': toc_labels}), encoding='utf-8')
 
 
 if __name__ == '__main__':

@@ -1,12 +1,14 @@
 import { common } from '@kit.AbilityKit';
 import { SegmentButtonV2Items, TabSegmentButtonV2, uiMaterial } from '@kit.ArkUI';
 import { FLOATING_TAB_CONTENT_INSET } from '../../common/AppTheme';
+import { showImmersiveNotice } from '../../common/ImmersiveNotice';
 import { LearningJourney } from '../../model/ContentModels';
 import { GrammarWork } from '../../model/GrammarModels';
 import { AiInquiryContext } from '../../model/DeepSeekModels';
 import { ContentRepository } from '../../services/ContentRepository';
 import { ContentShelfDataSource } from '../../services/ContentShelfDataSource';
 import { GrammarBookService } from '../../services/GrammarBookService';
+import { TextbookReaderService } from '../../services/TextbookReaderService';
 import { FloatingBarScrollTracker } from '../components/FloatingBarScrollTracker';
 import {
   ContentShelf,
@@ -152,7 +154,7 @@ export struct BasicsPage {
     const visible: string[] = [];
     for (let index: number = 0; index < this.lessonCategories.length; index++) {
       const category: string = this.lessonCategories[index];
-      if (this.shelfSource(category).totalCount() > 0) {
+      if (category === '入门' || this.lessonsForCategory(category).length > 0) {
         visible.push(category);
       }
     }
@@ -211,6 +213,16 @@ export struct BasicsPage {
     this.onOpenGrammar(lesson);
   }
 
+  private openTextbook(): void {
+    const reason: string = TextbookReaderService.unavailableReason();
+    if (reason.length > 0) {
+      showImmersiveNotice(this.getUIContext(), '暂时无法阅读', reason);
+      return;
+    }
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/NativeReaderPage' })
+      .catch(() => showImmersiveNotice(this.getUIContext(), '暂时无法打开', '请返回后重试。'));
+  }
+
   @Builder
   private basicsTabSelector() {
     Row() {
@@ -267,48 +279,55 @@ export struct BasicsPage {
 
   @Builder
   private grammarShelf() {
-    if (this.lessonsLoading && this.lessons.length === 0) {
-      Column({ space: 8 }) {
-        LoadingProgress()
-          .width(28)
-          .height(28)
-          .color($r('app.color.ink'))
-        Text('正在拉取文法课…')
-          .fontSize(15)
-          .fontColor($r('app.color.ink_muted'))
-      }
-      .width('100%')
-      .height('100%')
-      .justifyContent(FlexAlign.Center)
-      .padding({ bottom: FLOATING_TAB_CONTENT_INSET })
-    } else if (this.loadError.length > 0 && this.lessons.length === 0) {
-      Text(this.loadError)
-        .width('100%')
-        .height('100%')
-        .fontSize(15)
-        .fontColor($r('app.color.danger'))
-        .textAlign(TextAlign.Center)
-        .padding(28)
-    } else {
-      List({ space: 8, scroller: this.grammarScroller }) {
-        ForEach(this.visibleLessonCategories(), (category: string) => {
-          ListItem() {
-            this.lessonShelf(category)
-          }
-        }, (category: string) => category)
+    List({ space: 8, scroller: this.grammarScroller }) {
+      ForEach(this.visibleLessonCategories(), (category: string) => {
         ListItem() {
-          Column()
-            .height(FLOATING_TAB_CONTENT_INSET)
+          this.lessonShelf(category)
+        }
+      }, (category: string) => `${category}-${this.lessonsForCategory(category).length}`)
+      if (this.lessonsLoading && this.lessons.length === 0) {
+        ListItem() {
+          Row({ space: 10 }) {
+            LoadingProgress().width(24).height(24).color($r('app.color.ink'))
+            Text('正在加载更多文法课…').fontSize(14).fontColor($r('app.color.ink_muted'))
+          }
+          .width('100%').justifyContent(FlexAlign.Center).padding(24)
+        }
+      } else if (this.loadError.length > 0 && this.lessons.length === 0) {
+        ListItem() {
+          Text('在线文法课暂时无法加载，仍可阅读上方教材。')
+            .width('100%').fontSize(14).lineHeight(22)
+            .fontColor($r('app.color.ink_muted')).padding(24)
         }
       }
-      .width('100%')
-      .height('100%')
-      .scrollBar(BarState.Off)
-      .edgeEffect(EdgeEffect.Spring)
-      .clip(false)
-      .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) =>
-        this.grammarFloatingBarTracker.update(this.grammarScroller, this.onFloatingBarCompactChange))
+      ListItem() {
+        Column().height(FLOATING_TAB_CONTENT_INSET)
+      }
     }
+    .width('100%').height('100%')
+    .scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring).clip(false)
+    .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) =>
+      this.grammarFloatingBarTracker.update(this.grammarScroller, this.onFloatingBarCompactChange))
+  }
+
+  @Builder
+  private textbookCard() {
+    Column() {
+      CoverCard({
+        artwork: $r('app.media.yaramaika_textbook_cover'),
+        title: 'やらまいか日本語 · 新装二版',
+        actionIcon: $r('sys.symbol.book_pages_fill'),
+        cardWidth: SHELF_COVER_WIDTH,
+        cardHeight: SHELF_COVER_HEIGHT,
+        coverOnly: true,
+        compact: true,
+        downloaded: true,
+        onOpen: () => this.openTextbook()
+      })
+    }
+    .width(SHELF_COVER_WIDTH)
+    .height(SHELF_COVER_HEIGHT)
+    .id('grammar-yaramaika-textbook')
   }
 
   @Builder
@@ -316,9 +335,16 @@ export struct BasicsPage {
     Column() {
       ContentShelf({
         title: category,
-        meta: `${this.shelfSource(category).totalCount()} 课`
+        meta: category === '入门' ?
+          (this.lessonsForCategory(category).length > 0 ? `1 本 · ${this.lessonsForCategory(category).length} 课` : '1 本') :
+          `${this.lessonsForCategory(category).length} 课`
       })
       List({ space: 10 }) {
+        if (category === '入门') {
+          ListItem() {
+            this.textbookCard()
+          }
+        }
         LazyForEach(this.shelfSource(category), (lesson: GrammarWork) => {
           ListItem() {
             Column() {

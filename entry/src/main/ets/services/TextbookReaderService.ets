@@ -12,13 +12,13 @@ export interface NativeReaderEdition {
 }
 
 export const NATIVE_READER_EDITION: NativeReaderEdition = {
-  id: READERKIT_ID, label: '可重排版', fileBytes: READERKIT_BYTES,
+  id: READERKIT_ID, label: '新装二版', fileBytes: READERKIT_BYTES,
   classroomIndex: READERKIT_CLASSROOM_INDEX
 };
 
 // Keep this module free of Reader Kit imports. The routed reader page is loaded
 // only after the capability check, because unsupported systems lack kitview.hsp.
-export class NativeReaderTrial {
+export class TextbookReaderService {
   static chapterTitle(edition: NativeReaderEdition, index: number): string {
     return READERKIT_TITLES[index] ?? edition.label;
   }
@@ -34,17 +34,18 @@ export class NativeReaderTrial {
   static unavailableReason(): string {
     const model: string = `${deviceInfo.productModel} ${deviceInfo.brand}`.toLowerCase();
     if (model.includes('emulator') || model.includes('simulator') || model.includes('avd')) {
-      return 'Reader Kit 暂不支持模拟器，请在鸿蒙真机上体验。';
+      return '此教材暂不支持模拟器，请在鸿蒙手机或平板上阅读。';
     }
     if (!canIUse('SystemCapability.Reader.ReaderService.BookParser') ||
       !canIUse('SystemCapability.Reader.ReaderService.ReaderCore')) {
-      return '当前设备未提供 Reader Kit 阅读服务，请使用支持该服务的鸿蒙真机。';
+      return '当前设备暂不支持此教材的阅读服务，请在支持的鸿蒙手机或平板上打开。';
     }
     return '';
   }
 
   static async materialize(context: common.Context, edition: NativeReaderEdition): Promise<string> {
-    // A distinct, versioned directory per EPUB is required by BookParser.
+    // Keep the existing sandbox directory and progress keys when moving the
+    // book into Grammar. A versioned directory per EPUB is required by BookParser.
     const directory: string = `${context.filesDir}/reader-trial/${READERKIT_CACHE}/${edition.id}`;
     const path: string = `${directory}/book.epub`;
     try {

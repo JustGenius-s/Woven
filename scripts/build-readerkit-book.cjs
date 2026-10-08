@@ -48,6 +48,7 @@ async function main({ full = false } = {}) {
   prepared.imageSizes = {};
   const imageFiles = new Set([...assets.keys()].map(name => `images/${name}`));
   for (const filename of [...Object.values(prepared.diagrams), ...Object.values(prepared.cards)]) imageFiles.add(filename);
+  for (const label of Object.values(prepared.tocLabels || {})) imageFiles.add(label.asset);
   for (const filename of imageFiles) {
     const data = assets.get(filename.slice('images/'.length)) || await fs.readFile(path.join(work, filename));
     if (data.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') throw new Error(`Expected PNG image: ${filename}`);

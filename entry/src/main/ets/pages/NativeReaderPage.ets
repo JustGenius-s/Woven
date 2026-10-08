@@ -3,18 +3,18 @@ import { display, window } from '@kit.ArkUI';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { bookParser, ReadPageComponent, readerCore } from '@kit.ReaderKit';
 import { showImmersiveNotice } from '../common/ImmersiveNotice';
-import { NativeReaderEdition, NativeReaderTrial } from '../services/NativeReaderTrial';
+import { NativeReaderEdition, TextbookReaderService } from '../services/TextbookReaderService';
 import { READERKIT_TITLES } from '../services/ReaderKitContent';
 import { ReaderPreferences, ReaderProgressSnapshot } from '../services/ReaderPreferences';
 import { ImmersiveBackChrome } from '../views/components/ImmersiveBackChrome';
 
-// Do not import this page from Index/ExplorePage: its system HSP is unavailable
+// Do not import this page from Index/BasicsPage: its system HSP is unavailable
 // on simulators. Navigation uses the lazy page route after a capability check.
 @Entry
 @Component
 struct NativeReaderPage {
   @Env(SystemProperties.WINDOW_AVOID_AREA) private avoidAreas: window.UIEnvWindowAvoidAreaInfoVP;
-  @State private edition: NativeReaderEdition = NativeReaderTrial.edition();
+  @State private edition: NativeReaderEdition = TextbookReaderService.edition();
   @State private loading: boolean = true;
   @State private errorMessage: string = '';
   @State private resourceIndex: number = 0;
@@ -43,7 +43,7 @@ struct NativeReaderPage {
     const style = ReaderPreferences.style(this.context());
     this.fontSize = Math.max(16, Math.min(style.fontSize, 32));
     this.lineHeight = Math.max(1.2, Math.min(style.lineHeight, 2.4));
-    this.progress = ReaderPreferences.progress(this.context(), NativeReaderTrial.progressId(this.edition));
+    this.progress = ReaderPreferences.progress(this.context(), TextbookReaderService.progressId(this.edition));
     this.timeoutId = setTimeout(() => {
       if (this.loading && !this.disposed) {
         this.fail('阅读器响应超时，请返回后重试。');
@@ -143,7 +143,7 @@ struct NativeReaderPage {
     }
     this.opening = true;
     try {
-      const path: string = await NativeReaderTrial.materialize(this.context(), this.edition);
+      const path: string = await TextbookReaderService.materialize(this.context(), this.edition);
       if (this.disposed || this.errorMessage.length > 0) {
         return;
       }
@@ -174,7 +174,7 @@ struct NativeReaderPage {
       // Only PAGE_ON_SHOW dismisses the loading screen: startPlay resolving does
       // not guarantee the native surface has drawn its first page.
     } catch (error) {
-      this.fail(`无法打开${this.edition.label}：${this.errorDetail(error as BusinessError)}`);
+      this.fail(`无法打开教材：${this.errorDetail(error as BusinessError)}`);
       this.release();
     } finally {
       this.opening = false;
@@ -190,7 +190,7 @@ struct NativeReaderPage {
       return;
     }
     if (page.state === readerCore.PageState.OPEN_BOOK_FAIL) {
-      this.fail('Reader Kit 无法排版当前内容，请返回后重试。');
+      this.fail('教材内容暂时无法显示，请返回后重试。');
     } else if (page.state === readerCore.PageState.PAGE_ON_SHOW) {
       this.loading = false;
       this.clearTimeout();
@@ -199,7 +199,7 @@ struct NativeReaderPage {
       this.progress = {
         resourceIndex: this.resourceIndex, domPos: page.startDomPos, pageOffset: page.pageOffset
       };
-      ReaderPreferences.saveProgress(this.context(), NativeReaderTrial.progressId(this.edition), this.progress);
+      ReaderPreferences.saveProgress(this.context(), TextbookReaderService.progressId(this.edition), this.progress);
     }
   }
 
@@ -262,7 +262,7 @@ struct NativeReaderPage {
               Text('暂时无法阅读').fontSize(20).fontWeight(FontWeight.Medium).fontColor('#202124')
               Text(this.errorMessage).fontSize(14).lineHeight(22).fontColor('#6B7078')
                 .textAlign(TextAlign.Center)
-              Button('返回选择版本').onClick(() => this.getUIContext().getRouter().back())
+              Button('返回文法').onClick(() => this.getUIContext().getRouter().back())
             }
           }
           .width('100%').height('100%').justifyContent(FlexAlign.Center)
@@ -326,7 +326,7 @@ struct NativeReaderPage {
         }.width('100%')
         Column({ space: 10 }) {
           Text('章节').width('100%').fontSize(15)
-          Text(NativeReaderTrial.chapterTitle(this.edition, this.positionDraft))
+          Text(TextbookReaderService.chapterTitle(this.edition, this.positionDraft))
             .width('100%').fontSize(12).fontColor($r('app.color.ink_muted'))
           Slider({ value: this.positionDraft, min: 0, max: Math.max(1, this.resourceCount - 1), step: 1 })
             .onChange((value: number, mode: SliderChangeMode) => {

@@ -4,6 +4,23 @@ const escape = value => String(value ?? '').replace(/&/g, '&amp;').replace(/</g,
   .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const n = value => Number(value.toFixed(5));
 
+// Live TOC examples cannot rely on Reader Kit drawing their source outline.
+// Keep the source hue, darkening only enough to read against white paper.
+function tocExampleText(glyphs, base) {
+  const readable = glyphs.map(g => {
+    const rgb = /^rgb\((\d+),(\d+),(\d+)\)$/.exec(g.fill || '');
+    if (!rgb) return g;
+    const channels = rgb.slice(1).map(Number);
+    const luminance = scale => channels.map(v => v * scale / 255)
+      .map(v => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4)
+      .reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
+    let scale = 1;
+    while (scale > 0 && 1.05 / (luminance(scale) + .05) < 4.5) scale -= .01;
+    return { ...g, fill: `rgb(${channels.map(v => Math.floor(v * scale)).join(',')})`, stroke: 'transparent' };
+  });
+  return flowText(readable, base);
+}
+
 function flowText(glyphs, base) {
   const runs = [];
   for (const g of glyphs) {
@@ -78,11 +95,15 @@ function renderBlock(block, chapter, prepared) {
     `<div class="cover-bands" style="${block.background ? `background-color:${block.background};` : ''}">` +
     block.bands.map((band, i) => `<div class="cover-band${i ? ' lower-band' : ''}">${render(band)}</div>`).join('') +
     `</div><div class="cover-publisher">${render(block.publisher)}</div></div>`;
-  if (block.kind === 'toc') return `<div ${id} class="source-toc">` + block.items.map(item => {
+  if (block.kind === 'toc') return `<table ${id} class="source-toc" width="100%"><tbody>` + block.items.map((item, index) => {
     const href = `${item.target}.xhtml#${item.target}`;
-    return `<table class="toc-row" role="presentation"><tbody><tr><td class="toc-number"><a href="${href}">${text(item.number)}</a></td>` +
-      `<td class="toc-title"><a href="${href}">${item.rows.map(text).join('<br/>')}</a></td><td class="toc-page"><a href="${href}">${text(item.page)}</a></td></tr></tbody></table>`;
-  }).join('') + '</div>';
+    const label = field => tocLabel(`${block.id}-${index}-${field}`, chapter, prepared);
+    return `<tr class="toc-row"><td class="toc-number" width="12%"><a href="${href}">${label('number') || text(item.number)}</a></td>` +
+      `<td class="toc-title" width="78%"><a href="${href}">${label('title') || text(item.rows[0])}</a>` +
+      item.rows.slice(1).map(row => `<p class="toc-example"><a href="${href}">${tocExampleText(row, chapter.baseSize)}</a></p>`).join('') +
+      `</td><td class="toc-page" width="10%"><a href="${href}">${label('page') || text(item.page)}</a></td></tr>`;
+  }).join('') + '</tbody></table>';
+  if (block.kind === 'paragraph' && prepared.tocLabels?.[block.id]) return `<h1 ${id} class="toc-heading">${tocLabel(block.id, chapter, prepared)}</h1>`;
   if (block.kind === 'colophon') return `<div ${id} class="source-colophon">${lines(block.rows)}</div>`;
   if (block.kind === 'blank-area') return `<div ${id} class="source-blank-area" aria-label="メモ欄">&#160;</div>`;
   if (block.kind === 'callout-diagram') return `<div ${id} class="source-callout-diagram"><div class="callout-boxes">` +
@@ -113,6 +134,15 @@ function renderBlock(block, chapter, prepared) {
 
 function figureAlt(block) {
   return (block.alt || '挿絵') + (block.kind === 'diagram' ? '：' + block.labels.map(label => label.text).join('、') : '');
+}
+
+function tocLabel(key, chapter, prepared) {
+  const label = prepared.tocLabels?.[key];
+  if (!label) return '';
+  const size = prepared.imageSizes[label.asset];
+  if (!size) throw new Error(`Missing TOC label dimensions: ${key}`);
+  return `<img class="toc-label" src="../${escape(label.asset)}" alt="${escape(label.alt)}" width="${size.width}" height="${size.height}"` +
+    ` style="width:${n(label.width / chapter.baseSize)}em;max-width:100%;height:auto"/>`;
 }
 
 // Use a real image with its own dimensions, rather than a percentage-sized
@@ -208,13 +238,18 @@ rt{font-size:1em;line-height:1;text-align:center}
 .cover-band .illustration{margin:.65em auto}
 .lower-band .illustration{margin-left:auto;margin-right:0;max-width:74%}
 .cover-publisher{max-width:8em;margin:0 auto}
-.source-toc{margin:.6em 0 1em}
-.toc-row{border-collapse:collapse;width:100%;line-height:1.5;margin:.6em 0;page-break-inside:avoid;break-inside:avoid}
-.toc-row td{vertical-align:baseline;padding:.2em 0}
+.toc-heading{font-size:1em;font-weight:normal;text-align:center;margin:.15em 0 .9em;line-height:1.2;page-break-after:avoid;break-after:avoid}
+.toc-heading .toc-label{margin:0 auto}
+.source-toc{border-collapse:collapse;border-spacing:0;table-layout:fixed;width:100%;margin:0 0 .6em;line-height:1.3}
+.toc-row{page-break-inside:avoid;break-inside:avoid}
+.toc-row td{vertical-align:top;padding:.5em 0 .65em}
 .toc-row a{color:inherit;text-decoration:none}
-.toc-number{width:2.4em;white-space:nowrap}
-.toc-page{width:2em;white-space:nowrap;text-align:right;border-left:.04em solid #231f20}
-.toc-title{padding-right:.5em!important}
+.toc-number{width:12%;padding-right:.2em!important}
+.toc-page{width:10%;text-align:right;border-left:.08em solid #231f20;padding-left:.35em!important}
+.toc-page .toc-label{margin-left:auto}
+.toc-title{width:78%;padding-right:.4em!important}
+.toc-label{display:block;max-width:100%;height:auto}
+.toc-example{margin:.25em 0 0;line-height:1.3}
 .source-colophon{margin:2em auto;max-width:100%}
 .source-colophon p{margin:0 0 1.1em}
 .source-colophon p:nth-child(-n+4){text-align:center}

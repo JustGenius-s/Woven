@@ -14,7 +14,6 @@ import { VideoItem, videoSourceLabel } from '../../model/VideoModels';
 import { ContentRepository } from '../../services/ContentRepository';
 import { ContentShelfDataSource } from '../../services/ContentShelfDataSource';
 import { ReadingBookService } from '../../services/ReadingBookService';
-import { NativeReaderTrial } from '../../services/NativeReaderTrial';
 import { VideoLibraryStore } from '../../services/VideoLibraryStore';
 import { VideoCoverService } from '../../services/VideoCoverService';
 import { FloatingBarScrollTracker } from '../components/FloatingBarScrollTracker';
@@ -634,10 +633,6 @@ export struct ExplorePage {
   @Builder
   private readingPage() {
     List({ space: 8, scroller: this.readingScroller }) {
-      ListItem() {
-        this.nativeReaderTrialCard()
-      }
-      .padding({ left: 16, right: 16 })
       if (this.readingsLoading && this.readingWorks.length === 0) {
         ListItem() {
           Column({ space: 8 }) {
@@ -676,36 +671,6 @@ export struct ExplorePage {
     .clip(false)
     .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) =>
       this.readingFloatingBarTracker.update(this.readingScroller, this.onFloatingBarCompactChange))
-  }
-
-  private openNativeReader(): void {
-    const reason: string = NativeReaderTrial.unavailableReason();
-    if (reason.length > 0) {
-      showImmersiveNotice(this.getUIContext(), '教材阅读', reason);
-      return;
-    }
-    this.getUIContext().getRouter().pushUrl({ url: 'pages/NativeReaderPage' })
-      .catch(() => showImmersiveNotice(this.getUIContext(), '暂时无法打开', '请返回后重试。'));
-  }
-
-  @Builder
-  private nativeReaderTrialCard() {
-    Column({ space: 12 }) {
-      Text('教材阅读').fontSize(12).fontColor($r('app.color.accent')).width('100%')
-      Text('やらまいか日本語').fontSize(22).fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.ink')).width('100%')
-      Text('完整教材包含 12 课与附录，可调整字号与行距。')
-        .fontSize(14).lineHeight(22).fontColor($r('app.color.ink_muted')).width('100%')
-      Button('打开重排版').width('100%').fontSize(14)
-        .id('native-reader-reflow')
-        .backgroundColor($r('app.color.accent'))
-        .onClick(() => this.openNativeReader())
-      Text('本地教材 · 支持离线阅读')
-        .fontSize(11).fontColor($r('app.color.ink_muted')).width('100%')
-    }
-    .width('100%').alignItems(HorizontalAlign.Start).padding(20)
-    .backgroundColor($r('app.color.surface_raised')).borderRadius(24)
-    .margin({ top: 8, bottom: 16 })
   }
 
   @Builder

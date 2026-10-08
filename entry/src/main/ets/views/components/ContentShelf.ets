@@ -15,7 +15,7 @@ export const SHELF_VIDEO_HEIGHT: number = 108;
 @Component
 export struct ContentShelf {
   title: string = '';
-  meta: string = '';
+  @Prop meta: string = '';
 
   build() {
     SubHeader({
