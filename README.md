@@ -1,54 +1,60 @@
-# Woven · HarmonyOS 日语学习 App
+# Woven
 
-一款使用 ArkTS 与 ArkUI 构建的 HarmonyOS 原生日语学习应用。课程内容离线运行；AI 对练与内容问答可由用户在设备本地配置 DeepSeek API Key 后直连官方 API，不依赖自建网关。
+HarmonyOS 原生日语学习应用，用 ArkTS / ArkUI 编写。课程内容离线可用。AI 对练、日语朗读和文法实时语音由用户在本机填写密钥后直连对应服务，不经过自建网关。
 
-## 主要功能
+## 功能
 
-- 场景旅程：以“入景 → 识音 → 记词 → 懂句 → 会话 → 开口”贯通五十音、词汇、语法、日常对话和开口练习；当前旅程及完成阶段会保存在本地。
-- 基础：底部「基础」页含五十音图，以及 Irodori《生活の日本語》文法课（入门 / 初级1 / 初级2 / 初中级）。文法教材和分课音频从云端按需下载；入门至初级2另有语法练习册。
-- 词汇：7,742 条 N5–N1 考试词，外加 15,433 条考试外常用词（日常 / 一般 / 补遗）；支持按级别和关键词检索，选中词显示读音、东京式音调和释义。
-- 探索：音乐、阅读、场景三个原生子页签；音乐与场景使用原创沉浸主视觉，阅读收录 5 篇青空文库开放文学节选，以及 1 本用系统 PDF 阅读器按官方电子书原页展示的 Tadoku 绘本（可播放官方朗读并按句高亮），并展示来源与权利信息。
-- 日常对话：5 组内置旅程对话，按人物呈现台词、读音和释义。
-- AI 对练：5 个角色任务；支持离线开场提示，也可使用 `deepseek-v4-flash` 进行多轮对话。
-- 内容问答：从假名、单词、例句、语法段落或对话行直接打开上下文 AI Sheet，并围绕所选内容连续追问。
-- 沉浸光感：API 23 上由页面级动态光源统一驱动正文和内容平面，使用 HDS `pointLight`、`pressShadow` 与官方 `systemMaterialEffect`；系统不支持时由框架降级。
-- HDS 组件：导航、悬浮导航栏、核心动作和选择行使用官方 HDS 组件，并跟随系统深浅色。
-- 华为账号与云空间：使用系统标准账号按钮，并将学习进度、已学单词及对话按课程同步；未配置 AGC 时自动降级为本地模式。
-- 日语朗读：词汇、例句和对话用设备上的 sherpa-onnx + Piper 合成。系统 TTS 没有日语。五十音仍用打包录音。模型需另外拉取，见 [`docs/TTS.md`](docs/TTS.md)。
+- **旅程**：入景、识音、记词、懂句、会话、开口。进度保存在本机。
+- **基础**：五十音图，以及 Irodori《生活の日本語》文法课。课文和分课音频按需下载。
+- **词汇**：7,742 条 N5–N1 考试词，15,433 条考试外常用词（日常 / 一般 / 补遗）。级别是社区估计，不是 JLPT 官方词表。
+- **探索**：音乐、阅读、场景。阅读含青空文库节选和 Tadoku 绘本。
+- **对话与 AI**：内置旅程对话；5 个角色对练；可从假名、单词、例句、语法或对话行追问。
+- **账号**：华为账号登录后，可同步学习进度、已学单词和对话。未配置 AppGallery Connect 时只用本地数据。
 
-## 目录
+## 开始使用
 
-```text
-entry/                         HarmonyOS 应用模块
-  src/main/ets/                ArkTS 模型、服务和 ArkUI 页面
-  src/main/resources/rawfile/  打包在应用内的离线学习内容
-scripts/                       HAP 构建脚本
-```
-
-## DeepSeek 对练
-
-在 App 的「我的 → 设置」中填写 DeepSeek API Key。Key 只写入应用私有的本地偏好数据，不进入源码或 Git；AI 对练和内容问答请求由 App 直接发送到 `https://api.deepseek.com/chat/completions`，离线课程浏览本身不会调用 AI。
-
-## 华为账号与云空间
-
-端侧接入、Client ID 和多语言数据模型已完成。联调前仍需在 AGC 登记对应构建的证书指纹并创建云表；模拟器使用 `emulator + debug`，发布包使用 `default + release`。完整清单见 [`docs/HUAWEI_ACCOUNT_CLOUD_SYNC.md`](docs/HUAWEI_ACCOUNT_CLOUD_SYNC.md)。DeepSeek API Key 不参与云同步。
-
-## 日语朗读
-
-系统语音合成没有日语。本地朗读依赖 `sherpa_onnx` HAR 和 Piper 日语模型：
-
-模型文件不进 Git，需自行放到 `entry/src/main/resources/rawfile/tts/`。未安装时点朗读没有声音。细节见 [`docs/TTS.md`](docs/TTS.md)。
-
-## 构建
-
-macOS + DevEco Studio 默认安装路径下构建 HAP：
+需要 macOS 上的 DevEco Studio，以及 HarmonyOS SDK `26.0.0`。
 
 ```bash
 npm run build:hap
 ```
 
-默认发布 HAP 输出位于 `entry/build/default/outputs/default/`；模拟器调试产物位于 `entry/build/emulator/outputs/default/`。`build-profile.json5` 保存本机证书路径和 DevEco Studio 加密后的签名配置，证书、Profile、密钥库及明文密码均不进入仓库；其他开发环境需要重新配置各自的签名材料。
+| 产品 | 输出 |
+| --- | --- |
+| 默认发布包 | `entry/build/default/outputs/default/` |
+| 模拟器调试包 | `entry/build/emulator/outputs/default/` |
 
-## 内容来源
+`build-profile.json5` 里的证书路径和加密口令属于本机签名配置。证书、Profile 和密钥库不在仓库中，换机器后需要重新配置签名。
 
-词汇与语法内容的许可和归属文件已一起打包在 `entry/src/main/resources/rawfile/licenses/`。词库字段、音调来源和后期预留项见 [`docs/VOCABULARY_SCHEMA.md`](docs/VOCABULARY_SCHEMA.md)。开放阅读、音乐元数据和音频候选源的接入边界见 [`docs/OPEN_CONTENT.md`](docs/OPEN_CONTENT.md)；机器可读清单位于 `entry/src/main/resources/rawfile/open-sources.json`。N1–N5 词汇级别是社区估计，不是 JLPT 官方词表。
+密钥都在「我的 → 设置」填写，只写入应用私有存储，不进 Git，也不参与云同步。
+
+| 用途 | 服务 | 未配置时 |
+| --- | --- | --- |
+| AI 对练、内容问答 | [DeepSeek](https://api.deepseek.com) | 离线浏览不受影响 |
+| 词汇、例句、对话朗读 | [MiniMax](https://platform.minimaxi.com) | 点朗读没有声音。五十音仍用打包录音 |
+| 文法页实时语音 | [火山引擎语音](https://console.volcengine.com/speech/new/setting/apikeys?projectName=default) | 入口转到设置页 |
+
+## 文档
+
+| 主题 | 说明 |
+| --- | --- |
+| [词库字段](docs/VOCABULARY_SCHEMA.md) | JSON 结构、音调规则、文件划分 |
+| [开放内容](docs/OPEN_CONTENT.md) | 已打包来源和接入边界 |
+| [日语朗读](docs/TTS.md) | MiniMax 语音合成 |
+| [文法实时语音](docs/GRAMMAR_REALTIME_VOICE.md) | 火山引擎全双工伴读 |
+| [华为账号与云同步](docs/HUAWEI_ACCOUNT_CLOUD_SYNC.md) | AGC 配置和云表 |
+| [视觉素材](docs/GENERATED_ASSETS.md) | 原创封面的生成约束 |
+
+许可与归属随应用打包在 `entry/src/main/resources/rawfile/licenses/`。机器可读来源清单是 `entry/src/main/resources/rawfile/open-sources.json`。
+
+## 目录
+
+```text
+entry/src/main/ets/                 ArkTS 模型、服务和页面
+entry/src/main/resources/rawfile/   离线学习内容
+scripts/build-hap.sh                HAP 构建
+```
+
+## 许可
+
+代码采用 [MIT License](LICENSE)。学习内容各自的许可见上方归属文件，不随 MIT 许可一并授予。
