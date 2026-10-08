@@ -33,8 +33,8 @@ NativeReaderContent、NativeReaderSampleContent，以及 rawfile 里的 yaramaik
 yaramaika-readerkit-trial.epub、yaramaika-reflow.epub、yaramaika-reflow-sample.epub 和 fixed-layout.js。
 阅读设置里不再有“本章原版”入口，NativeReaderTrial 只描述重排版这一版。
 
-`yaramaika-fixed.epub` 保留在 rawfile：它是 pdf2htmlEX 的 XHTML/CSS/WOFF 与无文字底图，
-重排管线仍以它和源 PDF 为输入。它不再参与应用显示，只作为生成源留在包内。
+`yaramaika-fixed.epub` 保留在 `content/reader-source/`：它是 pdf2htmlEX 的 XHTML/CSS/WOFF 与无文字底图，
+重排管线仍以它和源 PDF 为输入。它不再参与应用显示，也不再打入安装包。
 生成脚本与 content/ 配置未改动，仍可生成两页基准预览；试版 EPUB 的构建入口不再被应用使用。
 
 旧 EPUB 的生成器与源配置已归档，位置见 [整理记录](READER_CLEANUP.md)。

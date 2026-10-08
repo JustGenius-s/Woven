@@ -48,8 +48,9 @@ def csscolor(rgb):return '#'+''.join(f'{max(0,min(255,round(v*255))):02x}' for v
 def kana(c):return '\u3040'<=c<='\u30ff'
 
 class StarterPage:
-    def __init__(self,page,number,lesson,fonts,assets):
+    def __init__(self,page,number,lesson,fonts,assets,starter_specific=True,audit=True):
         self.page=page;self.number=number;self.lesson=lesson;self.fonts=fonts;self.assets=assets
+        self.starter_specific=starter_specific;self.audit=audit
         self.chars=[];self.used={};self.raster_glyphs=set();self.ruby_count=0;self.crop_count=0;self.native_tables=0
         # PDF paths can extend far outside a clipping mask (e.g. the Yokohama
         # map). Respect clip scopes so invisible paths cannot absorb nearby prose.
@@ -91,7 +92,7 @@ class StarterPage:
         if base is None:base=self.base
         out=[];last=None
         for c in chars:
-            if (0xe000<=ord(c['c'])<0xe020 or 'Emoji' in c['font']) and not any(ord(c['c']) in record['cmap'] for record in self.fonts.lookup[c['font']]):
+            if (not self.starter_specific or 0xe000<=ord(c['c'])<0xe020 or 'Emoji' in c['font']) and not c['c'].isspace() and not any(ord(c['c']) in record['cmap'] for record in self.fonts.lookup[c['font']]):
                 # MuPDF exposes certain custom PDF glyphs as control characters
                 # while PDF.js assigns another Unicode. Preserve the glyph image.
                 self.raster_glyphs.add(c['id'])
@@ -189,6 +190,7 @@ class StarterPage:
         return (r.width>440 and r.height>180 and len(d['items'])<25) or (r.width>500 and r.height>400)
 
     def reviewed_tables(self):
+        if not self.starter_specific:return []
         if (self.lesson,self.number) not in ((2,15),(3,20)):return []
         specs=[([71,100,137,174,211,248,285],[173,194.5]+[194.5+i*32.6 for i in range(1,11)]),
             ([328,357,394,431,468,505,542],[173,194.5,227.1,259.7,292.3,324.9,357.5,390.1,422.7]),
@@ -237,7 +239,7 @@ class StarterPage:
         return regions
 
     def vocabulary_cards(self):
-        if (self.lesson,self.number)==(0,2):
+        if self.starter_specific and (self.lesson,self.number)==(0,2):
             # The last source label has a different baseline. Use the reviewed
             # grid so card i remains before section 5, not beside its heading.
             cards=[];rects=[];chars=[]
@@ -250,12 +252,13 @@ class StarterPage:
             return [rect]
         # Source vocabulary grids have explicit a./b./c. or circled-number labels.
         # Slice by those anchors, not by disconnected pieces of an illustration.
-        if (self.lesson,self.number) not in ((2,17),(0,2)) and 'ことばの準' not in self.text:return []
+        special=self.starter_specific and (self.lesson,self.number) in ((2,17),(0,2))
+        if not special and 'ことばの準' not in self.text:return []
         anchors=[]
         for block in self.page.get_text('dict')['blocks']:
             for line in block.get('lines',[]):
                 text=''.join(s['text'] for s in line['spans']).strip()
-                if re.match(r'^[a-n][.．]',text) or ((self.lesson,self.number)==(2,17) and re.match(r'^[①-⑤]',text) and line['bbox'][1]<400):
+                if re.match(r'^[a-n][.．]',text) or (special and re.match(r'^[①-⑤]',text) and line['bbox'][1]<400):
                     anchors.append(fitz.Rect(line['bbox']))
         rows=[]
         for a in sorted(anchors,key=lambda a:(a.y0,a.x0)):
@@ -277,12 +280,12 @@ class StarterPage:
             limit=min([r[0].y0-7 for r in rows if r[0].y0>y+15]+[v for v in instruction_tops if v>y+35]+[797])
             cards=[];bounds=[];allchars=[]
             for k,a in enumerate(row):
-                inset=2 if (self.lesson,self.number) in ((2,17),(0,2)) else 9
+                inset=2 if special else 9
                 left=a.x0-inset;right=row[k+1].x0-inset if k+1<len(row) else min(558,a.x0+(a.x0-row[k-1].x0)-inset)
                 cell=fitz.Rect(left,y,right,min(limit,a.y1+170))
                 candidates=[r for r in paths if area(r&cell)>350 and r.height>25 and r.width>20 and r.y1>a.y1+20 and r.y0<a.y1+60]
                 if not candidates or any(q.width>cell.width*1.35 for q in candidates):break
-                bottom=min(limit,max(r.y1 for r in candidates)+(40 if (self.lesson,self.number)==(15,10) else 2))
+                bottom=min(limit,max(r.y1 for r in candidates)+(40 if self.starter_specific and (self.lesson,self.number)==(15,10) else 2))
                 # Clothing/object names directly below each picture belong to its card.
                 captions=[c for c in self.available() if left<=center(c['bbox']).x<right and bottom-2<=c['bbox'][1]<min(limit,bottom+40)]
                 if captions:bottom=min(limit,max(bottom,max(c['bbox'][3] for c in captions)+2))
@@ -341,7 +344,9 @@ class StarterPage:
         # Each source arrow introduces the same word in three original typefaces.
         # Keep a complete comparison row together, stacking source columns.
         pages={3:13,4:17,5:22,6:16,7:23,8:17,9:15,10:18,11:18,12:17,13:22,14:18,15:20,16:21,17:18,18:15}
-        if pages.get(self.lesson)!=self.number:return []
+        if self.starter_specific:
+            if pages.get(self.lesson)!=self.number:return []
+        elif '漢字' not in self.text or 'ことば' not in self.text:return []
         arrows=[d['rect'] for d in self.drawings if d['fill'] and d['fill'][0]>.99 and .80<d['fill'][2]<.84 and len(d['items'])==5 and 75<d['rect'].width<95 and 40<d['rect'].height<50]
         regions=[]
         for r in sorted(arrows,key=lambda r:(r.y0,r.x0)):
@@ -352,7 +357,9 @@ class StarterPage:
             for c in bases:
                 if groups and c['bbox'][0]-groups[-1][-1]['bbox'][2]<15:groups[-1].append(c)
                 else:groups.append([c])
-            if len(groups)!=3:raise ValueError(f'Kanji row needs three faces: L{self.lesson} {len(groups)} at {rect}')
+            if len(groups)!=3:
+                if self.starter_specific:raise ValueError(f'Kanji row needs three faces: L{self.lesson} {len(groups)} at {rect}')
+                continue
             cuts=[rect.x0,r.x1]+[(groups[k][-1]['bbox'][2]+groups[k+1][0]['bbox'][0])/2 for k in range(2)]+[rect.x1]
             cells=[]
             for k,(a,b) in enumerate(zip(cuts,cuts[1:])):
@@ -476,7 +483,7 @@ class StarterPage:
 
     def layout(self):
         art=self.page_headers()
-        for coords in ART_REGIONS.get(f'{self.lesson}:{self.number}',[]):
+        for coords in (ART_REGIONS.get(f'{self.lesson}:{self.number}',[]) if self.starter_specific else []):
             rect=fitz.Rect(coords)
             item=self.crop(rect)
             if rect.width>270:item['html']=re.sub(r'width:[0-9.]+%;','width:100%;',item['html'])
@@ -563,12 +570,13 @@ class StarterPage:
                     'html':'<table class="columns"><tbody><tr><td>'+first['html']+'</td><td>'+second['html']+'</td></tr></tbody></table>'})
         markup=self.arrange(self.items)
         expected=Counter(c['c'] for c in self.bodychars if c['c'].strip())
-        root=ET.fromstring('<div>'+markup+'</div>')
-        actual=Counter(c for c in ''.join(root.itertext())+''.join(e.get('alt','') for e in root.iter('img')) if c.strip())
-        missing=[c for c in self.bodychars if c['c'].strip() and c['id'] not in self.used]
-        if missing or expected!=actual:raise ValueError(f'L{self.lesson} p{self.number}: missing ownership {missing}; text missing {expected-actual}; extra {actual-expected}')
+        if self.audit:
+            root=ET.fromstring('<div>'+markup+'</div>')
+            actual=Counter(c for c in ''.join(root.itertext())+''.join(e.get('alt','') for e in root.iter('img')) if c.strip())
+            missing=[c for c in self.bodychars if c['c'].strip() and c['id'] not in self.used]
+            if missing or expected!=actual:raise ValueError(f'L{self.lesson} p{self.number}: missing ownership {missing}; text missing {expected-actual}; extra {actual-expected}')
         audit={'page':self.number,'bodyCharacters':sum(expected.values()),'imageCharacters':sum(1 for c in self.bodychars if c['c'].strip() and (self.used.get(c['id'])=='image' or c['id'] in self.raster_glyphs)),
-               'rubyGroups':self.ruby_count,'nativeTables':self.native_tables,'images':self.crop_count,'unmapped':0}
+               'rubyGroups':self.ruby_count,'nativeTables':self.native_tables,'images':self.crop_count,'unmapped':0 if self.audit else None}
         return markup,audit
 
     def prose_blocks(self,lines):

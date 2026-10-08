@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "title": "やらまいか日本語 · 转换试版",
-  "fixedEpub": "entry/src/main/resources/rawfile/reader/yaramaika-fixed.epub",
+  "fixedEpub": "content/reader-source/yaramaika-fixed.epub",
   "pdfSha256": "b41ff392f7720ac135563b513849b1ba7accec94e367058b3a417db65cbf4958",
   "referenceDpi": 100,
   "omitFonts": ["ff5", "ffa", "ffb"],

@@ -33,7 +33,7 @@ async function main({ full = false } = {}) {
   const pdfSource = JSON.parse(await fs.readFile(path.join(source, 'pdf-graphics.json'), 'utf8'));
   if (pdfSource.sha256 !== config.pdfSha256) throw new Error('Source PDF does not match the approved trial profile.');
   const fixedHash = createHash('sha256').update(await fs.readFile(path.join(root, config.fixedEpub))).digest('hex');
-  if (htmlSource.sha256 !== fixedHash) throw new Error('Source HTML cache does not match the bundled original EPUB.');
+  if (htmlSource.sha256 !== fixedHash) throw new Error('Source HTML cache does not match the original source EPUB.');
   const { model, assets, audit } = (full ? buildFullModel : buildModel)(config, htmlSource, pdfSource, source);
   const work = path.join(root, full ? '.cache/readerkit-full-package' : '.cache/readerkit-trial-package');
   await fs.mkdir(path.join(work, 'images'), { recursive: true });

@@ -1,5 +1,17 @@
 # 教材源码整理与恢复
 
+## 2026-10-08 应用内置资源清理
+
+`entry/src/main/resources/rawfile/reader/` 只保留当前使用的 20 个教材 EPUB：
+《やらまいか日本語》的 Reader Kit 版本，以及 Irodori 入门教室用语和第 1–18 课。
+第 1 课文件名中的 `sample` 是历史命名，文件已包含完整 18 页，仍在使用。
+
+- 删除无读取入口的五本旧示例：`gon-fox`、`i-am-a-cat`、`many-orders`、`run-melos`、`spiders-thread`，同时移除未使用的 `ReadingBookService.materialize` EPUB 加载方法。
+- 将仍用于生成教材的 `yaramaika-fixed.epub` 移至 `content/reader-source/`，更新共用配置的 `fixedEpub` 路径。文件内容保持不变，继续纳入版本管理，但不进入应用包。
+- 内置资源减少 12,107,448 字节；原 PDF、当前教材 EPUB 和阅读进度配置均未改动。
+
+以下为此前整理记录。
+
 2026-09-09 将已被替换的模板转换流程归档。当前全书源码、原版阅读、Reader Kit 接入及其资源均保留。
 
 ## 保留内容

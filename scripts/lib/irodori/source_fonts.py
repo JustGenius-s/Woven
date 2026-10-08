@@ -10,7 +10,7 @@ from fontTools.ttLib.tables._c_m_a_p import CmapSubtable
 from fontTools import subset
 
 class SourceFonts:
-    def __init__(self, directory, expected_hash, starter_aliases=False):
+    def __init__(self, directory, expected_hash, starter_aliases=False, allow_missing=False):
         manifest=json.loads((directory/'fonts.json').read_text())
         if manifest['sourceSha256'] != expected_hash:
             raise ValueError('Font cache belongs to another PDF; rerun extract-fonts.cjs')
@@ -20,6 +20,9 @@ class SourceFonts:
             old=face.getBestCmap(); cmap={}
             for unicode,private in record['glyphs'].items():
                 if private not in old and chr(int(unicode)).isspace():continue
+                # Other Irodori levels contain PDF glyphs without a repaired
+                # OpenType outline. Their page renderer keeps the source crop.
+                if private not in old and allow_missing:continue
                 if private not in old:raise ValueError(f"Missing repaired glyph {record['name']} {unicode}")
                 cmap[int(unicode)]=old[private]
             # PDF subset glyphs sometimes use XML-forbidden C0 codes. Alias the
@@ -42,7 +45,7 @@ class SourceFonts:
                 return record['family']
         if text.isspace():return 'sans-serif'
         raise ValueError(f'No source font glyph for {name}: {text!r} U+{code:04X}')
-    def export(self):
+    def export(self,audit=True):
         assets={};css=[];report=[]
         for record in self.faces:
             if record['id'] not in self.used:continue
@@ -78,7 +81,8 @@ class SourceFonts:
             output=io.BytesIO();face.save(output)
             filename=f'fonts/{record["id"]}.ttf';assets[filename]=output.getvalue()
             # Reload to audit the packaged font, not only our input mapping.
-            check=TTFont(io.BytesIO(assets[filename]));assert set(cmap)<=set(check.getBestCmap())
+            if audit:
+                check=TTFont(io.BytesIO(assets[filename]));assert set(cmap)<=set(check.getBestCmap())
             # Reader Kit parses a format() suffix into the URL on this device.
             # A plain src:url(...) is valid CSS and works in both engines.
             css.append(f'@font-face{{font-family:{name};src:url({filename});font-weight:normal;font-style:normal}}')

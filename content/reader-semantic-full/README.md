@@ -7,7 +7,7 @@
 
 - `book.cjs` 是可编辑的本书区域配置，只记录页面、区域、行列和图文归属，不重写教材句子。
 - `docs/previews/reader-semantic-full-config.json` 是生成时导出的可读配置，不纳入源码管理。
-- 原版 `yaramaika-fixed.epub` 提供 pdf2htmlEX 的 XHTML、CSS、内嵌 WOFF 与无文字底图。
+- 原版 `content/reader-source/yaramaika-fixed.epub` 提供 pdf2htmlEX 的 XHTML、CSS、内嵌 WOFF 与无文字底图，仅用于生成，不打入安装包。
 - 原 PDF 提供背景色、边框、虚线、图片对象矩形等绘图信息。哈希不符会中止生成。
 - `semantic-full-layout.cjs` 恢复内容关系；`semantic-geometry.cjs` 从共用边恢复多行单元格。
 - `semantic-preview.cjs/css` 和 `semantic-diagram.js` 同时用于浏览器预览与应用。

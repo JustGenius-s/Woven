@@ -12,16 +12,16 @@ from starter_layout import StarterPage
 def xml_page(title,body):
  return '<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml" lang="ja"><head><meta charset="utf-8"/><title>'+html.escape(title)+'</title><link rel="stylesheet" href="style.css"/></head><body>'+body+'</body></html>'
 
-def build(source,lesson,cache,output):
- book_id=f'irodori-a1-l{lesson:02d}-reflow';title='いろどり 入门 · '+(f'第 {lesson} 课' if lesson else '教室用语')
- sha=hashlib.sha256(source.read_bytes()).hexdigest();fonts=SourceFonts(cache/f'fonts-l{lesson:02}',sha,starter_aliases=True)
+def build(source,lesson,cache,output,*,level='a1',label='入门',footer_label='入門',audit=True):
+ book_id=f'irodori-{level}-l{lesson:02d}-reflow';title=f'いろどり {label} · '+(f'第 {lesson} 课' if lesson else '教室用语')
+ sha=hashlib.sha256(source.read_bytes()).hexdigest();fonts=SourceFonts(cache/f'fonts-l{lesson:02}',sha,starter_aliases=True,allow_missing=level!='a1')
  doc=fitz.open(source);assets={};pages=[];audits=[]
  for i,page in enumerate(doc,1):
-  model=StarterPage(page,i,lesson,fonts,assets);markup,audit=model.layout()
-  footer=f'<p class="footer"><span style="font-size:.65em!important;color:#888!important">入門　'+(f'L{lesson} - {i}' if lesson else f'教室のことば - {i}')+'　© The Japan Foundation</span></p>'
-  pages.append(xml_page(f'第 {i} 页','<div class="chapter">'+markup+footer+'</div>').encode());audits.append(audit)
-  print(f'L{lesson:02} p{i:02}: {audit["bodyCharacters"]} chars, {audit["imageCharacters"]} in graphics, {audit["nativeTables"]} tables',flush=True)
- font_assets,font_css,font_report=fonts.export();files={'style.css':(font_css+'\n'+(ROOT/'scripts/lib/irodori/starter.css').read_text()).encode(),**assets,**font_assets}
+  model=StarterPage(page,i,lesson,fonts,assets,starter_specific=level=='a1',audit=audit);markup,page_record=model.layout()
+  footer=f'<p class="footer"><span style="font-size:.65em!important;color:#888!important">{footer_label}　'+(f'L{lesson} - {i}' if lesson else f'教室のことば - {i}')+'　© The Japan Foundation</span></p>'
+  pages.append(xml_page(f'第 {i} 页','<div class="chapter">'+markup+footer+'</div>').encode());audits.append(page_record)
+  print(f'{level} L{lesson:02} p{i:02}: converted',flush=True)
+ font_assets,font_css,font_report=fonts.export(audit=audit);files={'style.css':(font_css+'\n'+(ROOT/'scripts/lib/irodori/starter.css').read_text()).encode(),**assets,**font_assets}
  titles=[f'第 {i} 页' for i in range(1,len(pages)+1)]
  for i,data in enumerate(pages,1):files[f'p{i}.xhtml']=data
  files['nav.xhtml']=xml_page('目录','<nav xmlns:epub="http://www.idpf.org/2007/ops" epub:type="toc"><ol>'+''.join(f'<li><a href="p{i}.xhtml">{t}</a></li>' for i,t in enumerate(titles,1))+'</ol></nav>').encode()
@@ -41,8 +41,9 @@ def build(source,lesson,cache,output):
  for name,data in files.items():
   path=preview/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(data)
  digest=hashlib.sha256(dest.read_bytes()).hexdigest()
- record={'lesson':lesson,'lessonId':f'irodori-a1-l{lesson:02}','id':book_id,'title':title,'titles':titles,'fileBytes':dest.stat().st_size,'cache':digest[:12],'pageCount':len(pages),'sourceSha256':sha,'epubSha256':digest,'pages':audits,'fonts':font_report}
- (preview/'audit.json').write_text(json.dumps(record,ensure_ascii=False,indent=2))
+ record={'lesson':lesson,'lessonId':f'irodori-{level}-l{lesson:02}','id':book_id,'title':title,'titles':titles,'fileBytes':dest.stat().st_size,'cache':digest[:12],'pageCount':len(pages),'sourceSha256':sha,'epubSha256':digest,'pages':audits,'fonts':font_report}
+ if not audit:record['verification']='not_run'
+ (preview/('audit.json' if audit else 'conversion.json')).write_text(json.dumps(record,ensure_ascii=False,indent=2))
  return record
 
 def main():

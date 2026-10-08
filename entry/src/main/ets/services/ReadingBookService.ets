@@ -23,20 +23,6 @@ export interface ReadingDownloadResult {
 }
 
 export class ReadingBookService {
-  static materialize(context: common.Context, readingId: string): string {
-    const safeId: string = ReadingBookService.safeId(readingId);
-    const bookDirectory: string = ReadingBookService.bookDirectory(context, safeId);
-    const bookPath: string = `${bookDirectory}/${safeId}.epub`;
-    try {
-      ReadingBookService.ensureDirectory(bookDirectory);
-      const bytes: Uint8Array = context.resourceManager.getRawFileContentSync(`reader/${safeId}.epub`);
-      ReadingBookService.writeBytes(bookPath, bytes);
-      return bookPath;
-    } catch (error) {
-      throw new Error(`Unable to prepare reader book: ${safeId}`);
-    }
-  }
-
   static materializeCover(context: common.Context, readingId: string, relativePath: string): string {
     return ReadingBookService.materializePdf(context, readingId, relativePath);
   }
